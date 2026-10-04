@@ -373,9 +373,9 @@ export default function CustomerStorefront() {
                   onClick={() => setIsProfileOpen(true)}
                   aria-label={`Hồ sơ tài khoản: ${user.name}`}
                   title={`Hồ sơ: ${user.name}`}
-                  className="flex items-center gap-2 px-2.5 py-1 border hairline text-[#0a0a0a] hover:bg-black/5 transition-colors cursor-pointer"
+                  className="flex items-center gap-1.5 text-[#0a0a0a] hover:opacity-70 transition-opacity cursor-pointer"
                 >
-                  <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 md:w-[21px] md:h-[21px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
                   </svg>
                   <span className="font-mono text-[10px] md:text-[11px] uppercase font-bold tracking-wider truncate max-w-[120px] md:max-w-[160px]">
