@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database & wrangler
+caishop.db
+*.db
+*.db-journal
+*.sqlite
+.wrangler/
+
+# editor
+.vscode/
+.idea/
