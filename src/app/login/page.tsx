@@ -574,11 +574,6 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Bottom meta */}
-        <div className="relative z-10 pt-8 border-t border-white/10 text-xs text-slate-400 flex items-center justify-between">
-          <span>CAISHOP ATELIER • EST. 2026</span>
-          <span className="font-mono text-[11px]">VERSION 2.4</span>
-        </div>
       </div>
 
       {/* ================= RIGHT COLUMN: FULL SCREEN AUTH CANVAS ================= */}
