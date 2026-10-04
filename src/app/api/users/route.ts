@@ -4,17 +4,17 @@ import { calculateTier } from '@/lib/membership';
 
 export async function GET() {
   try {
-    const db = getDb();
+    const db = await getDb();
     
     // 1. Danh sách tài khoản đăng ký hệ thống
-    const users = db.prepare(`
+    const users = await db.queryAll(`
       SELECT id, name, email, role, created_at
       FROM users
       ORDER BY created_at DESC
-    `).all() as any[];
+    `);
 
     // 2. Danh sách khách hàng thực tế tổng hợp từ đơn hàng
-    const customers = db.prepare(`
+    const customers = await db.queryAll(`
       SELECT 
         o.customer_phone as phone,
         MAX(o.customer_name) as name,
@@ -28,7 +28,7 @@ export async function GET() {
       WHERE o.fulfillment_status != 'CANCELLED'
       GROUP BY o.customer_phone
       ORDER BY total_items DESC, total_spent DESC
-    `).all() as any[];
+    `);
 
     const enrichedCustomers = customers.map(c => {
       const tier = calculateTier(c.total_items);

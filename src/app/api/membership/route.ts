@@ -29,10 +29,10 @@ export async function GET(request: Request) {
       });
     }
 
-    const db = getDb();
+    const db = await getDb();
     
     // Aggregating past purchases by phone (or email)
-    const stats = db.prepare(`
+    const stats = await db.queryFirst<{ past_items: number; total_spent: number; order_count: number }>(`
       SELECT 
         COALESCE(SUM(oi.quantity), 0) as past_items,
         COALESCE(SUM(o.total_amount), 0) as total_spent,
@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE (o.customer_phone = ? OR (o.customer_email IS NOT NULL AND o.customer_email = ?))
         AND o.fulfillment_status != 'CANCELLED'
-    `).get(phone, email || phone) as { past_items: number; total_spent: number; order_count: number };
+    `, [phone, email || phone]);
 
     const pastItems = stats?.past_items || 0;
     const totalItems = pastItems + cartCount;

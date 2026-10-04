@@ -96,11 +96,11 @@ export const defaultContent = {
 
 export async function GET() {
   try {
-    const rawHeader = getSiteContent('header', null);
-    const rawHome = getSiteContent('home', null);
-    const rawProducts = getSiteContent('products', null);
-    const rawStudio = getSiteContent('studio', null);
-    const rawAbout = getSiteContent('about', null);
+    const rawHeader = await getSiteContent('header', null);
+    const rawHome = await getSiteContent('home', null);
+    const rawProducts = await getSiteContent('products', null);
+    const rawStudio = await getSiteContent('studio', null);
+    const rawAbout = await getSiteContent('about', null);
 
     const header = { ...defaultContent.header, ...(rawHeader || {}) };
     const home = { ...defaultContent.home, ...(rawHome || {}) };
@@ -136,10 +136,10 @@ export async function POST(request: Request) {
     }
 
     const fallback = (defaultContent as any)[section] || {};
-    const existing = getSiteContent(section, null) || fallback;
+    const existing = (await getSiteContent(section, null)) || fallback;
     const merged = { ...existing, ...data };
     
-    const result = setSiteContent(section, merged);
+    const result = await setSiteContent(section, merged);
     return NextResponse.json({ success: true, result, data: merged });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

@@ -50,3 +50,7 @@ caishop.db
 # editor
 .vscode/
 .idea/
+
+# open-next
+/.open-next/
+

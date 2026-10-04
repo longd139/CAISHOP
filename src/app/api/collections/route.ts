@@ -158,7 +158,7 @@ export const defaultCollections: BrandCollection[] = [
 
 export async function GET() {
   try {
-    const collections = getSiteContent<BrandCollection[]>('product_collections', defaultCollections);
+    const collections = await getSiteContent<BrandCollection[]>('product_collections', defaultCollections);
     return NextResponse.json({
       success: true,
       data: collections
@@ -181,7 +181,7 @@ export async function POST(req: Request) {
       );
     }
 
-    setSiteContent('product_collections', body);
+    await setSiteContent('product_collections', body);
 
     return NextResponse.json({
       success: true,

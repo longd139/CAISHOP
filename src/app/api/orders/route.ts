@@ -3,7 +3,7 @@ import { getOrders, createCustomerOrder, updateOrderStatus } from '@/lib/db';
 
 export async function GET() {
   try {
-    const orders = getOrders(30);
+    const orders = await getOrders(30);
     return NextResponse.json({
       success: true,
       data: orders
@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const result = createCustomerOrder({
+    const result = await createCustomerOrder({
       customer_name,
       customer_phone,
       customer_email,
@@ -55,7 +55,7 @@ export async function PATCH(request: Request) {
       }, { status: 400 });
     }
 
-    const result = updateOrderStatus(order_id, fulfillment_status);
+    const result = await updateOrderStatus(order_id, fulfillment_status);
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

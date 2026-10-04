@@ -14,7 +14,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const user = findUserByIdentifier(identifier);
+    const user = await findUserByIdentifier(identifier);
     if (!user) {
       return NextResponse.json({
         success: false,

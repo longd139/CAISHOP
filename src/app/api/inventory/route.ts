@@ -3,7 +3,7 @@ import { getInventoryOverview, adjustInventory } from '@/lib/db';
 
 export async function GET() {
   try {
-    const items = getInventoryOverview();
+    const items = await getInventoryOverview();
     const lowStockCount = items.filter(i => i.is_low_stock).length;
     const criticalCount = items.filter(i => i.is_critical).length;
     
@@ -30,7 +30,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, message: 'Thiếu thông tin variant_id hoặc physical_qty' }, { status: 400 });
     }
 
-    const result = adjustInventory(variant_id, Number(physical_qty));
+    const result = await adjustInventory(variant_id, Number(physical_qty));
     return NextResponse.json(result);
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });

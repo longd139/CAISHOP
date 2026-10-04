@@ -3,7 +3,7 @@ import { getAllProductsWithVariants, updateVariantPrice } from '@/lib/db';
 
 export async function GET() {
   try {
-    const products = getAllProductsWithVariants();
+    const products = await getAllProductsWithVariants();
     return NextResponse.json({
       success: true,
       data: products
@@ -22,7 +22,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ success: false, message: 'Thiếu thông tin variant_id hoặc selling_price' }, { status: 400 });
     }
 
-    const result = updateVariantPrice(variant_id, Number(selling_price));
+    const result = await updateVariantPrice(variant_id, Number(selling_price));
     if (!result.success) {
       return NextResponse.json(result, { status: 422 }); // Unprocessable Entity due to business rule (Floor price)
     }

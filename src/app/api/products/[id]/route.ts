@@ -7,7 +7,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const product = getProductByIdOrSlug(id);
+    const product = await getProductByIdOrSlug(id);
 
     if (!product) {
       return NextResponse.json(
@@ -34,7 +34,7 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    const result = deleteProduct(id);
+    const result = await deleteProduct(id);
 
     if (!result.success) {
       return NextResponse.json(result, { status: 404 });
@@ -58,7 +58,7 @@ export async function PATCH(
     const body = await request.json();
     
     if (body.is_active !== undefined) {
-      const result = updateProductStatus(id, body.is_active ? 1 : 0);
+      const result = await updateProductStatus(id, body.is_active ? 1 : 0);
       return NextResponse.json(result);
     }
 
@@ -78,7 +78,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const result = updateProduct(id, body);
+    const result = await updateProduct(id, body);
 
     if (!result.success) {
       return NextResponse.json(result, { status: 400 });

@@ -82,29 +82,29 @@ export function normalizePhone(rawPhone: string): string {
 /**
  * Tìm user theo Email hoặc Số điện thoại
  */
-export function findUserByIdentifier(identifier: string) {
-  const db = getDb();
+export async function findUserByIdentifier(identifier: string) {
+  const db = await getDb();
   const trimmed = identifier.trim();
   const cleanEmail = trimmed.toLowerCase();
   const cleanPhone = normalizePhone(trimmed);
-  return db.prepare('SELECT * FROM users WHERE LOWER(email) = ? OR phone = ? OR phone = ?').get(cleanEmail, trimmed, cleanPhone) as any;
+  return await db.queryFirst('SELECT * FROM users WHERE LOWER(email) = ? OR phone = ? OR phone = ?', [cleanEmail, trimmed, cleanPhone]);
 }
 
 /**
  * Tìm user theo email
  */
-export function findUserByEmail(email: string) {
-  const db = getDb();
-  return db.prepare('SELECT * FROM users WHERE LOWER(email) = ?').get(email.toLowerCase().trim()) as any;
+export async function findUserByEmail(email: string) {
+  const db = await getDb();
+  return await db.queryFirst('SELECT * FROM users WHERE LOWER(email) = ?', [email.toLowerCase().trim()]);
 }
 
 /**
  * Tìm user theo số điện thoại
  */
-export function findUserByPhone(phone: string) {
-  const db = getDb();
+export async function findUserByPhone(phone: string) {
+  const db = await getDb();
   const clean = normalizePhone(phone);
-  return db.prepare('SELECT * FROM users WHERE phone = ? OR phone = ?').get(phone.trim(), clean) as any;
+  return await db.queryFirst('SELECT * FROM users WHERE phone = ? OR phone = ?', [phone.trim(), clean]);
 }
 
 /**
@@ -117,19 +117,19 @@ export async function createUser(
   passwordPlain: string,
   role: 'ADMIN' | 'USER' = 'USER'
 ) {
-  const db = getDb();
+  const db = await getDb();
   const cleanPhone = normalizePhone(phone);
   const cleanEmail = email && email.trim() ? email.toLowerCase().trim() : null;
 
   // Kiểm tra trùng SĐT
-  const existingPhone = findUserByPhone(cleanPhone);
+  const existingPhone = await findUserByPhone(cleanPhone);
   if (existingPhone) {
     throw new Error('Số điện thoại này đã được đăng ký tài khoản.');
   }
 
   // Nếu có email thì kiểm tra trùng email
   if (cleanEmail) {
-    const existingEmail = findUserByEmail(cleanEmail);
+    const existingEmail = await findUserByEmail(cleanEmail);
     if (existingEmail) {
       throw new Error('Email này đã được đăng ký tài khoản.');
     }
@@ -138,10 +138,10 @@ export async function createUser(
   const id = `usr-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`;
   const passwordHash = await hashPassword(passwordPlain);
 
-  db.prepare(`
+  await db.execute(`
     INSERT INTO users (id, name, phone, email, password_hash, role)
     VALUES (?, ?, ?, ?, ?, ?)
-  `).run(id, name.trim(), cleanPhone, cleanEmail, passwordHash, role);
+  `, [id, name.trim(), cleanPhone, cleanEmail, passwordHash, role]);
 
   return {
     id,

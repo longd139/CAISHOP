@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const includeInactive = searchParams.get('include_inactive') === 'true' || searchParams.get('all') === 'true';
-    const products = getAllProductsWithVariants(includeInactive);
+    const products = await getAllProductsWithVariants(includeInactive);
     return NextResponse.json({
       success: true,
       data: products
@@ -27,7 +27,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, message: 'Cần có ít nhất một biến thể màu sắc, kích cỡ và giá.' }, { status: 400 });
     }
 
-    const result = createProduct(body);
+    const result = await createProduct(body);
 
     if (!result.success) {
       return NextResponse.json(result, { status: 400 });
