@@ -819,7 +819,9 @@ export default function ProductCatalog() {
                             e.stopPropagation();
                             setExpandedBrands((prev) => ({ ...prev, [col.id]: !prev[col.id] }));
                           }}
-                          className="p-1 text-black/50 hover:text-black cursor-pointer"
+                          className={`p-1 cursor-pointer transition-colors ${
+                            isBrandActive ? 'text-white hover:text-white/80' : 'text-black/50 hover:text-black'
+                          }`}
                           aria-label="Thu gọn / Mở rộng"
                         >
                           {isExpanded ? (
@@ -870,7 +872,9 @@ export default function ProductCatalog() {
                                       e.stopPropagation();
                                       setExpandedGroups((prev) => ({ ...prev, [grp.id]: !prev[grp.id] }));
                                     }}
-                                    className="p-0.5 opacity-60 hover:opacity-100"
+                                    className={`p-0.5 cursor-pointer transition-colors ${
+                                      isGrpActive ? 'text-white hover:text-white/80' : 'text-black/50 hover:text-black'
+                                    }`}
                                   >
                                     {isGrpExpanded ? (
                                       <ChevronDown className="w-3 h-3" />
