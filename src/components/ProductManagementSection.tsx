@@ -983,10 +983,10 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
       </div>
 
       {/* Product List Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+            <thead className="bg-slate-50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
               <tr>
                 <th className="py-3 px-4 w-12 text-center">Ảnh</th>
                 <th className="py-3 px-4">Sản phẩm & Danh mục</th>
@@ -998,7 +998,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                 <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading && products.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
@@ -1203,7 +1203,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                                       <th className="py-1.5 px-3 text-right">Lợi nhuận gộp/chiếc</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
                                     {p.variants.map(v => {
                                       const profit = v.selling_price - v.cost_price;
                                       const margin = v.selling_price > 0 ? Math.round((profit / v.selling_price) * 100) : 0;

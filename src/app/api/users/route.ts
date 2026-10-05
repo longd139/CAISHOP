@@ -26,12 +26,13 @@ export async function GET() {
       FROM orders o
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE o.fulfillment_status != 'CANCELLED'
+        AND (o.payment_status = 'PAID' OR o.fulfillment_status = 'DELIVERED')
       GROUP BY o.customer_phone
-      ORDER BY total_items DESC, total_spent DESC
+      ORDER BY order_count DESC, total_spent DESC
     `);
 
     const enrichedCustomers = customers.map(c => {
-      const tier = calculateTier(c.total_items);
+      const tier = calculateTier(c.order_count);
       return {
         ...c,
         tier: tier.name,

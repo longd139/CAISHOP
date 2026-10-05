@@ -170,7 +170,12 @@ function LoginForm() {
             } else if (data.user?.role === 'ADMIN') {
               window.location.href = '/admin';
             } else {
-              window.location.href = '/';
+              let hasCart = false;
+              try {
+                const raw = localStorage.getItem('caishop_cart');
+                hasCart = !!(raw && JSON.parse(raw).length > 0);
+              } catch (e) {}
+              window.location.href = hasCart ? '/?openCart=true' : '/';
             }
           }
         }, 400);
@@ -551,7 +556,7 @@ export default function LoginPage() {
             <div className="flex items-start gap-3 text-xs text-slate-200">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block font-medium">Hội viên Bạc (Từ 2 sản phẩm):</strong>
+                <strong className="text-white block font-medium">Hội viên Bạc (Từ 3 đơn hàng):</strong>
                 <span className="text-slate-300">Tự động giảm 5% toàn bộ giỏ hàng khi thanh toán.</span>
               </div>
             </div>
@@ -559,8 +564,8 @@ export default function LoginPage() {
             <div className="flex items-start gap-3 text-xs text-slate-200">
               <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block font-medium">Hội viên Vàng (Từ 4 sản phẩm):</strong>
-                <span className="text-slate-300">Giảm 10% toàn bộ đơn hàng và ưu tiên đóng gói giao nhanh.</span>
+                <strong className="text-white block font-medium">Hội viên Vàng (Từ 5 đơn hàng):</strong>
+                <span className="text-slate-300">Giảm 10% toàn bộ đơn hàng và nhận chiết khấu hội viên.</span>
               </div>
             </div>
 

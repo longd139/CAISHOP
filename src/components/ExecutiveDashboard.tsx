@@ -39,10 +39,20 @@ import {
   ChevronDown,
   ChevronRight,
   Tag,
-  FolderTree
+  FolderTree,
+  CreditCard,
+  QrCode,
+  Ticket,
+  LayoutDashboard,
+  Palette,
+  Sun,
+  Moon
 } from 'lucide-react';
+import OverviewSection from '@/components/OverviewSection';
 import ProductManagementSection from '@/components/ProductManagementSection';
 import CollectionManagementSection from '@/components/CollectionManagementSection';
+import PaymentManagementSection from '@/components/PaymentManagementSection';
+import DealManagementSection from '@/components/DealManagementSection';
 import { CustomSelect } from '@/components/CustomSelect';
 
 interface InventoryItem {
@@ -145,14 +155,111 @@ const DEFAULT_ADMIN_PROFILE: AdminProfile = {
   address: 'Tầng 5, Tòa nhà Atelier, 12 Phố Tràng Tiền, Hoàn Kiếm, Hà Nội',
 };
 
-type AdminTab = 'products' | 'collections' | 'cashflow' | 'orders' | 'pricing' | 'customers' | 'content' | 'settings';
+type AdminTab = 'overview' | 'products' | 'collections' | 'cashflow' | 'orders' | 'pricing' | 'deals' | 'customers' | 'content' | 'payment' | 'settings';
 type ContentSubTab = 'header' | 'home' | 'products' | 'studio' | 'about';
 
+export type ThemeMode = 'light' | 'dark';
+
+export const getTransactionTypeInfo = (type: string) => {
+  switch (type) {
+    case 'REVENUE':
+      return {
+        label: 'Doanh thu',
+        className: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/60'
+      };
+    case 'COGS':
+      return {
+        label: 'Giá vốn (COGS)',
+        className: 'bg-amber-50 text-amber-800 border border-amber-200/60 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800/60'
+      };
+    case 'SHIPPING_FEE':
+      return {
+        label: 'Phí vận chuyển',
+        className: 'bg-sky-50 text-sky-700 border border-sky-200/60 dark:bg-sky-950/40 dark:text-sky-400 dark:border-sky-800/60'
+      };
+    case 'GATEWAY_FEE':
+      return {
+        label: 'Phí thanh toán',
+        className: 'bg-violet-50 text-violet-700 border border-violet-200/60 dark:bg-violet-950/40 dark:text-violet-400 dark:border-violet-800/60'
+      };
+    case 'REFUND':
+      return {
+        label: 'Hoàn tiền',
+        className: 'bg-rose-50 text-rose-700 border border-rose-200/60 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-800/60'
+      };
+    default:
+      return {
+        label: type,
+        className: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:border-slate-700'
+      };
+  }
+};
+
 export default function ExecutiveDashboard() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('cashflow');
+  const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [contentSubTab, setContentSubTab] = useState<ContentSubTab>('header');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
+
+  // System Theme Mode (Light / Dark)
+  const [themeMode, setThemeMode] = useState<ThemeMode>('light');
+  const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedMode = localStorage.getItem('caishop_admin_theme_mode') as ThemeMode;
+      if (savedMode === 'dark' || savedMode === 'light') {
+        setThemeMode(savedMode);
+        document.documentElement.setAttribute('data-theme', savedMode);
+        document.documentElement.classList.toggle('dark', savedMode === 'dark');
+      } else {
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (prefersDark) {
+          setThemeMode('dark');
+          document.documentElement.setAttribute('data-theme', 'dark');
+          document.documentElement.classList.toggle('dark', true);
+        }
+      }
+    }
+  }, []);
+
+  const handleSelectThemeMode = (mode: ThemeMode) => {
+    setThemeMode(mode);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('caishop_admin_theme_mode', mode);
+      document.documentElement.setAttribute('data-theme', mode);
+      document.documentElement.classList.toggle('dark', mode === 'dark');
+    }
+    setContentToast(mode === 'dark' ? '✓ Đã kích hoạt Giao diện Tối (Dark Mode)' : '✓ Đã kích hoạt Giao diện Sáng (Light Mode)');
+    setTimeout(() => setContentToast(null), 3000);
+    setIsThemeMenuOpen(false);
+  };
+
+  const getNavTabStyle = (tabId: AdminTab) => {
+    if (activeTab === tabId) {
+      return themeMode === 'dark'
+        ? {
+          backgroundColor: '#1e293b',
+          color: '#38bdf8',
+          borderLeft: '2.5px solid #38bdf8',
+          paddingLeft: '0.625rem'
+        }
+        : {
+          backgroundColor: '#f1f5f9',
+          color: '#0f172a',
+          borderLeft: '2.5px solid #0f172a',
+          paddingLeft: '0.625rem'
+        };
+    }
+    return undefined;
+  };
+
+  const getNavIconStyle = (tabId: AdminTab) => {
+    if (activeTab === tabId) {
+      return { color: themeMode === 'dark' ? '#38bdf8' : '#0f172a' };
+    }
+    return undefined;
+  };
 
   // Data States
   const [cashflow, setCashflow] = useState<CashFlowSummary | null>(null);
@@ -385,18 +492,24 @@ export default function ExecutiveDashboard() {
   const restockNeededItems = inventory.filter(i => i.is_low_stock);
 
   const tabTitles: Record<AdminTab, string> = {
+    overview: 'Tổng quan điều hành',
     products: 'Quản lý sản phẩm & Biến thể',
     collections: 'Quản lý Bộ sưu tập & Phân cấp danh mục',
     cashflow: 'Dòng tiền & Lợi nhuận',
     orders: 'Đơn hàng vận hành',
     pricing: 'Bộ điều khiển giá',
+    deals: 'Quản lý Ưu đãi & Voucher (Deals)',
     customers: 'Khách hàng & Hội viên',
     content: 'Quản lý nội dung & Giao diện (CMS)',
+    payment: 'Cấu hình thanh toán & Mã VietQR',
     settings: 'Cấu hình hạ tầng & D1'
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex">
+    <div
+      data-theme={themeMode}
+      className={`min-h-screen ${themeMode === 'dark' ? 'dark' : ''} bg-slate-50 text-slate-900 flex transition-colors duration-200`}
+    >
       {/* Mobile Drawer Backdrop */}
       {mobileSidebarOpen && (
         <div
@@ -415,7 +528,10 @@ export default function ExecutiveDashboard() {
         {/* Brand Header */}
         <div className="h-14 border-b border-slate-200 px-4 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 bg-slate-900 text-white flex items-center justify-center rounded text-xs font-semibold tracking-wider">
+            <div
+              className={`w-7 h-7 flex items-center justify-center rounded text-xs font-semibold tracking-wider transition-colors shadow-2xs ${themeMode === 'dark' ? 'bg-sky-500 text-slate-950 font-bold' : 'bg-slate-900 text-white'
+                }`}
+            >
               CS
             </div>
             <div>
@@ -435,6 +551,26 @@ export default function ExecutiveDashboard() {
         {/* Navigation Categories */}
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-5" aria-label="Admin Navigation">
 
+          {/* BẢNG ĐIỀU KHIỂN CHÍNH */}
+          <div>
+            <div className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 font-mono">
+              Bảng điều khiển
+            </div>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => { setActiveTab('overview'); setMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'overview'
+                    ? 'font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                style={getNavTabStyle('overview')}
+              >
+                <LayoutDashboard className="w-4 h-4 text-slate-500" style={getNavIconStyle('overview')} />
+                <span>Tổng quan</span>
+              </button>
+            </div>
+          </div>
+
           {/* Group 1: TÀI CHÍNH & ĐƠN HÀNG */}
           <div>
             <div className="px-3 text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1.5 font-mono">
@@ -443,31 +579,40 @@ export default function ExecutiveDashboard() {
             <div className="space-y-0.5">
               <button
                 onClick={() => { setActiveTab('cashflow'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'cashflow'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'cashflow'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('cashflow')}
               >
                 <div className="flex items-center gap-2.5">
-                  <DollarSign className="w-4 h-4 text-slate-500" />
+                  <DollarSign className="w-4 h-4 text-slate-500" style={getNavIconStyle('cashflow')} />
                   <span>Dòng tiền & P&L</span>
                 </div>
               </button>
 
               <button
                 onClick={() => { setActiveTab('orders'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'orders'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'orders'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('orders')}
               >
-                <div className="flex items-center gap-2.5">
-                  <ShoppingCart className="w-4 h-4 text-slate-500" />
-                  <span>Đơn hàng vận hành</span>
-                </div>
-                <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                  {orders.length}
-                </span>
+                <ShoppingCart className="w-4 h-4 text-slate-500" style={getNavIconStyle('orders')} />
+                <span>Đơn hàng vận hành</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('payment'); setMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'payment'
+                    ? 'font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                style={getNavTabStyle('payment')}
+              >
+                <CreditCard className="w-4 h-4 text-slate-500" style={getNavIconStyle('payment')} />
+                <span>Thanh toán & VietQR</span>
               </button>
             </div>
           </div>
@@ -480,34 +625,26 @@ export default function ExecutiveDashboard() {
             <div className="space-y-0.5">
               <button
                 onClick={() => { setActiveTab('products'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'products'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'products'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('products')}
               >
-                <div className="flex items-center gap-2.5">
-                  <Tag className="w-4 h-4 text-slate-500" />
-                  <span>Sản phẩm & Biến thể</span>
-                </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-900 text-white font-medium">
-                  Quản lý
-                </span>
+                <Tag className="w-4 h-4 text-slate-500" style={getNavIconStyle('products')} />
+                <span>Sản phẩm & Biến thể</span>
               </button>
 
               <button
                 onClick={() => { setActiveTab('collections'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'collections'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'collections'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('collections')}
               >
-                <div className="flex items-center gap-2.5">
-                  <FolderTree className="w-4 h-4 text-slate-500" />
-                  <span>Bộ sưu tập (Phân cấp)</span>
-                </div>
-                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-bold">
-                  Tree
-                </span>
+                <FolderTree className="w-4 h-4 text-slate-500" style={getNavIconStyle('collections')} />
+                <span>Bộ sưu tập (Phân cấp)</span>
               </button>
             </div>
           </div>
@@ -520,31 +657,40 @@ export default function ExecutiveDashboard() {
             <div className="space-y-0.5">
               <button
                 onClick={() => { setActiveTab('pricing'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'pricing'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'pricing'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('pricing')}
               >
                 <div className="flex items-center gap-2.5">
-                  <Sliders className="w-4 h-4 text-slate-500" />
+                  <Sliders className="w-4 h-4 text-slate-500" style={getNavIconStyle('pricing')} />
                   <span>Bộ điều khiển giá</span>
                 </div>
               </button>
 
               <button
-                onClick={() => { setActiveTab('customers'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'customers'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                onClick={() => { setActiveTab('deals'); setMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'deals'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('deals')}
               >
-                <div className="flex items-center gap-2.5">
-                  <Users className="w-4 h-4 text-slate-500" />
-                  <span>Khách hàng & Hội viên</span>
-                </div>
-                <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
-                  {users.length}
-                </span>
+                <Ticket className="w-4 h-4 text-slate-500" style={getNavIconStyle('deals')} />
+                <span>Ưu đãi & Voucher</span>
+              </button>
+
+              <button
+                onClick={() => { setActiveTab('customers'); setMobileSidebarOpen(false); }}
+                className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'customers'
+                    ? 'font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                style={getNavTabStyle('customers')}
+              >
+                <Users className="w-4 h-4 text-slate-500" style={getNavIconStyle('customers')} />
+                <span>Khách hàng & Hội viên</span>
               </button>
             </div>
           </div>
@@ -557,21 +703,17 @@ export default function ExecutiveDashboard() {
             <div className="space-y-0.5">
               <button
                 onClick={() => { setActiveTab('content'); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'content'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'content'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('content')}
               >
                 <div className="flex items-center gap-2.5">
-                  <FileText className="w-4 h-4 text-slate-500" />
+                  <FileText className="w-4 h-4 text-slate-500" style={getNavIconStyle('content')} />
                   <span>Quản lý nội dung</span>
                 </div>
-                <div className="flex items-center gap-1.5">
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 font-semibold">
-                    CMS
-                  </span>
-                  <ChevronDown className={`w-3.5 h-3.5 text-slate-400 transition-transform duration-200 ${activeTab === 'content' ? 'rotate-180 text-slate-900' : ''}`} />
-                </div>
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${activeTab === 'content' ? 'rotate-180' : 'text-slate-400'}`} style={getNavIconStyle('content')} />
               </button>
 
               {/* SUB-SIDEBAR: Mở ra ngay khi chọn Quản lý nội dung */}
@@ -579,38 +721,26 @@ export default function ExecutiveDashboard() {
                 <div className="mt-1.5 ml-2 pl-2.5 border-l-2 border-slate-200 space-y-1 py-1 transition-all">
                   <button
                     onClick={() => { setContentSubTab('header'); setMobileSidebarOpen(false); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${contentSubTab === 'header'
-                        ? 'bg-slate-900 text-white shadow-2xs font-medium'
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${contentSubTab === 'header'
+                        ? 'text-white shadow-2xs font-medium'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       }`}
+                    style={contentSubTab === 'header' ? { backgroundColor: themeMode === 'dark' ? '#38bdf8' : '#0f172a', color: themeMode === 'dark' ? '#0f172a' : '#ffffff' } : undefined}
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <Globe className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Thanh Menu Header</span>
-                    </div>
-                    <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded shrink-0 ${contentSubTab === 'header' ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-500'
-                      }`}>
-                      {cmsContent?.header?.menu_items?.length || 4} mục
-                    </span>
+                    <Globe className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Thanh Menu Header</span>
                   </button>
 
                   <button
                     onClick={() => { setContentSubTab('home'); setMobileSidebarOpen(false); }}
-                    className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${contentSubTab !== 'header'
-                        ? 'bg-slate-900 text-white shadow-2xs font-medium'
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${contentSubTab !== 'header'
+                        ? 'text-white shadow-2xs font-medium'
                         : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                       }`}
+                    style={contentSubTab !== 'header' ? { backgroundColor: themeMode === 'dark' ? '#38bdf8' : '#0f172a', color: themeMode === 'dark' ? '#0f172a' : '#ffffff' } : undefined}
                   >
-                    <div className="flex items-center gap-2 truncate">
-                      <FileText className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate">Nội dung</span>
-                    </div>
-                    <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded shrink-0 font-medium ${contentSubTab !== 'header'
-                        ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/60'
-                        : 'bg-emerald-50 text-emerald-700'
-                      }`}>
-                      7 khối
-                    </span>
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Nội dung</span>
                   </button>
                 </div>
               )}
@@ -625,13 +755,14 @@ export default function ExecutiveDashboard() {
             <div className="space-y-0.5">
               <button
                 onClick={() => { setActiveTab('settings'); setMobileSidebarOpen(false); }}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-colors cursor-pointer ${activeTab === 'settings'
-                    ? 'bg-slate-100 text-slate-900 font-semibold border-l-2 border-slate-900 pl-2.5'
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'settings'
+                    ? 'font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                   }`}
+                style={getNavTabStyle('settings')}
               >
                 <div className="flex items-center gap-2.5">
-                  <Database className="w-4 h-4 text-slate-500" />
+                  <Database className="w-4 h-4 text-slate-500" style={getNavIconStyle('settings')} />
                   <span>Cơ sở dữ liệu D1</span>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-500" title="D1 Trực tuyến" />
@@ -650,7 +781,10 @@ export default function ExecutiveDashboard() {
             title="Bấm để xem & chỉnh sửa hồ sơ quản trị viên"
           >
             <div className="flex items-center gap-2 min-w-0 pr-2">
-              <div className="w-7 h-7 rounded-full bg-slate-900 text-white flex items-center justify-center text-[11px] font-semibold shrink-0 group-hover:scale-105 transition-transform">
+              <div
+                className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0 group-hover:scale-105 transition-all shadow-2xs ${themeMode === 'dark' ? 'bg-sky-500 text-slate-950 font-bold' : 'bg-slate-900 text-white'
+                  }`}
+              >
                 AD
               </div>
               <div className="min-w-0">
@@ -663,7 +797,12 @@ export default function ExecutiveDashboard() {
               </div>
             </div>
 
-            <span className="text-[9px] font-semibold font-mono bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+            <span
+              className={`text-[9px] font-semibold font-mono px-1.5 py-0.5 rounded border shrink-0 transition-colors ${themeMode === 'dark'
+                  ? 'bg-sky-950/60 text-sky-400 border-sky-800'
+                  : 'bg-slate-100 text-slate-800 border-slate-300'
+                }`}
+            >
               ADMIN
             </span>
           </button>
@@ -706,9 +845,85 @@ export default function ExecutiveDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded bg-slate-100 text-slate-600 border border-slate-200 text-[11px] font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Cloudflare D1 APAC</span>
+            {/* System Light / Dark Theme Mode Switcher */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
+                className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
+                title="Đổi chế độ Sáng / Tối hệ thống"
+              >
+                {themeMode === 'dark' ? (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+                    <span className="hidden sm:inline font-medium">Chế độ Tối</span>
+                  </>
+                ) : (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span className="hidden sm:inline font-medium">Chế độ Sáng</span>
+                  </>
+                )}
+                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${isThemeMenuOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* Theme Dropdown Menu */}
+              {isThemeMenuOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsThemeMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-2 shadow-pop z-50">
+                    <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1 flex items-center justify-between">
+                      <div className="text-xs font-semibold text-slate-900">Giao diện Hệ thống</div>
+                      <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">Sáng / Tối</span>
+                    </div>
+
+                    <div className="space-y-1">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectThemeMode('light')}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-all cursor-pointer text-left ${themeMode === 'light'
+                            ? 'bg-slate-100 font-semibold text-slate-900'
+                            : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-6 h-6 rounded-md bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
+                            <Sun className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-xs">Chế độ Sáng (Light)</div>
+                            <div className="text-[10px] text-slate-400">Nền sáng tiêu chuẩn ban ngày</div>
+                          </div>
+                        </div>
+                        {themeMode === 'light' && <Check className="w-3.5 h-3.5 text-slate-900 shrink-0" />}
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectThemeMode('dark')}
+                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-all cursor-pointer text-left ${themeMode === 'dark'
+                            ? 'bg-slate-800 font-semibold text-white'
+                            : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-6 h-6 rounded-md bg-slate-900 border border-slate-700 flex items-center justify-center text-sky-400">
+                            <Moon className="w-3.5 h-3.5" />
+                          </div>
+                          <div>
+                            <div className="font-medium text-xs">Chế độ Tối (Dark)</div>
+                            <div className="text-[10px] text-slate-400">Nền tối dịu mắt ban đêm</div>
+                          </div>
+                        </div>
+                        {themeMode === 'dark' && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <button
@@ -724,6 +939,21 @@ export default function ExecutiveDashboard() {
 
         {/* Main Body Content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+
+          {/* ================= TAB: TỔNG QUAN ĐIỀU HÀNH ================= */}
+          {activeTab === 'overview' && (
+            <OverviewSection
+              cashflow={cashflow}
+              transactions={transactions}
+              inventory={inventory}
+              orders={orders}
+              customers={customers}
+              loading={loading}
+              onRefresh={fetchData}
+              onNavigateTab={(tab) => setActiveTab(tab)}
+              themeColor={themeMode === 'dark' ? '#38bdf8' : '#0f172a'}
+            />
+          )}
 
           {/* ================= TAB: QUẢN LÝ NỘI DUNG (CMS) ================= */}
           {activeTab === 'content' && (
@@ -743,8 +973,8 @@ export default function ExecutiveDashboard() {
                     <button
                       onClick={() => setContentSubTab('header')}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${contentSubTab === 'header'
-                          ? 'bg-slate-900 text-white shadow-2xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
                         }`}
                     >
                       <Globe className="w-3.5 h-3.5" />
@@ -755,8 +985,8 @@ export default function ExecutiveDashboard() {
                     <button
                       onClick={() => setContentSubTab('home')}
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${contentSubTab !== 'header'
-                          ? 'bg-slate-900 text-white shadow-2xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
+                        ? 'bg-slate-900 text-white shadow-2xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200/80 hover:text-slate-900'
                         }`}
                     >
                       <FileText className="w-3.5 h-3.5" />
@@ -987,8 +1217,8 @@ export default function ExecutiveDashboard() {
                                   }
                                 }}
                                 className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${homeActiveSection === tab.id
-                                    ? 'bg-slate-900 text-white font-semibold shadow-xs'
-                                    : 'text-slate-600 bg-white border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
+                                  ? 'bg-slate-900 text-white font-semibold shadow-xs'
+                                  : 'text-slate-600 bg-white border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
                                   }`}
                               >
                                 {tab.label}
@@ -1107,7 +1337,7 @@ export default function ExecutiveDashboard() {
                                   <label className="font-medium text-slate-700">Nút hành động 1:</label>
                                   <input
                                     type="text"
-                                    value={cmsContent?.home?.hero_cta_1 || 'Enter the studio'}
+                                    value={cmsContent?.home?.hero_cta_1 || 'Săn đồ hiệu ngay'}
                                     onChange={(e) => setCmsContent({
                                       ...cmsContent,
                                       home: { ...cmsContent.home, hero_cta_1: e.target.value }
@@ -1119,7 +1349,7 @@ export default function ExecutiveDashboard() {
                                   <label className="font-medium text-slate-700">Nút hành động 2:</label>
                                   <input
                                     type="text"
-                                    value={cmsContent?.home?.hero_cta_2 || 'Browse the library'}
+                                    value={cmsContent?.home?.hero_cta_2 || 'Bảng chọn size chuẩn'}
                                     onChange={(e) => setCmsContent({
                                       ...cmsContent,
                                       home: { ...cmsContent.home, hero_cta_2: e.target.value }
@@ -1142,8 +1372,8 @@ export default function ExecutiveDashboard() {
                                   {/* Khung 1 */}
                                   <div className="p-3 rounded border border-slate-200 bg-slate-50/50 space-y-2">
                                     <div className="flex items-center justify-between">
-                                      <span className="text-[10px] font-mono font-bold text-slate-700 uppercase">Khung 1 (Sáng)</span>
-                                      <span className="text-[9px] font-mono text-slate-400">001 Concept</span>
+                                      <span className="text-[10px] font-mono font-bold text-slate-700 uppercase">Khung 1 (Dòng Cá Sấu)</span>
+                                      <span className="text-[9px] font-mono text-slate-400">001 Áo Polo</span>
                                     </div>
                                     <div className="grid grid-cols-4 gap-2">
                                       <div>
@@ -1162,7 +1392,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Nhãn bước:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate1_tag || 'Concept'}
+                                          value={cmsContent?.home?.hero_plate1_tag || 'Áo Polo'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate1_tag: e.target.value }
@@ -1174,7 +1404,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Tiêu đề:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate1_title || 'Canvas'}
+                                          value={cmsContent?.home?.hero_plate1_title || 'DÒNG CÁ SẤU'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate1_title: e.target.value }
@@ -1187,7 +1417,7 @@ export default function ExecutiveDashboard() {
                                         <input
                                           type="text"
                                           placeholder="/image/lacoste.png"
-                                          value={cmsContent?.home?.hero_plate1_logo || ''}
+                                          value={cmsContent?.home?.hero_plate1_logo || '/image/lacoste.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate1_logo: e.target.value }
@@ -1202,7 +1432,7 @@ export default function ExecutiveDashboard() {
                                   <div className="p-3 rounded border border-slate-800 bg-slate-900 text-white space-y-2">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[10px] font-mono font-bold text-slate-300 uppercase">Khung 2 (Dòng Xi-Kê)</span>
-                                      <span className="text-[9px] font-mono text-slate-400">002 Drape</span>
+                                      <span className="text-[9px] font-mono text-slate-400">002 Denim & Tee</span>
                                     </div>
                                     <div className="grid grid-cols-4 gap-2">
                                       <div>
@@ -1221,7 +1451,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-400 block">Nhãn bước:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate2_tag || 'Drape'}
+                                          value={cmsContent?.home?.hero_plate2_tag || 'Denim & Tee'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate2_tag: e.target.value }
@@ -1233,7 +1463,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-400 block">Tiêu đề:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate2_title || 'Compose'}
+                                          value={cmsContent?.home?.hero_plate2_title || 'DÒNG XI-KÊ'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate2_title: e.target.value }
@@ -1246,7 +1476,7 @@ export default function ExecutiveDashboard() {
                                         <input
                                           type="text"
                                           placeholder="/image/CK.png"
-                                          value={cmsContent?.home?.hero_plate2_logo || ''}
+                                          value={cmsContent?.home?.hero_plate2_logo || '/image/CK.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate2_logo: e.target.value }
@@ -1261,7 +1491,7 @@ export default function ExecutiveDashboard() {
                                   <div className="p-3 rounded border border-slate-200 bg-slate-50/50 space-y-2">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[10px] font-mono font-bold text-slate-700 uppercase">Khung 3 (Dòng Tô-Mì)</span>
-                                      <span className="text-[9px] font-mono text-slate-400">003 Craft</span>
+                                      <span className="text-[9px] font-mono text-slate-400">003 Phong cách Mỹ</span>
                                     </div>
                                     <div className="grid grid-cols-4 gap-2">
                                       <div>
@@ -1280,7 +1510,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Nhãn bước:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate3_tag || 'Craft'}
+                                          value={cmsContent?.home?.hero_plate3_tag || 'Phong cách Mỹ'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate3_tag: e.target.value }
@@ -1292,7 +1522,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Tiêu đề:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate3_title || 'Refine'}
+                                          value={cmsContent?.home?.hero_plate3_title || 'DÒNG TÔ-MÌ'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate3_title: e.target.value }
@@ -1305,7 +1535,7 @@ export default function ExecutiveDashboard() {
                                         <input
                                           type="text"
                                           placeholder="/image/tommy.png"
-                                          value={cmsContent?.home?.hero_plate3_logo || ''}
+                                          value={cmsContent?.home?.hero_plate3_logo || '/image/tommy.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate3_logo: e.target.value }
@@ -1320,7 +1550,7 @@ export default function ExecutiveDashboard() {
                                   <div className="p-3 rounded border border-slate-200 bg-slate-50/50 space-y-2">
                                     <div className="flex items-center justify-between">
                                       <span className="text-[10px] font-mono font-bold text-slate-700 uppercase">Khung 4 (Dòng Lê-Vy)</span>
-                                      <span className="text-[9px] font-mono text-slate-400">004 Dispatch</span>
+                                      <span className="text-[9px] font-mono text-slate-400">004 Jeans Đinh Tán</span>
                                     </div>
                                     <div className="grid grid-cols-4 gap-2">
                                       <div>
@@ -1339,7 +1569,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Nhãn bước:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate4_tag || 'Dispatch'}
+                                          value={cmsContent?.home?.hero_plate4_tag || 'Jeans Đinh Tán'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate4_tag: e.target.value }
@@ -1351,7 +1581,7 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Tiêu đề:</label>
                                         <input
                                           type="text"
-                                          value={cmsContent?.home?.hero_plate4_title || 'Ship'}
+                                          value={cmsContent?.home?.hero_plate4_title || 'DÒNG LÊ-VY'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate4_title: e.target.value }
@@ -1364,7 +1594,7 @@ export default function ExecutiveDashboard() {
                                         <input
                                           type="text"
                                           placeholder="/image/LEVIS.png"
-                                          value={cmsContent?.home?.hero_plate4_logo || ''}
+                                          value={cmsContent?.home?.hero_plate4_logo || '/image/LEVIS.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate4_logo: e.target.value }
@@ -1782,20 +2012,20 @@ export default function ExecutiveDashboard() {
                                 [KHỐI 1: HERO BANNER (ẢNH NỀN TOÀN BỘ)]
                               </div>
                               <div className="text-[9px] font-mono tracking-wider uppercase text-white/80 flex items-center gap-1.5">
-                                <span>{cmsContent?.home?.hero_badge || 'COLLECTION 01 / THE INTERFACE SERIES'}</span>
+                                <span>{cmsContent?.home?.hero_badge || 'TUYỂN TẬP ĐỒ HIỆU ĐƯƠNG ĐẠI / CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}</span>
                               </div>
                               <h2 className="text-xl md:text-2xl font-extrabold uppercase tracking-tight text-white leading-tight drop-shadow-sm">
-                                {cmsContent?.home?.hero_title || 'DESIGN, CUT TO MEASURE.'}
+                                {cmsContent?.home?.hero_title || 'ĐỒ HIỆU CHẤT LƯỢNG. ĐỊNH HÌNH PHONG CÁCH.'}
                               </h2>
                               <p className="text-[11px] leading-relaxed text-white/85 font-light line-clamp-3">
-                                {cmsContent?.home?.hero_description || 'An editorial retail experiment constructed for autonomous commerce. Pure monochrome plates, real-time inventory locking, and zero excess ornament.'}
+                                {cmsContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
                               </p>
                               <div className="flex items-center gap-3 text-[9px] font-medium tracking-wider uppercase pt-1 text-white">
                                 <span className="px-3 py-1 bg-white text-black font-semibold rounded-xs shadow-xs cursor-pointer">
-                                  {cmsContent?.home?.hero_cta_1 || 'Enter the studio'} →
+                                  {cmsContent?.home?.hero_cta_1 || 'Săn đồ hiệu ngay'} →
                                 </span>
                                 <span className="px-3 py-1 border border-white/60 text-white rounded-xs cursor-pointer">
-                                  {cmsContent?.home?.hero_cta_2 || 'Browse the library'}
+                                  {cmsContent?.home?.hero_cta_2 || 'Bảng chọn size chuẩn'}
                                 </span>
                               </div>
                             </div>
@@ -1812,10 +2042,10 @@ export default function ExecutiveDashboard() {
                                   </div>
                                   <div>
                                     <span className="text-[7px] font-mono uppercase text-white/50 group-hover:text-black/60 block tracking-wider leading-none mb-0.5 transition-colors">
-                                      {cmsContent?.home?.hero_plate1_tag || 'Concept'}
+                                      {cmsContent?.home?.hero_plate1_tag || 'Áo Polo'}
                                     </span>
                                     <span className="font-bold uppercase text-[9px] md:text-[10px] text-white group-hover:text-black tracking-tight leading-none block transition-colors">
-                                      {cmsContent?.home?.hero_plate1_title || 'Canvas'}
+                                      {cmsContent?.home?.hero_plate1_title || 'DÒNG CÁ SẤU'}
                                     </span>
                                   </div>
                                 </div>
@@ -1829,10 +2059,10 @@ export default function ExecutiveDashboard() {
                                   </div>
                                   <div>
                                     <span className="text-[7px] font-mono uppercase text-white/50 group-hover:text-black/60 block tracking-wider leading-none mb-0.5 transition-colors">
-                                      {cmsContent?.home?.hero_plate2_tag || 'Drape'}
+                                      {cmsContent?.home?.hero_plate2_tag || 'Denim & Tee'}
                                     </span>
                                     <span className="font-bold uppercase text-[9px] md:text-[10px] text-white group-hover:text-black tracking-tight leading-none block transition-colors">
-                                      {cmsContent?.home?.hero_plate2_title || 'Compose'}
+                                      {cmsContent?.home?.hero_plate2_title || 'DÒNG XI-KÊ'}
                                     </span>
                                   </div>
                                 </div>
@@ -1846,10 +2076,10 @@ export default function ExecutiveDashboard() {
                                   </div>
                                   <div>
                                     <span className="text-[7px] font-mono uppercase text-white/50 group-hover:text-black/60 block tracking-wider leading-none mb-0.5 transition-colors">
-                                      {cmsContent?.home?.hero_plate3_tag || 'Craft'}
+                                      {cmsContent?.home?.hero_plate3_tag || 'Phong cách Mỹ'}
                                     </span>
                                     <span className="font-bold uppercase text-[9px] md:text-[10px] text-white group-hover:text-black tracking-tight leading-none block transition-colors">
-                                      {cmsContent?.home?.hero_plate3_title || 'Refine'}
+                                      {cmsContent?.home?.hero_plate3_title || 'DÒNG TÔ-MÌ'}
                                     </span>
                                   </div>
                                 </div>
@@ -1863,10 +2093,10 @@ export default function ExecutiveDashboard() {
                                   </div>
                                   <div>
                                     <span className="text-[7px] font-mono uppercase text-white/50 group-hover:text-black/60 block tracking-wider leading-none mb-0.5 transition-colors">
-                                      {cmsContent?.home?.hero_plate4_tag || 'Dispatch'}
+                                      {cmsContent?.home?.hero_plate4_tag || 'Jeans Đinh Tán'}
                                     </span>
                                     <span className="font-bold uppercase text-[9px] md:text-[10px] text-white group-hover:text-black tracking-tight leading-none block transition-colors">
-                                      {cmsContent?.home?.hero_plate4_title || 'Ship'}
+                                      {cmsContent?.home?.hero_plate4_title || 'DÒNG LÊ-VY'}
                                     </span>
                                   </div>
                                 </div>
@@ -1895,8 +2125,8 @@ export default function ExecutiveDashboard() {
                                 <h3 className="text-lg font-bold uppercase text-neutral-900 tracking-tight">
                                   {cmsContent?.home?.collection_title || 'Looks of the season'}
                                 </h3>
-                                </div>
                               </div>
+                            </div>
 
                             {/* 3 Sample Product Cards */}
                             <div className="grid grid-cols-3 gap-2.5 pt-1">
@@ -2483,14 +2713,14 @@ export default function ExecutiveDashboard() {
                   </div>
 
                   {/* Net Profit */}
-                  <div className="p-4 sm:p-5 bg-slate-50/50">
+                  <div className="p-4 sm:p-5">
                     <div className="flex items-center justify-between">
-                      <span className="text-xs font-medium text-slate-700">Lợi nhuận ròng thực tế</span>
+                      <span className="text-xs font-medium text-slate-500">Lợi nhuận ròng thực tế</span>
                       <span className="rounded-sm bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-200">
                         Biên {cashflow.gross_margin_percentage}%
                       </span>
                     </div>
-                    <div className="mt-1 text-2xl font-semibold text-emerald-700">
+                    <div className="mt-1 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
                       {formatMoney(cashflow.net_profit)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
@@ -2532,14 +2762,14 @@ export default function ExecutiveDashboard() {
                             )}
                           </td>
                           <td className="py-2.5 px-4">
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-sm text-[11px] font-medium ${tx.transaction_type === 'REVENUE'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : tx.transaction_type === 'COGS'
-                                  ? 'bg-amber-50 text-amber-800'
-                                  : 'bg-slate-100 text-slate-700'
-                              }`}>
-                              {tx.transaction_type}
-                            </span>
+                            {(() => {
+                              const badge = getTransactionTypeInfo(tx.transaction_type);
+                              return (
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-sm text-[11px] font-medium ${badge.className}`}>
+                                  {badge.label}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="py-2.5 px-4 text-slate-600 max-w-md truncate">{tx.notes}</td>
                           <td className={`py-2.5 px-4 text-right font-mono font-semibold ${tx.direction === 'INFLOW' ? 'text-emerald-700' : 'text-slate-600'
@@ -2569,8 +2799,8 @@ export default function ExecutiveDashboard() {
 
                 {priceMessage && (
                   <div className={`rounded-md px-3 py-1.5 font-medium border ${priceMessage.type === 'success'
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                      : 'bg-rose-50 text-rose-800 border-rose-200'
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-rose-50 text-rose-800 border-rose-200'
                     }`}>
                     {priceMessage.text}
                   </div>
@@ -2708,8 +2938,8 @@ export default function ExecutiveDashboard() {
                           <td className="py-2.5 px-4 text-slate-600 max-w-xs truncate">{ord.shipping_address}</td>
                           <td className="py-2.5 px-4 text-center">
                             <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium ${ord.payment_status === 'PAID'
-                                ? 'bg-emerald-50 text-emerald-700'
-                                : 'bg-amber-50 text-amber-800'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-amber-50 text-amber-800'
                               }`}>
                               {ord.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
                             </span>
@@ -2777,11 +3007,11 @@ export default function ExecutiveDashboard() {
                       Hội Viên Đồng
                     </span>
                     <span className="text-[10px] font-mono bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold">
-                      0 - 2 áo
+                      0 - 2 đơn
                     </span>
                   </div>
                   <div className="text-xl font-bold text-slate-900">0% <span className="text-xs font-normal text-slate-500">giảm giá</span></div>
-                  <p className="text-[11px] text-slate-600">Khách hàng mới mua dưới 3 sản phẩm, áp dụng giá niêm yết chuẩn.</p>
+                  <p className="text-[11px] text-slate-600">Khách hàng mới dưới 3 đơn hàng, áp dụng giá niêm yết chuẩn.</p>
                 </div>
 
                 <div className="rounded-lg border border-slate-300 bg-slate-50/80 p-3.5 space-y-1.5 shadow-2xs">
@@ -2791,11 +3021,11 @@ export default function ExecutiveDashboard() {
                       Hội Viên Bạc
                     </span>
                     <span className="text-[10px] font-mono bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded font-semibold">
-                      Từ 3 áo
+                      Từ 3 đơn
                     </span>
                   </div>
                   <div className="text-xl font-bold text-slate-900">5% <span className="text-xs font-normal text-emerald-600 font-medium">chiết khấu</span></div>
-                  <p className="text-[11px] text-slate-600">Khách tích lũy từ 3 sản phẩm trở lên, giảm ngay 5% toàn bộ giỏ hàng.</p>
+                  <p className="text-[11px] text-slate-600">Khách tích lũy từ 3 đơn hàng thành công, giảm ngay 5% toàn bộ giỏ hàng.</p>
                 </div>
 
                 <div className="rounded-lg border border-yellow-300 bg-yellow-50/60 p-3.5 space-y-1.5 shadow-2xs">
@@ -2805,11 +3035,11 @@ export default function ExecutiveDashboard() {
                       Hội Viên Vàng
                     </span>
                     <span className="text-[10px] font-mono bg-yellow-200 text-yellow-900 px-1.5 py-0.5 rounded font-semibold">
-                      Từ 5 áo
+                      Từ 5 đơn
                     </span>
                   </div>
                   <div className="text-xl font-bold text-slate-900">10% <span className="text-xs font-normal text-emerald-600 font-medium">chiết khấu</span></div>
-                  <p className="text-[11px] text-slate-600">Khách VIP mua từ 5 sản phẩm, giảm 10% cho mọi đơn hàng tiếp theo.</p>
+                  <p className="text-[11px] text-slate-600">Khách VIP hoàn thành từ 5 đơn hàng, giảm 10% cho mọi đơn tiếp theo.</p>
                 </div>
 
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5 space-y-1.5 shadow-2xs">
@@ -2819,11 +3049,11 @@ export default function ExecutiveDashboard() {
                       Kim Cương / CTV VIP
                     </span>
                     <span className="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-semibold">
-                      Từ 10 áo
+                      Từ 10 đơn
                     </span>
                   </div>
                   <div className="text-xl font-bold text-indigo-950">15% <span className="text-xs font-normal text-emerald-600 font-medium">giảm sâu</span></div>
-                  <p className="text-[11px] text-slate-600">Dành riêng cho Cộng tác viên và khách sỉ mua từ 10 áo trở lên.</p>
+                  <p className="text-[11px] text-slate-600">Dành riêng cho khách hàng thân thiết từ 10 đơn hàng thành công trở lên.</p>
                 </div>
               </div>
 
@@ -2925,9 +3155,8 @@ export default function ExecutiveDashboard() {
                             <td className="py-2.5 px-4 font-medium text-slate-900">{u.name}</td>
                             <td className="py-2.5 px-4 font-mono text-slate-600">{u.email}</td>
                             <td className="py-2.5 px-4 text-center">
-                              <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-mono font-medium ${
-                                u.role === 'ADMIN' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
-                              }`}>
+                              <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-mono font-medium ${u.role === 'ADMIN' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'
+                                }`}>
                                 {u.role}
                               </span>
                             </td>
@@ -2951,6 +3180,107 @@ export default function ExecutiveDashboard() {
           {/* ================= TAB 7: SETTINGS & D1 INFRASTRUCTURE ================= */}
           {activeTab === 'settings' && (
             <div className="space-y-6">
+              {/* CHẾ ĐỘ HIỂN THỊ GIAO DIỆN HỆ THỐNG (SÁNG / TỐI) */}
+              <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-4 shadow-2xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3 flex-wrap gap-2">
+                  <div className="flex items-center gap-2.5">
+                    {themeMode === 'dark' ? (
+                      <Moon className="w-5 h-5 text-sky-400" />
+                    ) : (
+                      <Sun className="w-5 h-5 text-amber-500" />
+                    )}
+                    <div>
+                      <h2 className="text-sm font-semibold text-slate-900">Chế độ Hiển thị Giao diện Hệ thống</h2>
+                      <p className="text-xs text-slate-500">Chuyển đổi linh hoạt giữa giao diện Sáng và Tối cho toàn bộ màn hình điều hành</p>
+                    </div>
+                  </div>
+                  <div
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 text-slate-800 border border-slate-200"
+                  >
+                    <span className={`w-2 h-2 rounded-full ${themeMode === 'dark' ? 'bg-sky-400' : 'bg-amber-500'}`} />
+                    <span>Đang kích hoạt: {themeMode === 'dark' ? 'Chế độ Tối (Dark Mode)' : 'Chế độ Sáng (Light Mode)'}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Card Sáng */}
+                  <div
+                    onClick={() => handleSelectThemeMode('light')}
+                    className={`p-4 rounded-lg border transition-all cursor-pointer relative group text-xs ${themeMode === 'light'
+                        ? 'border-amber-400 ring-2 ring-amber-400/30 bg-amber-50/20'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                      }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center border border-amber-200">
+                          <Sun className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-900 text-xs">Chế độ Sáng (Light Mode)</div>
+                          <div className="text-[11px] text-slate-500">Nền trắng thanh lịch, tương phản chuẩn Atelier</div>
+                        </div>
+                      </div>
+                      {themeMode === 'light' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-500 text-white">
+                          <Check className="w-3 h-3" />
+                          Đang dùng
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 group-hover:text-slate-600 font-medium">
+                          Chọn dùng
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 mb-3">
+                      Tối ưu độ rõ nét khi làm việc ban ngày hoặc trong văn phòng đủ sáng, chuẩn typography cao cấp.
+                    </p>
+                    <div className="p-2.5 rounded bg-white border border-slate-200 flex items-center justify-between text-[11px]">
+                      <span className="font-medium text-slate-800">Mẫu giao diện sáng</span>
+                      <span className="px-2 py-0.5 rounded bg-slate-900 text-white text-[10px] font-medium">Nút mẫu</span>
+                    </div>
+                  </div>
+
+                  {/* Card Tối */}
+                  <div
+                    onClick={() => handleSelectThemeMode('dark')}
+                    className={`p-4 rounded-lg border transition-all cursor-pointer relative group text-xs ${themeMode === 'dark'
+                        ? 'border-sky-400 ring-2 ring-sky-400/30 bg-slate-800/40'
+                        : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/50'
+                      }`}
+                  >
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-slate-800 text-sky-400 flex items-center justify-center border border-slate-700">
+                          <Moon className="w-4 h-4" />
+                        </div>
+                        <div>
+                          <div className="font-semibold text-slate-900 text-xs">Chế độ Tối (Dark Mode)</div>
+                          <div className="text-[11px] text-slate-500">Nền tối Onyx Slate chuyên nghiệp</div>
+                        </div>
+                      </div>
+                      {themeMode === 'dark' ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-500 text-slate-950 font-bold">
+                          <Check className="w-3 h-3" />
+                          Đang dùng
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 group-hover:text-slate-600 font-medium">
+                          Chọn dùng
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-600 mb-3">
+                      Bảo vệ mắt, giảm chói sáng khi làm việc ban đêm, tăng sự tập trung và tiết kiệm điện năng màn hình OLED.
+                    </p>
+                    <div className="p-2.5 rounded bg-slate-900 border border-slate-800 flex items-center justify-between text-[11px]">
+                      <span className="font-medium text-slate-200">Mẫu giao diện tối</span>
+                      <span className="px-2 py-0.5 rounded bg-sky-500 text-slate-950 text-[10px] font-bold">Nút mẫu</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
               <section className="rounded-lg border border-slate-200 bg-white p-5 space-y-4">
                 <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                   <Database className="w-5 h-5 text-slate-700" />
@@ -3007,6 +3337,12 @@ export default function ExecutiveDashboard() {
               </section>
             </div>
           )}
+
+          {/* ================= TAB: CẤU HÌNH THANH TOÁN (VIETQR & COD) ================= */}
+          {activeTab === 'payment' && <PaymentManagementSection />}
+
+          {/* ================= TAB: QUẢN LÝ ƯU ĐÃI & VOUCHER (DEALS) ================= */}
+          {activeTab === 'deals' && <DealManagementSection />}
 
         </main>
       </div>

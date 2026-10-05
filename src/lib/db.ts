@@ -124,12 +124,11 @@ export async function getSiteContent<T = any>(key: string, fallback: T): Promise
 
 export async function setSiteContent(key: string, value: any) {
   const db = await getDb();
-  const jsonStr = JSON.stringify(value);
+  const jsonStr = typeof value === 'string' ? value : JSON.stringify(value ?? {});
   const now = new Date().toISOString();
   await db.execute(`
-    INSERT INTO site_content (key, value, updated_at)
+    INSERT OR REPLACE INTO site_content (key, value, updated_at)
     VALUES (?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
   `, [key, jsonStr, now]);
   return { success: true, key, updated_at: now };
 }
@@ -229,6 +228,7 @@ export interface CreateOrderInput {
   customer_phone: string;
   customer_email?: string;
   shipping_address: string;
+  payment_method?: 'vietqr' | 'cod';
   items: CreateOrderItemInput[];
 }
 
@@ -413,9 +413,86 @@ export async function updateVariantPrice(variantId: string, newSellingPrice: num
 }
 
 /**
+ * Tự động hủy/xóa các đơn hàng PENDING chuyển khoản quá 1 tiếng (3600 giây) chưa thanh toán:
+ * - Hoàn trả số lượng giữ chỗ (reserved_qty) trong kho inventory_levels.
+ * - Xóa các bút toán tài chính phát sinh.
+ * - Xóa các sản phẩm trong order_items.
+ * - Xóa đơn hàng khỏi bảng orders.
+ */
+export async function cleanupExpiredOrders(specificOrderId?: string): Promise<{ cleanedCount: number; cleanedOrderIds: string[] }> {
+  try {
+    const db = await getDb();
+    let expiredOrders: { id: string; order_code: string; created_at: string }[] = [];
+
+    if (specificOrderId) {
+      expiredOrders = await db.queryAll<any>(`
+        SELECT id, order_code, created_at
+        FROM orders
+        WHERE (id = ? OR order_code = ?)
+          AND payment_status = 'PENDING' 
+          AND fulfillment_status = 'UNFULFILLED'
+          AND (
+            datetime(created_at, '+1 hour') <= datetime('now')
+            OR (strftime('%s', 'now') - strftime('%s', created_at)) >= 3600
+          )
+      `, [specificOrderId, specificOrderId]);
+    } else {
+      expiredOrders = await db.queryAll<any>(`
+        SELECT id, order_code, created_at
+        FROM orders
+        WHERE payment_status = 'PENDING' 
+          AND fulfillment_status = 'UNFULFILLED'
+          AND (
+            datetime(created_at, '+1 hour') <= datetime('now')
+            OR (strftime('%s', 'now') - strftime('%s', created_at)) >= 3600
+          )
+      `);
+    }
+
+    if (!expiredOrders || expiredOrders.length === 0) {
+      return { cleanedCount: 0, cleanedOrderIds: [] };
+    }
+
+    const cleanedOrderIds: string[] = [];
+
+    for (const ord of expiredOrders) {
+      // 1. Hoàn lại số lượng hàng đã giữ chỗ trong kho
+      const items = await db.queryAll<{ variant_id: string; quantity: number }>(`
+        SELECT variant_id, quantity FROM order_items WHERE order_id = ?
+      `, [ord.id]);
+
+      for (const item of items) {
+        await db.execute(`
+          UPDATE inventory_levels
+          SET reserved_qty = MAX(0, reserved_qty - ?), updated_at = datetime('now')
+          WHERE variant_id = ?
+        `, [item.quantity, item.variant_id]);
+      }
+
+      // 2. Xóa các bút toán tài chính phát sinh liên quan đơn này
+      await db.execute(`DELETE FROM financial_transactions WHERE order_id = ?`, [ord.id]);
+
+      // 3. Xóa các dòng hàng order_items
+      await db.execute(`DELETE FROM order_items WHERE order_id = ?`, [ord.id]);
+
+      // 4. Xóa đơn hàng khỏi bảng orders
+      await db.execute(`DELETE FROM orders WHERE id = ?`, [ord.id]);
+
+      cleanedOrderIds.push(ord.id);
+    }
+
+    return { cleanedCount: cleanedOrderIds.length, cleanedOrderIds };
+  } catch (error) {
+    console.error('Error during cleanupExpiredOrders:', error);
+    return { cleanedCount: 0, cleanedOrderIds: [] };
+  }
+}
+
+/**
  * Lấy danh sách đơn hàng
  */
 export async function getOrders(limit: number = 20): Promise<Order[]> {
+  await cleanupExpiredOrders();
   const db = await getDb();
   return await db.queryAll<Order>(`
     SELECT o.*, COUNT(oi.id) as items_count
@@ -425,6 +502,54 @@ export async function getOrders(limit: number = 20): Promise<Order[]> {
     ORDER BY o.created_at DESC
     LIMIT ?
   `, [limit]);
+}
+
+/**
+ * Lấy danh sách đơn hàng của khách hàng theo SĐT hoặc Email
+ */
+export async function getCustomerOrders(phone: string, email?: string): Promise<any[]> {
+  await cleanupExpiredOrders();
+  const db = await getDb();
+  const cleanPhone = phone?.trim() || '';
+  const cleanEmail = email?.trim() || '';
+
+  if (!cleanPhone && !cleanEmail) return [];
+
+  // Chuẩn hóa số điện thoại: hỗ trợ 098... lẫn +8498...
+  const rawDigits = cleanPhone.replace(/\D/g, '');
+  const phoneVariants = Array.from(new Set([
+    cleanPhone,
+    rawDigits,
+    rawDigits.startsWith('84') ? '0' + rawDigits.slice(2) : '',
+    rawDigits.startsWith('0') ? '84' + rawDigits.slice(1) : '',
+    rawDigits.startsWith('0') ? '+84' + rawDigits.slice(1) : '',
+  ].filter(Boolean)));
+
+  const orders = await db.queryAll<any>(`
+    SELECT o.*, COUNT(oi.id) as items_count
+    FROM orders o
+    LEFT JOIN order_items oi ON o.id = oi.order_id
+    WHERE (
+      (? != '' AND (o.customer_phone = ? OR o.customer_phone IN (${phoneVariants.map(() => '?').join(',')})))
+      OR (? != '' AND o.customer_email IS NOT NULL AND LOWER(o.customer_email) = LOWER(?))
+    )
+    GROUP BY o.id
+    ORDER BY o.created_at DESC
+    LIMIT 50
+  `, [cleanPhone, cleanPhone, ...phoneVariants, cleanEmail, cleanEmail]);
+
+  for (const ord of orders) {
+    const items = await db.queryAll<any>(`
+      SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size
+      FROM order_items oi
+      LEFT JOIN product_variants pv ON oi.variant_id = pv.id
+      LEFT JOIN products p ON pv.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [ord.id]);
+    ord.items = items;
+  }
+
+  return orders;
 }
 
 /**
@@ -448,9 +573,61 @@ export async function updateOrderStatus(orderId: string, fulfillmentStatus: stri
   await db.execute(`
     UPDATE orders 
     SET fulfillment_status = ?, updated_at = datetime('now') 
-    WHERE id = ?
-  `, [fulfillmentStatus, orderId]);
+    WHERE id = ? OR order_code = ?
+  `, [fulfillmentStatus, orderId, orderId]);
   return { success: true, message: 'Cập nhật trạng thái đơn hàng thành công!' };
+}
+
+/**
+ * Lấy chi tiết đơn hàng theo ID hoặc Order Code
+ */
+export async function getOrderById(orderIdOrCode: string): Promise<Order | null> {
+  await cleanupExpiredOrders(orderIdOrCode);
+  const db = await getDb();
+  return await db.queryFirst<Order>(`
+    SELECT o.*, COUNT(oi.id) as items_count
+    FROM orders o
+    LEFT JOIN order_items oi ON o.id = oi.order_id
+    WHERE o.id = ? OR o.order_code = ?
+    GROUP BY o.id
+  `, [orderIdOrCode, orderIdOrCode]);
+}
+
+/**
+ * Xác nhận thanh toán chuyển khoản: chuyển payment_status sang PAID và fulfillment_status sang PACKING (Chờ vận chuyển)
+ */
+export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ success: boolean; message: string; order?: Order }> {
+  const db = await getDb();
+  const order = await db.queryFirst<Order>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
+  if (!order) {
+    return { success: false, message: 'Không tìm thấy đơn hàng' };
+  }
+
+  // Cập nhật trạng thái đơn: PAID và PACKING (Chờ vận chuyển)
+  await db.execute(`
+    UPDATE orders 
+    SET payment_status = 'PAID', fulfillment_status = 'PACKING', updated_at = datetime('now') 
+    WHERE id = ?
+  `, [order.id]);
+
+  // Ghi nhận sổ cái tài chính REVENUE (nếu chưa có)
+  const existingTx = await db.queryFirst(`
+    SELECT id FROM financial_transactions WHERE order_id = ? AND transaction_type = 'REVENUE'
+  `, [order.id]);
+
+  if (!existingTx) {
+    await db.execute(`
+      INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
+      VALUES (?, ?, 'REVENUE', ?, 'INFLOW', 'VIETQR', ?, ?)
+    `, [`fin-${Date.now().toString(36)}-rev`, order.id, order.total_amount, `VQR-${order.order_code}`, `Khách ${order.customer_name} thanh toán chuyển khoản đơn ${order.order_code}`]);
+  }
+
+  const updatedOrder = await db.queryFirst<Order>(`SELECT * FROM orders WHERE id = ?`, [order.id]);
+  return {
+    success: true,
+    message: 'Thanh toán thành công. Đơn hàng đã chuyển sang trạng thái: Chờ vận chuyển!',
+    order: updatedOrder || undefined,
+  };
 }
 
 /**
@@ -503,18 +680,17 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     });
   }
 
-  // 1.1 Tính toán Cấp bậc hội viên & Chiết khấu giảm giá
-  const currentOrderItemsCount = input.items.reduce((acc, it) => acc + it.quantity, 0);
-  const pastStats = await db.queryFirst<{ past_items: number }>(`
-    SELECT COALESCE(SUM(oi.quantity), 0) as past_items
+  // 1.1 Tính toán Cấp bậc hội viên & Chiết khấu giảm giá theo số lượng đơn hàng (chỉ tính đơn đã thanh toán hoặc đã giao)
+  const pastOrdersStats = await db.queryFirst<{ past_orders: number }>(`
+    SELECT COUNT(DISTINCT o.id) as past_orders
     FROM orders o
-    LEFT JOIN order_items oi ON o.id = oi.order_id
-    WHERE o.customer_phone = ? AND o.fulfillment_status != 'CANCELLED'
+    WHERE o.customer_phone = ? 
+      AND o.fulfillment_status != 'CANCELLED'
+      AND (o.payment_status = 'PAID' OR o.fulfillment_status = 'DELIVERED')
   `, [input.customer_phone]);
 
-  const pastItems = pastStats?.past_items || 0;
-  const totalItemsWithCurrent = pastItems + currentOrderItemsCount;
-  const tier = calculateTier(totalItemsWithCurrent);
+  const pastOrders = pastOrdersStats?.past_orders || 0;
+  const tier = calculateTier(pastOrders);
   const discountPercent = tier.discount_percent;
   const discountAmount = discountPercent > 0 ? Math.round((subtotal * discountPercent) / 100) : 0;
 
@@ -524,10 +700,16 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
   const orderId = `ord-${Date.now().toString(36)}`;
   const orderCode = `ORD-${Date.now().toString().slice(-6)}`;
 
+  const isCod = input.payment_method === 'cod';
+  // Đối với VietQR: Khách cần quét mã, trạng thái ban đầu là PENDING (Chờ chuyển khoản) & UNFULFILLED
+  // Đối với COD: PENDING (Chờ thu tiền) & PACKING (Chờ vận chuyển)
+  const initialPaymentStatus = 'PENDING';
+  const initialFulfillmentStatus = isCod ? 'PACKING' : 'UNFULFILLED';
+
   // 2. Insert Order
   await db.execute(`
     INSERT INTO orders (id, order_code, customer_name, customer_phone, customer_email, shipping_address, subtotal, shipping_fee, discount_amount, total_amount, payment_status, fulfillment_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'PACKING')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     orderId,
     orderCode,
@@ -538,7 +720,9 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     subtotal,
     shippingFee,
     discountAmount,
-    totalAmount
+    totalAmount,
+    initialPaymentStatus,
+    initialFulfillmentStatus
   ]);
 
   // 3. Insert Order Items & Update Inventory Reserved
@@ -557,10 +741,12 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
   }
 
   // 4. Ghi nhận sổ cái tài chính kép (Inflow Doanh thu & Outflow Giá vốn COGS)
-  await db.execute(`
-    INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
-    VALUES (?, ?, 'REVENUE', ?, 'INFLOW', 'VIETQR', ?, ?)
-  `, [`fin-${Date.now().toString(36)}-rev`, orderId, totalAmount, `VQR-${orderCode}`, `Khách ${input.customer_name} thanh toán đơn ${orderCode}`]);
+  if (isCod) {
+    await db.execute(`
+      INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
+      VALUES (?, ?, 'REVENUE', ?, 'INFLOW', 'COD', ?, ?)
+    `, [`fin-${Date.now().toString(36)}-rev`, orderId, totalAmount, `COD-${orderCode}`, `Khách ${input.customer_name} thanh toán COD đơn ${orderCode}`]);
+  }
 
   await db.execute(`
     INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
@@ -570,19 +756,26 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
   if (shippingFee > 0) {
     await db.execute(`
       INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
-      VALUES (?, ?, 'SHIPPING_FEE', ?, 'OUTFLOW', 'GHN', NULL, ?)
-    `, [`fin-${Date.now().toString(36)}-shp`, orderId, 25000, `Cước ship ước tính GHN đơn ${orderCode}`]);
+      VALUES (?, ?, 'SHIPPING_FEE', ?, 'OUTFLOW', 'DELIVERY', NULL, ?)
+    `, [`fin-${Date.now().toString(36)}-shp`, orderId, 25000, `Cước ship ước tính đơn ${orderCode}`]);
   }
 
   return {
     success: true,
-    message: 'Đặt hàng thành công!',
+    message: isCod ? 'Đặt hàng COD thành công!' : 'Đã tạo đơn hàng. Vui lòng quét mã QR chuyển khoản.',
     order: {
       id: orderId,
       order_code: orderCode,
-      total_amount: totalAmount,
+      customer_name: input.customer_name,
+      customer_phone: input.customer_phone,
+      shipping_address: input.shipping_address,
+      subtotal,
       shipping_fee: shippingFee,
-      items: verifiedItems
+      discount_amount: discountAmount,
+      total_amount: totalAmount,
+      payment_status: initialPaymentStatus,
+      fulfillment_status: initialFulfillmentStatus,
+      payment_method: input.payment_method || 'vietqr'
     }
   };
 }

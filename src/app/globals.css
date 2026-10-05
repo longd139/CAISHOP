@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Archivo:wght@300;400;500;600&family=Archivo+Expanded:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *, .dark, .dark *));
+
 :root {
   --ink: #0a0a0a;
   --paper: #ffffff;
@@ -136,4 +138,237 @@ html {
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
+
+/* ================= SYSTEM THEME MODE (LIGHT / DARK) ================= */
+[data-theme="dark"],
+.dark {
+  color-scheme: dark;
+  --paper: #090d16;
+  --ink: #f8fafc;
+  --color-slate-100: #1e293b;
+  --color-slate-200: #334155;
+}
+
+[data-theme="dark"],
+[data-theme="dark"] .bg-slate-50,
+[data-theme="dark"] [class*="bg-slate-50\/"],
+[data-theme="dark"] [class*="bg-slate-100\/"] {
+  background-color: #090d16 !important;
+}
+
+[data-theme="dark"] .bg-white {
+  background-color: #0f172a !important;
+}
+
+[data-theme="dark"] .bg-white\/90 {
+  background-color: rgba(15, 23, 42, 0.92) !important;
+}
+
+[data-theme="dark"] .bg-white\/80 {
+  background-color: rgba(15, 23, 42, 0.85) !important;
+}
+
+[data-theme="dark"] .bg-slate-100 {
+  background-color: #1e293b !important;
+}
+
+[data-theme="dark"] .bg-slate-200 {
+  background-color: #334155 !important;
+}
+
+/* Hover states */
+[data-theme="dark"] .hover\:bg-slate-50:hover,
+[data-theme="dark"] .hover\:bg-slate-50\/50:hover,
+[data-theme="dark"] .hover\:bg-slate-50\/60:hover {
+  background-color: #1e293b !important;
+}
+
+[data-theme="dark"] .hover\:bg-slate-100:hover {
+  background-color: #334155 !important;
+}
+
+[data-theme="dark"] .hover\:bg-slate-200\/80:hover {
+  background-color: #475569 !important;
+}
+
+/* Borders */
+[data-theme="dark"] .border-slate-100,
+[data-theme="dark"] .border-slate-200 {
+  border-color: #1e293b !important;
+}
+
+[data-theme="dark"] .border-slate-300 {
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] .border-slate-400 {
+  border-color: #475569 !important;
+}
+
+/* All Dividers and Table borders */
+[data-theme="dark"] [class*="divide-"] > *,
+[data-theme="dark"] .divide-y > *,
+[data-theme="dark"] .divide-x > *,
+[data-theme="dark"] table,
+[data-theme="dark"] thead,
+[data-theme="dark"] tbody,
+[data-theme="dark"] tbody > tr,
+[data-theme="dark"] tr,
+[data-theme="dark"] td,
+[data-theme="dark"] th {
+  border-color: #1e293b !important;
+}
+
+/* Text colors */
+[data-theme="dark"] .text-slate-900,
+[data-theme="dark"] .text-slate-800 {
+  color: #f8fafc !important;
+}
+
+[data-theme="dark"] .text-slate-700 {
+  color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] .text-slate-600 {
+  color: #cbd5e1 !important;
+}
+
+[data-theme="dark"] .text-slate-500 {
+  color: #94a3b8 !important;
+}
+
+[data-theme="dark"] .text-slate-400 {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] .hover\:text-slate-900:hover {
+  color: #ffffff !important;
+}
+
+[data-theme="dark"] .hover\:text-slate-700:hover {
+  color: #f1f5f9 !important;
+}
+
+/* Inputs, Selects, and Textareas */
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: #131d31 !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #64748b !important;
+}
+
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: #38bdf8 !important;
+  box-shadow: 0 0 0 1px #38bdf8 !important;
+}
+
+/* Invert solid dark buttons for visibility */
+[data-theme="dark"] button.bg-slate-900 {
+  background-color: #f8fafc !important;
+  color: #0f172a !important;
+}
+
+[data-theme="dark"] button.bg-slate-900:hover {
+  background-color: #e2e8f0 !important;
+}
+
+[data-theme="dark"] button.bg-slate-900 * {
+  color: #0f172a !important;
+}
+
+/* Badges & Alert boxes in dark mode */
+[data-theme="dark"] [class*="bg-emerald-50"],
+[data-theme="dark"] [class*="bg-emerald-100"] {
+  background-color: rgba(6, 78, 59, 0.28) !important;
+}
+[data-theme="dark"] [class*="border-emerald-200"],
+[data-theme="dark"] [class*="border-emerald-300"] {
+  border-color: rgba(16, 185, 129, 0.35) !important;
+}
+[data-theme="dark"] [class*="text-emerald-900"],
+[data-theme="dark"] [class*="text-emerald-800"] {
+  color: #d1fae5 !important;
+}
+[data-theme="dark"] [class*="text-emerald-700"] {
+  color: #6ee7b7 !important;
+}
+
+[data-theme="dark"] [class*="bg-rose-50"],
+[data-theme="dark"] [class*="bg-rose-100"] {
+  background-color: rgba(159, 18, 57, 0.28) !important;
+}
+[data-theme="dark"] [class*="border-rose-200"],
+[data-theme="dark"] [class*="border-rose-300"] {
+  border-color: rgba(244, 63, 94, 0.35) !important;
+}
+[data-theme="dark"] [class*="text-rose-900"],
+[data-theme="dark"] [class*="text-rose-800"] {
+  color: #ffe4e6 !important;
+}
+[data-theme="dark"] [class*="text-rose-700"] {
+  color: #fda4af !important;
+}
+
+[data-theme="dark"] [class*="bg-amber-50"],
+[data-theme="dark"] [class*="bg-amber-100"] {
+  background-color: rgba(180, 83, 9, 0.25) !important;
+}
+[data-theme="dark"] [class*="border-amber-200"],
+[data-theme="dark"] [class*="border-amber-300"] {
+  border-color: rgba(245, 158, 11, 0.35) !important;
+}
+[data-theme="dark"] [class*="text-amber-900"],
+[data-theme="dark"] [class*="text-amber-800"] {
+  color: #fef3c7 !important;
+}
+[data-theme="dark"] [class*="text-amber-700"] {
+  color: #fcd34d !important;
+}
+
+[data-theme="dark"] [class*="bg-blue-50"],
+[data-theme="dark"] [class*="bg-blue-100"] {
+  background-color: rgba(30, 58, 138, 0.28) !important;
+}
+[data-theme="dark"] [class*="border-blue-200"],
+[data-theme="dark"] [class*="border-blue-300"] {
+  border-color: rgba(59, 130, 246, 0.35) !important;
+}
+[data-theme="dark"] [class*="text-blue-900"],
+[data-theme="dark"] [class*="text-blue-800"] {
+  color: #dbeafe !important;
+}
+[data-theme="dark"] [class*="text-blue-700"] {
+  color: #93c5fd !important;
+}
+
+/* Tables in dark mode */
+[data-theme="dark"] table thead {
+  background-color: #1e293b !important;
+}
+
+[data-theme="dark"] table thead th {
+  color: #94a3b8 !important;
+  border-color: #1e293b !important;
+}
+
+[data-theme="dark"] table tbody tr:hover {
+  background-color: rgba(30, 41, 59, 0.6) !important;
+}
+
+/* Dropdowns & Popovers */
+[data-theme="dark"] .shadow-pop,
+[data-theme="dark"] .shadow-modal,
+[data-theme="dark"] .shadow-xl,
+[data-theme="dark"] .shadow-2xl {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
+}
+
 

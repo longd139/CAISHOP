@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Ruler, X, Check, Sparkles, ShoppingBag, ChevronRight, User } from 'lucide-react';
+import { ArrowRight, Ruler, X, Check, Sparkles, ShoppingBag, ChevronRight, User, Tag } from 'lucide-react';
 import { useHeaderNav, useSiteContent } from '@/lib/useSiteContent';
 import { getProductGallery, getPrimaryImageUrl } from '@/lib/productImages';
 import { useAuth } from '@/lib/useAuth';
 import { UserProfileModal } from '@/components/UserProfileModal';
+import { useCart, CartItem, AVAILABLE_DEALS } from '@/lib/useCart';
 
 interface ProductVariant {
   id: string;
@@ -33,36 +34,55 @@ interface Product {
   variants: ProductVariant[];
 }
 
-interface CartItem {
-  variant_id: string;
-  product_name: string;
-  product_image: string;
-  sku: string;
-  color: string;
-  size: string;
-  price: number;
-  quantity: number;
-  available_qty: number;
-}
-
 export default function CustomerStorefront() {
   const { items: headerNavItems } = useHeaderNav();
   const { content: siteContent } = useSiteContent();
   const { user, isLoggedIn, logout } = useAuth();
+  const { cart, setCart, appliedDeal, appliedDealCode, setAppliedDealCode } = useCart();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [profileActiveTab, setProfileActiveTab] = useState<'profile' | 'orders'>('profile');
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
+  const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close user dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(e.target as Node)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+    if (isUserDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isUserDropdownOpen]);
+
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [scrolled, setScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBagOpen, setIsBagOpen] = useState(false);
-  const [cart, setCart] = useState<CartItem[]>([]);
-  
+
+  // Lock body scroll when bag drawer is open
+  useEffect(() => {
+    if (isBagOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isBagOpen]);
+
   // Quick View / Variant Selection
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [quickViewImageIndex, setQuickViewImageIndex] = useState<number>(0);
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
-  
+
   // Checkout State
   const [isCheckingOut, setIsCheckingOut] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -118,7 +138,7 @@ export default function CustomerStorefront() {
           }
         });
       },
-      { 
+      {
         threshold: 0.12,
         rootMargin: '0px 0px -30px 0px'
       }
@@ -271,8 +291,22 @@ export default function CustomerStorefront() {
 
   const totalBagCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  const cartShippingFee = cartSubtotal >= 500000 || cartSubtotal === 0 ? 0 : 30000;
-  const cartTotal = cartSubtotal + cartShippingFee;
+
+  // Deal voucher calculations
+  let dealDiscount = 0;
+  if (appliedDeal?.discount_amount && cartSubtotal >= (appliedDeal.min_order || 0)) {
+    dealDiscount = appliedDeal.discount_amount;
+  }
+  const isFreeshipDeal = appliedDeal?.is_freeship;
+  const cartShippingFee = (cartSubtotal >= 500000 || isFreeshipDeal || cartSubtotal === 0) ? 0 : 30000;
+  const cartTotal = Math.max(0, cartSubtotal - dealDiscount) + cartShippingFee;
+
+  // Auto-clear deal if not eligible for cartSubtotal
+  useEffect(() => {
+    if (appliedDeal && appliedDeal.min_order && cartSubtotal < appliedDeal.min_order) {
+      setAppliedDealCode(null);
+    }
+  }, [appliedDeal, cartSubtotal, setAppliedDealCode]);
 
   // Place Order
   const handlePlaceOrder = async (e: React.FormEvent) => {
@@ -314,17 +348,16 @@ export default function CustomerStorefront() {
 
   return (
     <div className="min-h-screen bg-white text-[#0a0a0a] font-sans antialiased selection:bg-[#0a0a0a] selection:text-white">
-      
+
       {/* ================= 1. STICKY FROSTED HEADER ================= */}
       <header
         id="nav"
-        className={`sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b hairline transition-all duration-500 ${
-          scrolled ? 'shadow-[0_1px_0_rgba(10,10,10,0.06)]' : ''
-        }`}
+        className={`sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b hairline transition-all duration-500 ${scrolled ? 'shadow-[0_1px_0_rgba(10,10,10,0.06)]' : ''
+          }`}
       >
         <nav className="max-w-[1400px] mx-auto px-6 md:px-10">
           <div className="relative flex items-center justify-between h-[68px] md:h-[88px]">
-            
+
             {/* Zone 1: Left uppercase nav links + mobile hamburger */}
             <div className="flex items-center">
               <ul className="hidden lg:flex items-center gap-10 xl:gap-12 text-[11px] tracking-wide-2 font-medium uppercase">
@@ -364,24 +397,95 @@ export default function CustomerStorefront() {
 
             {/* Zone 3: Right utility cluster */}
             <div className="flex items-center gap-5 lg:gap-7 text-[11px] tracking-wide-2 font-medium uppercase">
-              <Link href="/products" className="nav-link hidden lg:inline text-[#0a0a0a]">Product / Search</Link>
-
-              {/* User / Login Icon / Profile Trigger */}
+              {/* User Dropdown Trigger */}
               {isLoggedIn && user ? (
-                <button
-                  type="button"
-                  onClick={() => setIsProfileOpen(true)}
-                  aria-label={`Hồ sơ tài khoản: ${user.name}`}
-                  title={`Hồ sơ: ${user.name}`}
-                  className="flex items-center gap-1.5 text-[#0a0a0a] hover:opacity-70 transition-opacity cursor-pointer"
-                >
-                  <svg className="w-5 h-5 md:w-[21px] md:h-[21px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="square" strokeWidth="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-                  </svg>
-                  <span className="font-mono text-[10px] md:text-[11px] uppercase font-bold tracking-wider truncate max-w-[120px] md:max-w-[160px]">
-                    {user.name}
-                  </span>
-                </button>
+                <div ref={userDropdownRef} className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                    aria-expanded={isUserDropdownOpen}
+                    aria-haspopup="true"
+                    aria-label={`Tài khoản: ${user.name}`}
+                    title={`Tài khoản: ${user.name}`}
+                    className="flex items-center gap-1.5 text-[#0a0a0a] hover:opacity-70 transition-opacity cursor-pointer py-1"
+                  >
+                    <svg className="w-5 h-5 md:w-[21px] md:h-[21px] shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="square" strokeWidth="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                    </svg>
+                    <span className="text-[11px] uppercase font-bold tracking-wider truncate max-w-[120px] md:max-w-[160px]">
+                      {user.name}
+                    </span>
+                    <svg
+                      className={`w-3 h-3 text-slate-500 transition-transform duration-200 ${isUserDropdownOpen ? 'rotate-180' : ''}`}
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+
+                  {/* Dropdown Menu */}
+                  {isUserDropdownOpen && (
+                    <div className="absolute right-0 top-full mt-2 w-52 bg-white border border-slate-200 rounded-lg shadow-xl py-1 z-50 normal-case tracking-normal animate-in fade-in zoom-in-95 duration-100">
+                      {/* User Info Header */}
+                      <div className="px-3.5 py-2.5 border-b border-slate-100">
+                        <div className="text-xs font-bold text-slate-900 truncate">
+                          {user.name}
+                        </div>
+                        <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                          {user.email || user.phone || 'Thành viên'}
+                        </div>
+                      </div>
+
+                      {/* Menu Actions */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUserDropdownOpen(false);
+                          setProfileActiveTab('profile');
+                          setIsProfileOpen(true);
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-left transition-colors cursor-pointer block"
+                      >
+                        Hồ sơ
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUserDropdownOpen(false);
+                          setProfileActiveTab('orders');
+                          setIsProfileOpen(true);
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 hover:text-slate-900 text-left transition-colors cursor-pointer block border-t border-slate-50"
+                      >
+                        Đơn hàng
+                      </button>
+
+                      {user.role === 'ADMIN' && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsUserDropdownOpen(false)}
+                          className="w-full px-3.5 py-2.5 text-xs font-medium text-blue-700 hover:bg-blue-50 text-left transition-colors block"
+                        >
+                          Quản trị
+                        </Link>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          setIsUserDropdownOpen(false);
+                          await logout();
+                        }}
+                        className="w-full px-3.5 py-2.5 text-xs font-medium text-rose-600 hover:bg-rose-50 text-left transition-colors cursor-pointer border-t border-slate-100 block"
+                      >
+                        Đăng xuất
+                      </button>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <Link
                   href="/login"
@@ -427,9 +531,8 @@ export default function CustomerStorefront() {
           {/* Mobile Drawer */}
           <div
             id="drawer"
-            className={`lg:hidden overflow-hidden transition-[max-height] duration-500 ease-out border-t hairline ${
-              isMenuOpen ? 'max-h-64' : 'max-h-0'
-            }`}
+            className={`lg:hidden overflow-hidden transition-[max-height] duration-500 ease-out border-t hairline ${isMenuOpen ? 'max-h-64' : 'max-h-0'
+              }`}
           >
             <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
               {headerNavItems.map((item) => (
@@ -441,20 +544,26 @@ export default function CustomerStorefront() {
               ))}
               {isLoggedIn && user ? (
                 <li className="pt-3 border-t hairline space-y-2">
-                  <div className="flex items-center justify-between text-xs font-mono">
+                  <div className="flex items-center justify-between text-xs">
                     <span className="font-bold text-[#0a0a0a] truncate flex items-center gap-1.5">
                       <User className="w-3.5 h-3.5 text-[#0a0a0a]/70 shrink-0" />
                       {user.name}
                     </span>
-                    <span className="text-[10px] text-emerald-600 bg-emerald-50 px-1.5 py-0.5 border border-emerald-200 uppercase shrink-0">Đã đăng nhập</span>
                   </div>
                   <div className="flex gap-2">
                     <button
                       type="button"
-                      onClick={() => { setIsMenuOpen(false); setIsProfileOpen(true); }}
+                      onClick={() => { setIsMenuOpen(false); setProfileActiveTab('profile'); setIsProfileOpen(true); }}
                       className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
                     >
                       Hồ sơ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setIsMenuOpen(false); setProfileActiveTab('orders'); setIsProfileOpen(true); }}
+                      className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
+                    >
+                      Đơn hàng
                     </button>
                     <button
                       type="button"
@@ -485,8 +594,8 @@ export default function CustomerStorefront() {
       </header>
 
       {/* ================= 2. EDITORIAL DISPLAY HERO (FULL VIEWPORT MINUS HEADER) ================= */}
-      <section 
-        id="hero" 
+      <section
+        id="hero"
         className="relative w-full border-b hairline overflow-hidden bg-[#0a0a0a] text-white flex flex-col justify-between h-[calc(100dvh-68px)] md:h-[calc(100dvh-88px)] min-h-[560px]"
       >
         {/* Full-Bleed Background Image */}
@@ -505,27 +614,27 @@ export default function CustomerStorefront() {
         <div className="relative z-10 max-w-[1400px] w-full mx-auto px-6 md:px-10 my-auto py-6 md:py-8">
           <div className="space-y-4 md:space-y-6 max-w-3xl">
             <div className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/90 flex items-center gap-2.5 font-medium">
-              <span>{siteContent?.home?.hero_badge || 'COLLECTION 01 / THE INTERFACE SERIES'}</span>
+              <span>{siteContent?.home?.hero_badge || 'TUYỂN TẬP ĐỒ HIỆU ĐƯƠNG ĐẠI / CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}</span>
             </div>
-            
+
             <h1 className="font-wide uppercase leading-[0.92] tracking-tight text-[10vw] md:text-[7vw] lg:text-[5.8vw] xl:text-[78px] text-white drop-shadow-md">
-              {siteContent?.home?.hero_title || 'DESIGN, CUT TO MEASURE.'}
+              {siteContent?.home?.hero_title || 'ĐỒ HIỆU CHẤT LƯỢNG. ĐỊNH HÌNH PHONG CÁCH.'}
             </h1>
 
             <div className="max-w-xl space-y-5 pt-1">
               <p className="text-[14px] md:text-[16px] leading-relaxed text-white/90 font-light drop-shadow-sm">
-                {siteContent?.home?.hero_description || 'An editorial retail experiment constructed for autonomous commerce. Pure monochrome plates, real-time inventory locking, and zero excess ornament.'}
+                {siteContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
               </p>
 
               <div className="flex flex-wrap items-center gap-4 text-[11px] tracking-wide-2 uppercase font-medium pt-2">
                 {/* Nút 1: Săn đồ hiệu ngay (Micro-interaction: Liquid Bottom Fill + Shimmer Sheen + Arrow Eject) */}
-                <a 
-                  href="#collection" 
+                <a
+                  href="#collection"
                   className="group relative overflow-hidden inline-flex items-center gap-3 px-7 py-3.5 bg-white text-[#0a0a0a] font-bold tracking-wider rounded-xs shadow-[0_10px_25px_rgba(0,0,0,0.4)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
                 >
                   {/* Background Liquid Fill (slides from bottom up) */}
                   <span className="absolute inset-0 bg-[#0a0a0a] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-0" />
-                  
+
                   {/* Sheen reflection sweep */}
                   <span className="absolute -inset-full top-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -skew-x-12 translate-x-[-120%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out z-10 pointer-events-none" />
 
@@ -537,14 +646,14 @@ export default function CustomerStorefront() {
                 </a>
 
                 {/* Nút 2: Bảng chọn size chuẩn (Micro-interaction: Frosted Glass + Liquid Fill + Rotating Ruler + Modal Trigger) */}
-                <button 
+                <button
                   type="button"
                   onClick={() => setIsSizeGuideOpen(true)}
                   className="group relative overflow-hidden inline-flex items-center gap-2.5 px-6 py-3.5 border border-white/60 text-white backdrop-blur-md bg-white/5 rounded-xs transition-all duration-300 hover:border-white hover:bg-white shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer font-medium tracking-wider"
                 >
                   {/* Background Liquid Fill (slides from bottom up) */}
                   <span className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-0" />
-                  
+
                   {/* Button Content */}
                   <span className="relative z-10 flex items-center gap-2.5 transition-colors duration-300 group-hover:text-[#0a0a0a]">
                     <Ruler className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-45" />
@@ -556,12 +665,15 @@ export default function CustomerStorefront() {
           </div>
         </div>
 
-        {/* 4-Plate Process Strip (Docked perfectly along bottom of screen) */}
+        {/* 4-Plate Process Strip (Docked along bottom of screen, links to brand collections) */}
         <div className="relative z-10 border-t border-white/15 bg-black/85 backdrop-blur-md text-white shrink-0">
           <div className="grid grid-cols-2 md:grid-cols-4">
-            
+
             {/* Plate 1 - Lacoste */}
-            <div className="group relative overflow-hidden border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer">
+            <Link
+              href="/products?brand=col-lacoste"
+              className="group relative overflow-hidden border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer block"
+            >
               {/* Left: Brand Icon on hover */}
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
@@ -577,16 +689,19 @@ export default function CustomerStorefront() {
               {/* Right: Text remains intact, switches to dark on hover */}
               <div className="text-right transition-colors duration-200">
                 <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
-                  {siteContent?.home?.hero_plate1_tag || 'Concept'}
+                  {siteContent?.home?.hero_plate1_tag || 'Áo Polo'}
                 </span>
                 <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
-                  {siteContent?.home?.hero_plate1_title || 'Canvas'}
+                  {siteContent?.home?.hero_plate1_title || 'DÒNG CÁ SẤU'}
                 </span>
               </div>
-            </div>
+            </Link>
 
             {/* Plate 2 - Calvin Klein */}
-            <div className="group relative overflow-hidden border-r md:border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer">
+            <Link
+              href="/products?brand=col-ck"
+              className="group relative overflow-hidden border-r md:border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer block"
+            >
               {/* Left: Brand Icon on hover */}
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
@@ -602,16 +717,19 @@ export default function CustomerStorefront() {
               {/* Right: Text remains intact, switches to dark on hover */}
               <div className="text-right transition-colors duration-200">
                 <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
-                  {siteContent?.home?.hero_plate2_tag || 'Drape'}
+                  {siteContent?.home?.hero_plate2_tag || 'Denim & Tee'}
                 </span>
                 <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
-                  {siteContent?.home?.hero_plate2_title || 'Compose'}
+                  {siteContent?.home?.hero_plate2_title || 'DÒNG XI-KÊ'}
                 </span>
               </div>
-            </div>
+            </Link>
 
             {/* Plate 3 - Tommy Hilfiger */}
-            <div className="group relative overflow-hidden border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer">
+            <Link
+              href="/products?brand=col-tommy"
+              className="group relative overflow-hidden border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer block"
+            >
               {/* Left: Brand Icon on hover */}
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
@@ -627,16 +745,19 @@ export default function CustomerStorefront() {
               {/* Right: Text remains intact, switches to dark on hover */}
               <div className="text-right transition-colors duration-200">
                 <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
-                  {siteContent?.home?.hero_plate3_tag || 'Craft'}
+                  {siteContent?.home?.hero_plate3_tag || 'Phong cách Mỹ'}
                 </span>
                 <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
-                  {siteContent?.home?.hero_plate3_title || 'Refine'}
+                  {siteContent?.home?.hero_plate3_title || 'DÒNG TÔ-MÌ'}
                 </span>
               </div>
-            </div>
+            </Link>
 
             {/* Plate 4 - Levi's */}
-            <div className="group relative overflow-hidden px-6 py-3.5 md:py-4.5 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer">
+            <Link
+              href="/products?brand=col-levis"
+              className="group relative overflow-hidden px-6 py-3.5 md:py-4.5 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer block"
+            >
               {/* Left: Brand Icon on hover */}
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
@@ -652,13 +773,13 @@ export default function CustomerStorefront() {
               {/* Right: Text remains intact, switches to dark on hover */}
               <div className="text-right transition-colors duration-200">
                 <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
-                  {siteContent?.home?.hero_plate4_tag || 'Dispatch'}
+                  {siteContent?.home?.hero_plate4_tag || 'Jeans Đinh Tán'}
                 </span>
                 <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
-                  {siteContent?.home?.hero_plate4_title || 'Ship'}
+                  {siteContent?.home?.hero_plate4_title || 'DÒNG LÊ-VY'}
                 </span>
               </div>
-            </div>
+            </Link>
 
           </div>
         </div>
@@ -669,26 +790,26 @@ export default function CustomerStorefront() {
         <div className="marquee-track">
           {/* Group 1 */}
           <div className="flex items-center text-[11px] md:text-[12px] tracking-mono uppercase text-[#0a0a0a]/70">
-            <span className="px-8">{siteContent?.home?.marquee_text || 'ATELIER • AUTONOMOUS MONOCHROME COMMERCE • ARCHIVE EDITIONS • CUT TO MEASURE •'}</span>
+            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • KHO D1 THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
           </div>
           {/* Group 2 (Duplicate for infinite seamless loop) */}
           <div aria-hidden="true" className="flex items-center text-[11px] md:text-[12px] tracking-mono uppercase text-[#0a0a0a]/70">
-            <span className="px-8">{siteContent?.home?.marquee_text || 'ATELIER • AUTONOMOUS MONOCHROME COMMERCE • ARCHIVE EDITIONS • CUT TO MEASURE •'}</span>
+            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • KHO D1 THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
           </div>
         </div>
       </section>
 
       {/* ================= 4. EDITORIAL PRODUCT GRID ================= */}
       <section id="product" className="max-w-[1400px] mx-auto px-6 md:px-10 py-20 md:py-28">
-        
+
         {/* Section Header */}
         <div className="reveal flex flex-col sm:flex-row sm:items-end justify-between border-b hairline pb-6 mb-12 gap-4">
           <div>
             <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block mb-2 font-mono">
-              {siteContent?.home?.collection_badge || 'The Product Collection'}
+              {siteContent?.home?.collection_badge || 'LOOKBOOK 4 HÃNG NỔI TIẾNG'}
             </span>
             <h2 className="font-wide uppercase text-[8vw] md:text-[44px] leading-tight">
-              {siteContent?.home?.collection_title || 'Looks of the season'}
+              {siteContent?.home?.collection_title || 'THIẾT KẾ ĐƯỢC CHĂM CHÚT NHẤT'}
             </h2>
           </div>
         </div>
@@ -716,7 +837,7 @@ export default function CustomerStorefront() {
                   <div className="space-y-4">
                     {/* Product Image Plate */}
                     <div className="relative group/plate">
-                      <Link 
+                      <Link
                         href={`/products/${product.id}`}
                         className="aspect-[4/5] bg-[#0a0a0a]/5 overflow-hidden relative cursor-pointer border hairline block"
                       >
@@ -725,7 +846,7 @@ export default function CustomerStorefront() {
                           alt={product.name}
                           className="w-full h-full object-cover contrast-105 group-hover:scale-105 transition-transform duration-700 ease-out"
                         />
-                        
+
                         {/* Corner Number */}
                         <span className="absolute top-4 left-4 text-[10px] font-mono tracking-widest bg-white/90 backdrop-blur-sm px-2 py-1 uppercase text-[#0a0a0a]">
                           No. {plateNumber}
@@ -751,7 +872,7 @@ export default function CustomerStorefront() {
                         <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
                           {product.category}
                         </span>
-                        <Link 
+                        <Link
                           href={`/products/${product.id}`}
                           className="font-wide uppercase text-base md:text-lg font-semibold cursor-pointer group-hover:opacity-70 transition-opacity block min-h-[3.25rem] line-clamp-2"
                         >
@@ -816,41 +937,41 @@ export default function CustomerStorefront() {
       <section id="studio" className="w-full bg-[#0a0a0a] text-white border-y hairline-dark">
         <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-24 md:py-32">
           <div className="grid md:grid-cols-12 gap-12 lg:gap-16 items-start">
-            
+
             {/* Left Column: Big Headline */}
             <div className="reveal md:col-span-6 space-y-4">
               <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/60 block">
-                {siteContent?.home?.studio_badge || siteContent?.studio?.badge || 'The Fitting Room'}
+                {siteContent?.home?.studio_badge || siteContent?.studio?.badge || 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC'}
               </span>
               <h2 className="font-wide uppercase text-[10vw] md:text-[52px] leading-[0.95] tracking-tight">
-                {siteContent?.home?.studio_title || siteContent?.studio?.title || 'Crafted at the edge. Verified by code.'}
+                {siteContent?.home?.studio_title || siteContent?.studio?.title || 'Chất vải nguyên bản. Form dáng vừa vặn từng centimet.'}
               </h2>
             </div>
 
             {/* Right Column: Narrative + DL Definition List */}
             <div className="reveal md:col-span-6 space-y-8" style={{ transitionDelay: '150ms' }}>
               <p className="text-[15px] md:text-[16px] leading-relaxed text-white/70 font-light">
-                {siteContent?.home?.studio_narrative || siteContent?.studio?.narrative || 'Every garment is linked to Cloudflare D1 distributed edge storage. Zero speculative inventory, instant double-entry accounting records, and automated dispatch upon bank confirmation.'}
+                {siteContent?.home?.studio_narrative || siteContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, sổ cái D1 xác thực giao dịch sau 3 giây để đóng gói giao ngay.'}
               </p>
 
               <dl className="border-b hairline-dark">
                 <div className="flex justify-between py-5 border-t hairline-dark text-xs">
                   <dt className="text-white/60 uppercase tracking-wide-2">Web Canvas</dt>
-                  <dd className="font-mono text-white">{siteContent?.home?.studio_canvas || siteContent?.studio?.spec_canvas || 'Full-bleed monochrome UI'}</dd>
+                  <dd className="font-mono text-white">{siteContent?.home?.studio_canvas || siteContent?.studio?.spec_canvas || 'Form Á / Âu chuẩn size'}</dd>
                 </div>
                 <div className="flex justify-between py-5 border-t hairline-dark text-xs">
-                  <dt className="text-white/60 uppercase tracking-wide-2">Inventory Engine</dt>
-                  <dd className="font-mono text-white">{siteContent?.home?.studio_ledger || siteContent?.studio?.spec_ledger || 'Cloudflare D1 APAC (Singapore)'}</dd>
+                  <dt className="text-white/60 uppercase tracking-wide-2">Kho hàng thực tế</dt>
+                  <dd className="font-mono text-white">{siteContent?.home?.studio_ledger || siteContent?.studio?.spec_ledger || 'Kho hàng thực tế D1 (Singapore)'}</dd>
                 </div>
                 <div className="flex justify-between py-5 border-t hairline-dark text-xs">
-                  <dt className="text-white/60 uppercase tracking-wide-2">Fulfillment Dispatch</dt>
-                  <dd className="font-mono text-white">Zero-touch GHN / GHTK API</dd>
+                  <dt className="text-white/60 uppercase tracking-wide-2">Vận chuyển</dt>
+                  <dd className="font-mono text-white">Giao hàng hỏa tốc toàn quốc</dd>
                 </div>
               </dl>
 
               <div>
                 <a href="#product" className="nav-link text-[11px] tracking-wide-2 uppercase font-medium text-white">
-                  Order a garment now
+                  Chọn sản phẩm ngay
                 </a>
               </div>
             </div>
@@ -862,13 +983,13 @@ export default function CustomerStorefront() {
       {/* ================= 6. CENTERED MANIFESTO ================= */}
       <section id="manifesto" className="reveal max-w-[1100px] mx-auto text-center py-28 md:py-36 px-6 md:px-10">
         <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block mb-6">
-          {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'Manifesto'}
+          {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI CÁI SHOP'}
         </span>
         <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight">
-          "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'True luxury is not ornament. It is the absolute precision of cut, material integrity, and silent execution.'}"
+          "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
         </blockquote>
         <div className="mt-8 text-[11px] tracking-mono uppercase text-[#0a0a0a]/50">
-          {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'Atelier / Caishop Architecture 2026'}
+          {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
         </div>
       </section>
 
@@ -876,18 +997,18 @@ export default function CustomerStorefront() {
       <section className="reveal w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark">
         <div className="max-w-[1000px] mx-auto space-y-8">
           <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/50 block">
-            {siteContent?.home?.cta_badge || 'Begin the sequence'}
+            {siteContent?.home?.cta_badge || 'SỐ LƯỢNG MỖI MẪU CÓ HẠN'}
           </span>
           <h2 className="font-wide uppercase text-[11vw] md:text-[7vw] leading-[0.9] tracking-tight">
-            {siteContent?.home?.cta_title || 'Begin your first fitting.'}
+            {siteContent?.home?.cta_title || 'SỞ HỮU ITEM ĐỒ HIỆU ƯA THÍCH'}
           </h2>
-          
+
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
             <a
               href="#product"
               className="w-full sm:w-auto px-8 py-3.5 bg-white text-[#0a0a0a] text-[11px] tracking-wide-2 uppercase font-medium hover:bg-white/90 transition-colors"
             >
-              {siteContent?.home?.cta_button_text || 'Start shopping'}
+              {siteContent?.home?.cta_button_text || 'CHỐT ĐƠN NGAY'}
             </a>
             <Link
               href="/admin"
@@ -898,7 +1019,7 @@ export default function CustomerStorefront() {
           </div>
 
           <p className="text-[11px] font-mono text-white/40 pt-4">
-            {siteContent?.home?.cta_note || 'Direct VietQR dynamic settlement • Instant ledger confirmation'}
+            {siteContent?.home?.cta_note || 'Quét mã VietQR tự động xác nhận đơn • Bao kiểm tra chất vải khi nhận hàng'}
           </p>
         </div>
       </section>
@@ -906,12 +1027,12 @@ export default function CustomerStorefront() {
       {/* ================= 8. DARK EDITORIAL FOOTER ================= */}
       <footer className="w-full bg-[#0a0a0a] text-white border-t hairline-dark px-6 md:px-10 py-16">
         <div className="max-w-[1400px] mx-auto space-y-12">
-          
+
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-6 space-y-2">
-              <div className="font-wide text-2xl uppercase tracking-mono">{siteContent?.home?.footer_brand || 'ATELIER'}</div>
+              <div className="font-wide text-2xl uppercase tracking-mono">{siteContent?.home?.footer_brand || 'CÁI SHOP - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN'}</div>
               <p className="text-xs text-white/50 max-w-sm font-light">
-                {siteContent?.home?.footer_address || 'High-fashion monochrome storefront powered by Next.js & Cloudflare D1.'}
+                {siteContent?.home?.footer_address || 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận Cloudflare D1'}
               </p>
             </div>
 
@@ -957,7 +1078,7 @@ export default function CustomerStorefront() {
       {activeProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white border hairline max-w-2xl w-full p-6 md:p-8 space-y-6 max-h-[90vh] overflow-y-auto">
-            
+
             <div className="flex items-start justify-between border-b hairline pb-4">
               <div>
                 <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block">
@@ -986,14 +1107,9 @@ export default function CustomerStorefront() {
                     className="w-full h-full object-cover contrast-105"
                   />
                   {currentQuickViewImg && (
-                    <>
-                      <span className="absolute top-2 left-2 text-[9px] font-mono px-2 py-0.5 bg-white/95 text-black border hairline uppercase font-medium">
-                        {currentQuickViewImg.plate} • {currentQuickViewImg.tag}
-                      </span>
-                      <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 bg-black text-white font-bold">
-                        0{quickViewImageIndex + 1}/04
-                      </span>
-                    </>
+                    <span className="absolute top-2 right-2 text-[9px] font-mono px-1.5 py-0.5 bg-black text-white font-bold">
+                      0{quickViewImageIndex + 1}/04
+                    </span>
                   )}
                 </div>
 
@@ -1006,16 +1122,10 @@ export default function CustomerStorefront() {
                         key={g.id}
                         type="button"
                         onClick={() => setQuickViewImageIndex(idx)}
-                        className={`aspect-[4/5] bg-black/5 border hairline overflow-hidden relative cursor-pointer transition-all ${
-                          isActive ? 'ring-2 ring-black opacity-100' : 'opacity-60 hover:opacity-100'
-                        }`}
+                        className={`aspect-[4/5] bg-black/5 border hairline overflow-hidden relative cursor-pointer transition-all ${isActive ? 'ring-2 ring-black opacity-100' : 'opacity-60 hover:opacity-100'
+                          }`}
                       >
                         <img src={g.url} alt="" className="w-full h-full object-cover" />
-                        <span className={`absolute bottom-0.5 left-0.5 text-[8px] font-mono px-1 ${
-                          isActive ? 'bg-black text-white font-bold' : 'bg-white/95 text-black'
-                        }`}>
-                          0{idx + 1}
-                        </span>
                       </button>
                     );
                   })}
@@ -1042,11 +1152,10 @@ export default function CustomerStorefront() {
                         <button
                           key={color}
                           onClick={() => setSelectedColor(color)}
-                          className={`px-3 py-1.5 text-xs font-mono border transition-all ${
-                            selectedColor === color
+                          className={`px-3 py-1.5 text-xs font-mono border transition-all ${selectedColor === color
                               ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                               : 'bg-white text-[#0a0a0a] border-black/20 hover:border-black'
-                          }`}
+                            }`}
                         >
                           {color}
                         </button>
@@ -1070,11 +1179,10 @@ export default function CustomerStorefront() {
                         <button
                           key={size}
                           onClick={() => setSelectedSize(size)}
-                          className={`w-10 h-9 text-xs font-mono border transition-all ${
-                            selectedSize === size
+                          className={`w-10 h-9 text-xs font-mono border transition-all ${selectedSize === size
                               ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                               : 'bg-white text-[#0a0a0a] border-black/20 hover:border-black'
-                          }`}
+                            }`}
                         >
                           {size}
                         </button>
@@ -1116,17 +1224,20 @@ export default function CustomerStorefront() {
       {/* ================= BAG DRAWER ================= */}
       {isBagOpen && (
         <div className="fixed inset-0 z-50 flex justify-end bg-black/60 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-white h-full shadow-2xl flex flex-col justify-between border-l hairline">
-            
-            {/* Drawer Header */}
-            <div className="p-6 border-b hairline flex items-center justify-between">
+          {/* Backdrop click to close */}
+          <div className="absolute inset-0" onClick={() => setIsBagOpen(false)} />
+
+          <div className="relative w-full max-w-md bg-white h-full shadow-2xl flex flex-col border-l hairline overflow-hidden animate-in slide-in-from-right duration-300">
+
+            {/* Drawer Header (Fixed shrink-0) */}
+            <div className="p-6 border-b hairline flex items-center justify-between bg-white shrink-0">
               <div>
                 <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block">Danh mục chọn</span>
                 <h3 className="font-wide uppercase text-sm font-semibold">Giỏ hàng ({totalBagCount})</h3>
               </div>
               <button
                 onClick={() => setIsBagOpen(false)}
-                className="p-1 hover:opacity-50 text-[#0a0a0a]"
+                className="p-1 hover:opacity-50 text-[#0a0a0a] cursor-pointer"
                 aria-label="Đóng"
               >
                 ✕
@@ -1155,22 +1266,22 @@ export default function CustomerStorefront() {
                     />
                     <div className="flex-1 min-w-0 space-y-1">
                       <div className="text-xs font-semibold uppercase font-wide truncate">{item.product_name}</div>
-                      <div className="text-[11px] font-mono text-[#0a0a0a]/60">
+                      <div className="text-[11px] text-[#0a0a0a]/60">
                         {item.color} / Size {item.size}
                       </div>
-                      <div className="text-xs font-mono font-medium pt-1">
+                      <div className="text-xs font-medium pt-1 tabular-nums">
                         {formatMoney(item.price)}
                       </div>
 
                       <div className="flex items-center justify-between pt-2">
-                        <div className="flex items-center border hairline text-xs font-mono">
+                        <div className="flex items-center border hairline text-xs">
                           <button
                             onClick={() => updateCartQty(item.variant_id, -1)}
                             className="px-2 py-0.5 hover:bg-black/5"
                           >
                             -
                           </button>
-                          <span className="px-2.5">{item.quantity}</span>
+                          <span className="px-2.5 tabular-nums">{item.quantity}</span>
                           <button
                             onClick={() => updateCartQty(item.variant_id, 1)}
                             className="px-2 py-0.5 hover:bg-black/5"
@@ -1189,37 +1300,166 @@ export default function CustomerStorefront() {
                   </div>
                 ))
               )}
+
+              {/* Deal Selection Area (inside scrollable body) */}
+              {cart.length > 0 && (
+                <div className="space-y-2.5 pt-4 border-t hairline">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-[#0a0a0a]/70 flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-[#0a0a0a]" />
+                      <span>Chọn Deal / Khuyến mãi</span>
+                    </span>
+                    {appliedDealCode && (
+                      <button
+                        type="button"
+                        onClick={() => setAppliedDealCode(null)}
+                        className="text-[11px] text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                      >
+                        Bỏ chọn
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    {AVAILABLE_DEALS.map((deal) => {
+                      const isSelected = appliedDealCode === deal.code;
+                      const hasMinOrder = Boolean((deal.min_order ?? 0) > 0);
+                      const isMinOrderReached = hasMinOrder ? cartSubtotal >= (deal.min_order ?? 0) : true;
+
+                      if (isSelected) {
+                        return (
+                          <div
+                            key={deal.code}
+                            onClick={() => setAppliedDealCode(null)}
+                            className="p-3 rounded-xl bg-black text-white border border-black shadow-xs flex items-start justify-between gap-3 cursor-pointer transition-all active:scale-[0.99]"
+                            title="Bấm để bỏ chọn mã này"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold tracking-wide text-white">{deal.code}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-white/20 text-white">
+                                    {deal.discount}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-white/80 font-mono">Đang chọn ✓</span>
+                              </div>
+                              <div className="text-[11px] text-white/70 mt-1 leading-snug">
+                                {deal.title} • {deal.condition}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (isMinOrderReached) {
+                        return (
+                          <div
+                            key={deal.code}
+                            onClick={() => setAppliedDealCode(deal.code)}
+                            className="p-3 rounded-xl bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-400 shadow-2xs flex items-start justify-between gap-3 cursor-pointer transition-all active:scale-[0.99] group"
+                            title="Bấm để áp dụng mã"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="text-xs font-bold text-slate-900 group-hover:text-black">{deal.code}</span>
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-semibold bg-rose-50 text-rose-600 border border-rose-200">
+                                    {deal.discount}
+                                  </span>
+                                </div>
+                                <span className="text-[11px] text-emerald-600 font-medium group-hover:underline">Áp dụng →</span>
+                              </div>
+                              <div className="text-[11px] text-slate-500 mt-1 leading-snug">
+                                {deal.title} • {deal.condition}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Ineligible deal (matches exact design in user screenshot)
+                      return (
+                        <div
+                          key={deal.code}
+                          className="p-3 rounded-xl bg-slate-50/80 border border-slate-200/70 select-none cursor-not-allowed"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-slate-400">{deal.code}</span>
+                              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-slate-200/70 text-slate-500">
+                                {deal.discount}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-400 italic">Chưa đủ điều kiện</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-1 leading-snug">
+                            {deal.title} • {deal.condition}
+                          </div>
+                          <p className="text-[10px] text-amber-700/80 font-medium mt-1">
+                            Mua thêm {formatMoney((deal.min_order || 0) - cartSubtotal)} để áp dụng mã này
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {/* Summary & Checkout Button */}
+            {/* Summary & Checkout Button (Sticky Footer shrink-0) */}
             {cart.length > 0 && (
-              <div className="p-6 border-t hairline bg-[#0a0a0a]/[0.02] space-y-4">
-                <div className="space-y-1.5 text-xs font-mono">
+              <div className="p-6 border-t hairline bg-white shrink-0 space-y-3 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
+                <div className="space-y-1.5 text-xs">
                   <div className="flex justify-between text-[#0a0a0a]/60">
                     <span>Subtotal</span>
-                    <span>{formatMoney(cartSubtotal)}</span>
+                    <span className="tabular-nums">{formatMoney(cartSubtotal)}</span>
                   </div>
+                  {Boolean(dealDiscount > 0 && appliedDeal) && (
+                    <div className="flex justify-between text-emerald-600 font-semibold">
+                      <span className="flex items-center gap-1">
+                        <span>{appliedDeal?.title}:</span>
+                        <button
+                          type="button"
+                          onClick={() => setAppliedDealCode(null)}
+                          className="text-[10px] text-slate-400 hover:text-rose-600 underline ml-1 cursor-pointer font-normal"
+                          title="Bỏ áp dụng deal"
+                        >
+                          (Bỏ chọn)
+                        </button>
+                      </span>
+                      <span className="tabular-nums">-{formatMoney(dealDiscount)}</span>
+                    </div>
+                  )}
+                  {Boolean(appliedDeal && (appliedDeal.min_order ?? 0) > 0 && cartSubtotal < (appliedDeal.min_order ?? 0)) && (
+                    <div className="text-[11px] text-amber-700 bg-amber-50 px-2.5 py-1.5 border border-amber-200 rounded">
+                      Deal {appliedDeal?.code}: Mua thêm {formatMoney((appliedDeal?.min_order ?? 0) - cartSubtotal)} để được {appliedDeal?.discount}
+                    </div>
+                  )}
                   <div className="flex justify-between text-[#0a0a0a]/60">
-                    <span>Dispatch (GHN/GHTK)</span>
-                    <span>{cartShippingFee === 0 ? 'Complimentary' : formatMoney(cartShippingFee)}</span>
+                    <span>Vận chuyển tiêu chuẩn</span>
+                    <span className="tabular-nums">
+                      {isFreeshipDeal
+                        ? '0 ₫ (Voucher Freeship)'
+                        : cartShippingFee === 0
+                          ? 'Complimentary'
+                          : formatMoney(cartShippingFee)}
+                    </span>
                   </div>
                   <div className="flex justify-between text-sm font-semibold pt-2 border-t hairline text-[#0a0a0a]">
                     <span>Total</span>
-                    <span>{formatMoney(cartTotal)}</span>
+                    <span className="tabular-nums">{formatMoney(cartTotal)}</span>
                   </div>
                 </div>
 
                 {!isLoggedIn ? (
-                  <div className="space-y-2">
-                    <p className="text-[11px] text-slate-500 text-center font-mono">
+                  <div className="space-y-2 pt-1">
+                    <p className="text-[11px] text-slate-500 text-center">
                       Vui lòng đăng nhập tài khoản để tiếp tục thanh toán.
                     </p>
                     <button
                       onClick={() => {
-                        const returnPath = typeof window !== 'undefined'
-                          ? window.location.pathname + '?openCart=true'
-                          : '/?openCart=true';
-                        window.location.href = `/login?redirect=${encodeURIComponent(returnPath)}&reason=checkout`;
+                        window.location.href = `/login?redirect=${encodeURIComponent('/checkout')}&reason=checkout`;
                       }}
                       className="w-full py-3.5 bg-[#0f172a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-[#1e293b] transition-colors flex items-center justify-center gap-2 cursor-pointer"
                     >
@@ -1228,21 +1468,18 @@ export default function CustomerStorefront() {
                     </button>
                   </div>
                 ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[11px] font-mono text-slate-600 bg-slate-50 px-3 py-1.5 border hairline">
-                      <span className="truncate flex items-center gap-1.5">
-                        <User className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                        {user?.name}
-                      </span>
-                      <span className="text-[10px] text-emerald-600 font-semibold uppercase">Đã xác thực</span>
-                    </div>
-                    <button
-                      onClick={() => setIsCheckingOut(true)}
-                      className="w-full py-3.5 bg-[#0a0a0a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black/90 transition-colors cursor-pointer"
-                    >
-                      Tiến hành thanh toán VietQR
-                    </button>
-                  </div>
+                  <Link
+                    href="/checkout"
+                    onClick={() => {
+                      if (appliedDeal && appliedDeal.min_order && cartSubtotal < appliedDeal.min_order) {
+                        setAppliedDealCode(null);
+                      }
+                      setIsBagOpen(false);
+                    }}
+                    className="w-full py-3.5 bg-[#0a0a0a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black/90 transition-colors cursor-pointer text-center block mt-1"
+                  >
+                    Tiến hành thanh toán
+                  </Link>
                 )}
               </div>
             )}
@@ -1255,7 +1492,7 @@ export default function CustomerStorefront() {
       {isCheckingOut && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-white border hairline max-w-lg w-full p-6 md:p-8 space-y-6">
-            
+
             <div className="flex items-center justify-between border-b hairline pb-4">
               <div>
                 <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block">Settlement</span>
@@ -1353,7 +1590,7 @@ export default function CustomerStorefront() {
       {orderSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="bg-white border hairline max-w-md w-full p-8 text-center space-y-6">
-            
+
             <div className="space-y-2">
               <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block">Receipt Verified</span>
               <h3 className="font-wide uppercase text-xl font-bold">Order Received</h3>
@@ -1407,11 +1644,11 @@ export default function CustomerStorefront() {
 
       {/* Size Guide Modal (Bảng Quy Đổi Size Chuẩn 4 Hãng Đồ Hiệu) */}
       {isSizeGuideOpen && (
-        <div 
+        <div
           className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 md:p-6 overflow-y-auto"
           onClick={() => setIsSizeGuideOpen(false)}
         >
-          <div 
+          <div
             className="bg-[#0f0f0f] border border-white/20 text-white max-w-2xl w-full my-auto shadow-2xl relative overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
@@ -1430,7 +1667,7 @@ export default function CustomerStorefront() {
                   </p>
                 </div>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => setIsSizeGuideOpen(false)}
                 className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-full transition-all cursor-pointer"
@@ -1451,11 +1688,10 @@ export default function CustomerStorefront() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveSizeBrand(tab.id as any)}
-                  className={`py-3 px-3 text-center transition-all cursor-pointer border-b-2 flex flex-col items-center justify-center ${
-                    activeSizeBrand === tab.id
+                  className={`py-3 px-3 text-center transition-all cursor-pointer border-b-2 flex flex-col items-center justify-center ${activeSizeBrand === tab.id
                       ? 'border-white bg-white/10 text-white font-semibold'
                       : 'border-transparent text-white/50 hover:text-white/80 hover:bg-white/5'
-                  }`}
+                    }`}
                 >
                   <span className="font-wide">{tab.label}</span>
                   <span className="text-[9px] opacity-60 normal-case">{tab.desc}</span>
@@ -1696,9 +1932,9 @@ export default function CustomerStorefront() {
                   <span>Kinh nghiệm chọn size thực tế từ Cái Shop:</span>
                 </div>
                 <p>
-                  Nếu số đo cân nặng hoặc chiều cao của bạn nằm ở ranh giới giữa 2 size: 
-                  thích mặc ôm gọn người (fitted) hãy chọn <strong>size nhỏ hơn</strong>; 
-                  thích thoải mái dễ cử động hãy chọn <strong>size lớn hơn</strong>. 
+                  Nếu số đo cân nặng hoặc chiều cao của bạn nằm ở ranh giới giữa 2 size:
+                  thích mặc ôm gọn người (fitted) hãy chọn <strong>size nhỏ hơn</strong>;
+                  thích thoải mái dễ cử động hãy chọn <strong>size lớn hơn</strong>.
                   Cái Shop hỗ trợ đổi size miễn phí trong 48 giờ nếu chưa vừa vặn.
                 </p>
               </div>
@@ -1756,6 +1992,7 @@ export default function CustomerStorefront() {
         logout={logout}
         onOpenCart={() => setIsBagOpen(true)}
         cartCount={totalBagCount}
+        initialTab={profileActiveTab}
       />
 
     </div>
