@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useHeaderNav } from '@/lib/useSiteContent';
-import { ChevronLeft, ChevronRight, Maximize2, X, ZoomIn, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag } from 'lucide-react';
 import { getProductGallery, getPrimaryImageUrl, ProductImagePlate } from '@/lib/productImages';
 import { calculateTier, getNextTierInfo } from '@/lib/membership';
 import { useAuth } from '@/lib/useAuth';
@@ -19,6 +19,7 @@ interface ProductVariant {
   cost_price: number;
   selling_price: number;
   floor_price: number;
+  image_url?: string | null;
   physical_qty: number;
   reserved_qty: number;
   available_qty: number;
@@ -92,9 +93,58 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
   const [activeImageIndex, setActiveImageIndex] = useState<number>(0);
   const [isLightboxOpen, setIsLightboxOpen] = useState<boolean>(false);
 
-  // Danh sách 4 hình ảnh kèm chú thích chuyên sâu cho sản phẩm
-  const galleryImages = useMemo(() => getProductGallery(product), [product]);
+  // Active variant
+  const activeVariant = useMemo(() => {
+    return product?.variants.find(
+      (v) => v.color === selectedColor && v.size === selectedSize
+    );
+  }, [product, selectedColor, selectedSize]);
+
+  const availableSizesForColor = useMemo(() => {
+    return product?.variants.filter((v) => v.color === selectedColor) || [];
+  }, [product, selectedColor]);
+
+  const uniqueColors = useMemo(() => {
+    return Array.from(new Set(product?.variants.map((v) => v.color) || []));
+  }, [product]);
+
+  // Ảnh đại diện riêng của biến thể/màu sắc đang chọn
+  const variantColorImage = useMemo(() => {
+    if (!product || !selectedColor) return null;
+    // 1. Ưu tiên biến thể đang chọn chính xác (màu + size)
+    const exact = product.variants.find((v) => v.color === selectedColor && v.size === selectedSize && v.image_url);
+    if (exact?.image_url) return exact.image_url;
+    // 2. Lấy biến thể bất kỳ cùng màu có ảnh
+    const anyOfColor = product.variants.find((v) => v.color === selectedColor && v.image_url);
+    if (anyOfColor?.image_url) return anyOfColor.image_url;
+    return null;
+  }, [product, selectedColor, selectedSize]);
+
+  // Danh sách hình ảnh: Nếu biến thể hoặc màu có ảnh riêng, tự động thay đổi ảnh chính số 1
+  const galleryImages = useMemo(() => {
+    const base = getProductGallery(product);
+    if (variantColorImage) {
+      return [
+        {
+          id: 1,
+          url: variantColorImage,
+          plate: 'MÀU ' + (selectedColor || '').toUpperCase(),
+          tag: 'MÀU ' + (selectedColor || '').toUpperCase(),
+          title: `${product?.name || ''} - Màu ${selectedColor}`,
+          description: `Hình ảnh thực tế phiên bản màu ${selectedColor}`
+        },
+        ...base.slice(1)
+      ];
+    }
+    return base;
+  }, [product, variantColorImage, selectedColor]);
+
   const activeImage = galleryImages[activeImageIndex] || galleryImages[0];
+
+  // Khi người dùng bấm chuyển màu, tự động đưa viewport về ảnh đầu tiên của màu đó
+  useEffect(() => {
+    setActiveImageIndex(0);
+  }, [selectedColor]);
 
   // Toast message
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -200,14 +250,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
     }, 3200);
   };
 
-  // Active variant
-  const activeVariant = product?.variants.find(
-    (v) => v.color === selectedColor && v.size === selectedSize
-  );
-
-  const availableSizesForColor = product?.variants.filter((v) => v.color === selectedColor) || [];
-  const uniqueColors = Array.from(new Set(product?.variants.map((v) => v.color) || []));
-
   // Add to Bag
   const handleAddToBag = () => {
     if (!product || !activeVariant) return;
@@ -231,7 +273,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
         {
           variant_id: activeVariant.id,
           product_name: product.name,
-          product_image: product.image_url || '',
+          product_image: activeVariant.image_url || variantColorImage || product.image_url || '',
           sku: activeVariant.sku,
           color: activeVariant.color,
           size: activeVariant.size,
@@ -416,7 +458,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
             <div className="flex items-center gap-5 lg:gap-7 text-[11px] tracking-wide-2 font-medium uppercase">
               {/* User Dropdown Trigger */}
               {isLoggedIn && user ? (
-                <div ref={userDropdownRef} className="relative">
+                <div ref={userDropdownRef} className="relative hidden lg:block">
                   <button
                     type="button"
                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
@@ -508,7 +550,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                   href="/login"
                   aria-label="Account & Login"
                   title="Tài khoản / Đăng nhập"
-                  className="relative flex items-center text-[#0a0a0a] hover:opacity-70 transition-opacity"
+                  className="relative hidden lg:flex items-center text-[#0a0a0a] hover:opacity-70 transition-opacity"
                 >
                   <svg className="w-5 h-5 md:w-[21px] md:h-[21px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -540,7 +582,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
 
           {/* Mobile Drawer */}
           <div
-            className={`lg:hidden overflow-hidden transition-[max-height] duration-300 ease-out border-t hairline ${isMenuOpen ? 'max-h-64' : 'max-h-0'
+            className={`lg:hidden overflow-hidden transition-[max-height] duration-300 ease-out border-t hairline ${isMenuOpen ? 'max-h-[500px]' : 'max-h-0'
               }`}
           >
             <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
@@ -565,6 +607,15 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                       <User className="w-3.5 h-3.5 text-[#0a0a0a]/70 shrink-0" />
                       {user.name}
                     </span>
+                    {user.role === 'ADMIN' && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="text-[10px] font-mono uppercase bg-slate-900 text-white px-2 py-0.5 rounded font-bold"
+                      >
+                        Quản trị ↗
+                      </Link>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -708,14 +759,8 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 </button>
               </div>
 
-              {/* Thanh chọn 4 bức hình (4 Interactive Thumbnails) */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between text-[10px] font-mono uppercase text-[#0a0a0a]/60">
-                  <span className="font-semibold text-black/80">BỘ 5 GÓC CHỤP SẢN PHẨM</span>
-                  <span>CHỌN ẢNH ĐỂ XEM CHI TIẾT (01 - 05)</span>
-                </div>
-
-                <div className="grid grid-cols-5 gap-2 sm:gap-3">
+              {/* Thanh chọn các bức hình (Interactive Thumbnails) */}
+              <div className="grid grid-cols-5 gap-2 sm:gap-3">
                   {galleryImages.map((img, idx) => {
                     const isActive = activeImageIndex === idx;
                     return (
@@ -736,19 +781,10 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                               }`}
                           />
                         </div>
-                        <div className="mt-1.5">
-                          <div
-                            className={`text-[9px] sm:text-[10px] font-mono uppercase truncate ${isActive ? 'text-black font-bold' : 'text-black/60 group-hover:text-black'
-                              }`}
-                          >
-                            {img.tag}
-                          </div>
-                        </div>
                       </button>
                     );
                   })}
                 </div>
-              </div>
 
             </div>
 
@@ -791,6 +827,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 <div className="flex flex-wrap gap-2.5">
                   {uniqueColors.map((color) => {
                     const isSelected = selectedColor === color;
+                    const colorImg = product.variants.find((v) => v.color === color && v.image_url)?.image_url;
                     return (
                       <button
                         key={color}
@@ -798,13 +835,21 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                           setSelectedColor(color);
                           const matched = product.variants.find((v) => v.color === color);
                           if (matched) setSelectedSize(matched.size);
+                          setActiveImageIndex(0);
                         }}
-                        className={`px-4 py-2 text-xs font-mono uppercase border transition-colors cursor-pointer ${isSelected
-                          ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
+                        className={`px-3.5 py-1.5 text-xs font-mono uppercase border transition-all cursor-pointer flex items-center gap-2 ${isSelected
+                          ? 'bg-[#0a0a0a] text-white border-[#0a0a0a] shadow-xs'
                           : 'bg-white text-black/70 border-black/15 hover:border-black'
                           }`}
                       >
-                        {color}
+                        {colorImg && (
+                          <img
+                            src={colorImg}
+                            alt={color}
+                            className={`w-4 h-4 rounded-full object-cover border ${isSelected ? 'border-white' : 'border-black/20'}`}
+                          />
+                        )}
+                        <span>{color}</span>
                       </button>
                     );
                   })}
@@ -874,8 +919,8 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 </div>
               </div>
 
-              {/* Action Buttons */}
-              <div className="space-y-3 pt-2">
+              {/* Action Button: Thêm vào giỏ hàng */}
+              <div className="pt-2">
                 <button
                   onClick={handleAddToBag}
                   disabled={!activeVariant || activeVariant.available_qty <= 0}
@@ -886,17 +931,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                     : activeVariant.available_qty <= 0
                       ? 'Tạm hết hàng'
                       : `Thêm vào giỏ hàng • ${formatMoney(activeVariant.selling_price * selectedQty)}`}
-                </button>
-
-                <button
-                  onClick={() => {
-                    handleAddToBag();
-                    setIsCheckingOut(true);
-                  }}
-                  disabled={!activeVariant || activeVariant.available_qty <= 0}
-                  className="w-full py-3.5 border hairline text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black hover:text-white transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  Mua ngay qua VietQR
                 </button>
               </div>
 
@@ -945,62 +979,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
               </div>
             </div>
 
-            {/* Lookbook Archive: Hiển thị trọn vẹn cả 5 bức ảnh kèm chú thích chuyên sâu */}
-            <div className="border hairline p-6 md:p-8 space-y-6 bg-white">
-              <div className="flex items-center justify-between border-b hairline pb-4">
-                <div>
-                  <span className="text-[9px] font-mono uppercase tracking-widest text-[#0a0a0a]/50 block">
-                    ARCHIVAL LOOKBOOK • BỘ 5 GÓC CHỤP ĐẶC TẢ
-                  </span>
-                  <h3 className="font-wide uppercase text-sm sm:text-base mt-0.5">
-                    Chi Tiết Chế Tác & Góc Nhìn Thực Tế
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setIsLightboxOpen(true)}
-                  className="text-[10px] font-mono uppercase underline underline-offset-4 text-black/70 hover:text-black flex items-center gap-1.5 cursor-pointer"
-                >
-                  <ZoomIn className="w-3.5 h-3.5" />
-                  Phóng to
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                {galleryImages.map((plate, idx) => (
-                  <div
-                    key={plate.id}
-                    onClick={() => {
-                      setActiveImageIndex(idx);
-                      setIsLightboxOpen(true);
-                    }}
-                    className="group border hairline p-3 bg-black/[0.01] hover:bg-black/[0.03] transition-colors cursor-pointer space-y-2.5"
-                  >
-                    <div className="aspect-[4/5] bg-black/5 overflow-hidden border hairline relative">
-                      <img
-                        src={plate.url}
-                        alt={plate.title}
-                        className="w-full h-full object-cover filter contrast-105 group-hover:scale-105 transition-all duration-500"
-                      />
-                      <span className="absolute bottom-2 right-2 text-[8px] font-mono uppercase bg-black text-white px-1.5 py-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                        Xem chi tiết ↗
-                      </span>
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[9px] font-mono uppercase text-black/50 font-medium">{plate.tag}</span>
-                        <span className="text-[9px] font-mono text-black/40">Góc 0{idx + 1}/05</span>
-                      </div>
-                      <h4 className="text-xs font-semibold uppercase mt-0.5 text-black line-clamp-1">
-                        {plate.title}
-                      </h4>
-                      <p className="text-[10px] font-mono text-black/60 mt-1 leading-relaxed line-clamp-2">
-                        {plate.description}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </section>
         )}
 

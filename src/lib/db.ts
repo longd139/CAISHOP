@@ -156,6 +156,7 @@ export interface ProductVariant {
   cost_price: number;
   selling_price: number;
   floor_price: number;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -789,6 +790,7 @@ export interface CreateVariantInput {
   cost_price: number;
   selling_price: number;
   floor_price?: number;
+  image_url?: string;
   physical_qty?: number;
   safety_threshold?: number;
   location_code?: string;
@@ -878,9 +880,9 @@ export async function createProduct(input: CreateProductInput): Promise<{ succes
       : Math.max(costPrice, Math.round(sellingPrice * 0.7));
 
     await db.execute(`
-      INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice]);
+      INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, image_url, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.image_url?.trim() || null]);
 
     // Insert Inventory Level
     const invId = `inv-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
@@ -953,6 +955,7 @@ export interface UpdateProductInput {
     cost_price?: number;
     selling_price?: number;
     floor_price?: number;
+    image_url?: string;
     physical_qty?: number;
     safety_threshold?: number;
     location_code?: string;
@@ -1017,9 +1020,9 @@ export async function updateProduct(productId: string, input: UpdateProductInput
         }
         await db.execute(`
           UPDATE product_variants
-          SET sku = ?, color = ?, size = ?, cost_price = ?, selling_price = ?, floor_price = ?, updated_at = datetime('now')
+          SET sku = ?, color = ?, size = ?, cost_price = ?, selling_price = ?, floor_price = ?, image_url = ?, updated_at = datetime('now')
           WHERE id = ?
-        `, [sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.id]);
+        `, [sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.image_url?.trim() || null, v.id]);
 
         const inv = await db.queryFirst<{ id: string }>('SELECT id FROM inventory_levels WHERE variant_id = ?', [v.id]);
         if (inv) {
@@ -1049,9 +1052,9 @@ export async function updateProduct(productId: string, input: UpdateProductInput
         }
 
         await db.execute(`
-          INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-        `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice]);
+          INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, image_url, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.image_url?.trim() || null]);
 
         const invId = `inv-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
         await db.execute(`

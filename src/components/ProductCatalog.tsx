@@ -543,7 +543,7 @@ export default function ProductCatalog() {
             <div className="flex items-center gap-5 lg:gap-7 text-[11px] tracking-wide-2 font-medium uppercase">
               {/* User Dropdown Trigger */}
               {isLoggedIn && user ? (
-                <div ref={userDropdownRef} className="relative">
+                <div ref={userDropdownRef} className="relative hidden lg:block">
                   <button
                     type="button"
                     onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
@@ -635,7 +635,7 @@ export default function ProductCatalog() {
                   href="/login"
                   aria-label="Tài khoản & Đăng nhập"
                   title="Tài khoản & Đăng nhập"
-                  className="relative flex items-center text-[#0a0a0a] hover:opacity-70 transition-opacity"
+                  className="relative hidden lg:flex items-center text-[#0a0a0a] hover:opacity-70 transition-opacity"
                 >
                   <svg className="w-5 h-5 md:w-[21px] md:h-[21px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="square" strokeWidth="1.5" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
@@ -667,7 +667,7 @@ export default function ProductCatalog() {
 
           {/* Mobile Drawer */}
           <div
-            className={`lg:hidden overflow-hidden transition-[max-height] duration-300 ease-out border-t hairline ${isMenuOpen ? 'max-h-64' : 'max-h-0'
+            className={`lg:hidden overflow-hidden transition-[max-height] duration-300 ease-out border-t hairline ${isMenuOpen ? 'max-h-[500px]' : 'max-h-0'
               }`}
           >
             <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
@@ -688,7 +688,19 @@ export default function ProductCatalog() {
               {isLoggedIn && user ? (
                 <li className="pt-3 border-t hairline space-y-2">
                   <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#0a0a0a] truncate">👤 {user.name}</span>
+                    <span className="font-bold text-[#0a0a0a] truncate flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#0a0a0a]/70 shrink-0" />
+                      {user.name}
+                    </span>
+                    {user.role === 'ADMIN' && (
+                      <Link
+                        href="/admin"
+                        onClick={() => setIsMenuOpen(false)}
+                        className="text-[10px] font-mono uppercase bg-slate-900 text-white px-2 py-0.5 rounded font-bold"
+                      >
+                        Quản trị ↗
+                      </Link>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button
