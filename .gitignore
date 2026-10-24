@@ -54,3 +54,6 @@ caishop.db
 # open-next
 /.open-next/
 
+# agents & skills
+.agents/
+skills-lock.json

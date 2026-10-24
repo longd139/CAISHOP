@@ -170,7 +170,12 @@ function LoginForm() {
             } else if (data.user?.role === 'ADMIN') {
               window.location.href = '/admin';
             } else {
-              window.location.href = '/';
+              let hasCart = false;
+              try {
+                const raw = localStorage.getItem('caishop_cart');
+                hasCart = !!(raw && JSON.parse(raw).length > 0);
+              } catch (e) {}
+              window.location.href = hasCart ? '/?openCart=true' : '/';
             }
           }
         }, 400);
@@ -520,7 +525,7 @@ export default function LoginPage() {
         {/* Full-bleed Lookbook Visual Anchor */}
         <div
           className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-luminosity contrast-110"
-          style={{ backgroundImage: `url('/images/hero-atelier.jpg')` }}
+          style={{ backgroundImage: `url('https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg')` }}
         />
         {/* Editorial Gradients */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />
@@ -532,7 +537,7 @@ export default function LoginPage() {
             href="/"
             className="inline-block font-wide text-2xl tracking-widest uppercase text-white hover:opacity-80 transition-opacity"
           >
-            ATELIER
+            DE&apos;GENT
           </Link>
         </div>
 
@@ -551,7 +556,7 @@ export default function LoginPage() {
             <div className="flex items-start gap-3 text-xs text-slate-200">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block font-medium">Hội viên Bạc (Từ 2 sản phẩm):</strong>
+                <strong className="text-white block font-medium">Hội viên Bạc (Từ 3 đơn hàng):</strong>
                 <span className="text-slate-300">Tự động giảm 5% toàn bộ giỏ hàng khi thanh toán.</span>
               </div>
             </div>
@@ -559,8 +564,8 @@ export default function LoginPage() {
             <div className="flex items-start gap-3 text-xs text-slate-200">
               <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <div>
-                <strong className="text-white block font-medium">Hội viên Vàng (Từ 4 sản phẩm):</strong>
-                <span className="text-slate-300">Giảm 10% toàn bộ đơn hàng và ưu tiên đóng gói giao nhanh.</span>
+                <strong className="text-white block font-medium">Hội viên Vàng (Từ 5 đơn hàng):</strong>
+                <span className="text-slate-300">Giảm 10% toàn bộ đơn hàng và nhận chiết khấu hội viên.</span>
               </div>
             </div>
 
@@ -594,7 +599,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md mx-auto my-auto py-10 sm:py-14">
           <div className="mb-8 space-y-1.5">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
-              Chào mừng bạn đến với Atelier
+              Chào mừng bạn đến với DE&apos;GENT
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-light">
               Đăng nhập để quản lý đơn hàng hoặc tiếp tục thanh toán giỏ hàng.
@@ -608,7 +613,7 @@ export default function LoginPage() {
 
         {/* Footer inside right column */}
         <div className="pt-6 border-t border-slate-100 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-          <span>© 2026 CAISHOP. Bảo mật thông tin tuyệt đối.</span>
+          <span>© 2026 DE&apos;GENT. Bảo mật thông tin tuyệt đối.</span>
           <div className="flex items-center gap-4 text-slate-500 text-xs">
             <Link href="/" className="hover:text-slate-900">Trang chủ</Link>
             <Link href="/products" className="hover:text-slate-900">Sản phẩm</Link>

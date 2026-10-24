@@ -1,7 +1,7 @@
 import ProductCatalog from '@/components/ProductCatalog';
 
 export const metadata = {
-  title: 'Product Archive — ATELIER / CAISHOP',
+  title: "Product Archive — DE'GENT",
   description: 'Danh mục sản phẩm thời trang tối giản, cấu trúc định hình và chất liệu chọn lọc.'
 };
 

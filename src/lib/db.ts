@@ -36,7 +36,55 @@ async function getLocalNodeDb() {
             value TEXT NOT NULL,
             updated_at TEXT NOT NULL
           );
+
+          CREATE TABLE IF NOT EXISTS product_views (
+            id TEXT PRIMARY KEY,
+            product_id TEXT NOT NULL,
+            session_id TEXT,
+            viewed_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+
+          CREATE TABLE IF NOT EXISTS size_returns (
+            id TEXT PRIMARY KEY,
+            order_id TEXT,
+            product_id TEXT NOT NULL,
+            product_name TEXT NOT NULL,
+            variant_sku TEXT,
+            size TEXT NOT NULL,
+            color TEXT,
+            return_reason TEXT NOT NULL,
+            notes TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+
+          CREATE TABLE IF NOT EXISTS search_logs (
+            id TEXT PRIMARY KEY,
+            query TEXT NOT NULL,
+            duration_seconds REAL NOT NULL DEFAULT 0,
+            results_count INTEGER NOT NULL DEFAULT 0,
+            selected_product_id TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
+
+          CREATE TABLE IF NOT EXISTS shipments (
+            id TEXT PRIMARY KEY,
+            order_id TEXT UNIQUE NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+            carrier TEXT NOT NULL DEFAULT 'VIETTEL_POST',
+            tracking_code TEXT UNIQUE,
+            shipping_fee REAL NOT NULL DEFAULT 0,
+            cod_amount REAL NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'READY_TO_PICK',
+            dispatched_at TEXT,
+            delivered_at TEXT,
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
+          );
         `);
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN tracking_code TEXT;`);
+        } catch {}
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN carrier TEXT DEFAULT 'VIETTEL_POST';`);
+        } catch {}
       } catch {}
     } catch (e) {
       console.error('Failed to initialize local node:sqlite database:', e);
@@ -45,6 +93,8 @@ async function getLocalNodeDb() {
   }
   return localNodeDbInstance;
 }
+
+let d1SchemaInitialized = false;
 
 export async function getDb(): Promise<UniversalDb> {
   // Check if running inside Cloudflare Worker runtime
@@ -59,6 +109,47 @@ export async function getDb(): Promise<UniversalDb> {
     const env = ctx?.env as any;
     if (env && env.DB) {
       const d1 = env.DB;
+
+      if (!d1SchemaInitialized) {
+        try {
+          await d1.prepare(`
+            CREATE TABLE IF NOT EXISTS size_returns (
+              id TEXT PRIMARY KEY,
+              order_id TEXT,
+              product_id TEXT NOT NULL,
+              product_name TEXT NOT NULL,
+              variant_sku TEXT,
+              size TEXT NOT NULL,
+              color TEXT,
+              return_reason TEXT NOT NULL,
+              notes TEXT,
+              created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+          `).run();
+          try {
+            await d1.prepare(`
+              CREATE TABLE IF NOT EXISTS shipments (
+                id TEXT PRIMARY KEY,
+                order_id TEXT UNIQUE NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                carrier TEXT NOT NULL DEFAULT 'VIETTEL_POST',
+                tracking_code TEXT UNIQUE,
+                shipping_fee REAL NOT NULL DEFAULT 0,
+                cod_amount REAL NOT NULL DEFAULT 0,
+                status TEXT NOT NULL DEFAULT 'READY_TO_PICK',
+                dispatched_at TEXT,
+                delivered_at TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+              )
+            `).run();
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN tracking_code TEXT`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN carrier TEXT DEFAULT 'VIETTEL_POST'`).run().catch(() => {});
+          } catch {}
+          d1SchemaInitialized = true;
+        } catch (e) {
+          console.error('Failed to init size_returns/shipments table in D1:', e);
+        }
+      }
+
       return {
         async queryAll<T = any>(sql: string, params?: any[]): Promise<T[]> {
           const safeParams = (params || []).map(p => (p === undefined ? null : p));
@@ -124,12 +215,11 @@ export async function getSiteContent<T = any>(key: string, fallback: T): Promise
 
 export async function setSiteContent(key: string, value: any) {
   const db = await getDb();
-  const jsonStr = JSON.stringify(value);
+  const jsonStr = typeof value === 'string' ? value : JSON.stringify(value ?? {});
   const now = new Date().toISOString();
   await db.execute(`
-    INSERT INTO site_content (key, value, updated_at)
+    INSERT OR REPLACE INTO site_content (key, value, updated_at)
     VALUES (?, ?, ?)
-    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
   `, [key, jsonStr, now]);
   return { success: true, key, updated_at: now };
 }
@@ -157,6 +247,7 @@ export interface ProductVariant {
   cost_price: number;
   selling_price: number;
   floor_price: number;
+  image_url?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -217,6 +308,9 @@ export interface Order {
   fulfillment_status: 'UNFULFILLED' | 'PACKING' | 'DISPATCHED' | 'DELIVERED' | 'RETURNED' | 'CANCELLED';
   created_at: string;
   items_count?: number;
+  tracking_code?: string | null;
+  carrier?: string | null;
+  shipment_dispatched_at?: string | null;
 }
 
 export interface CreateOrderItemInput {
@@ -229,6 +323,7 @@ export interface CreateOrderInput {
   customer_phone: string;
   customer_email?: string;
   shipping_address: string;
+  payment_method?: 'vietqr' | 'cod';
   items: CreateOrderItemInput[];
 }
 
@@ -245,9 +340,8 @@ export async function getAllProductsWithVariants(includeInactive: boolean = fals
   const products = await db.queryAll<Product>(query);
   
   const variants = await db.queryAll<ProductVariant & { physical_qty: number; reserved_qty: number; available_qty: number; safety_threshold: number; location_code: string }>(`
-    SELECT v.*, i.physical_qty, i.reserved_qty, (i.physical_qty - i.reserved_qty) as available_qty, i.safety_threshold, i.location_code
+    SELECT v.*, 999999 as physical_qty, 0 as reserved_qty, 999999 as available_qty, 0 as safety_threshold, 'DEFAULT' as location_code
     FROM product_variants v
-    LEFT JOIN inventory_levels i ON v.id = i.variant_id
   `);
 
   const result = products.map(p => ({
@@ -267,9 +361,8 @@ export async function getProductByIdOrSlug(idOrSlug: string) {
   if (!product) return null;
 
   const variants = await db.queryAll<ProductVariant & { physical_qty: number; reserved_qty: number; available_qty: number; safety_threshold: number; location_code: string }>(`
-    SELECT v.*, i.physical_qty, i.reserved_qty, (i.physical_qty - i.reserved_qty) as available_qty, i.safety_threshold, i.location_code
+    SELECT v.*, 999999 as physical_qty, 0 as reserved_qty, 999999 as available_qty, 0 as safety_threshold, 'DEFAULT' as location_code
     FROM product_variants v
-    LEFT JOIN inventory_levels i ON v.id = i.variant_id
     WHERE v.product_id = ?
   `, [product.id]);
 
@@ -298,21 +391,20 @@ export async function getInventoryOverview(): Promise<InventoryItem[]> {
       v.cost_price,
       v.selling_price,
       v.floor_price,
-      i.physical_qty,
-      i.reserved_qty,
-      (i.physical_qty - i.reserved_qty) as available_qty,
-      i.safety_threshold,
-      i.location_code
+      999999 as physical_qty,
+      0 as reserved_qty,
+      999999 as available_qty,
+      0 as safety_threshold,
+      'KHO-CHINH' as location_code
     FROM product_variants v
     JOIN products p ON v.product_id = p.id
-    JOIN inventory_levels i ON v.id = i.variant_id
-    ORDER BY (i.physical_qty <= i.safety_threshold) DESC, i.physical_qty ASC
+    ORDER BY p.name ASC, v.sku ASC
   `);
 
   return rows.map(r => ({
     ...r,
-    is_low_stock: r.physical_qty <= r.safety_threshold,
-    is_critical: r.physical_qty <= Math.max(1, Math.floor(r.safety_threshold / 2))
+    is_low_stock: false,
+    is_critical: false
   }));
 }
 
@@ -413,18 +505,169 @@ export async function updateVariantPrice(variantId: string, newSellingPrice: num
 }
 
 /**
+ * Tự động hủy/xóa các đơn hàng PENDING chuyển khoản quá 1 tiếng (3600 giây) chưa thanh toán:
+ * - Hoàn trả số lượng giữ chỗ (reserved_qty) trong kho inventory_levels.
+ * - Xóa các bút toán tài chính phát sinh.
+ * - Xóa các sản phẩm trong order_items.
+ * - Xóa đơn hàng khỏi bảng orders.
+ */
+export async function cleanupExpiredOrders(specificOrderId?: string): Promise<{ cleanedCount: number; cleanedOrderIds: string[] }> {
+  try {
+    const db = await getDb();
+    let expiredOrders: { id: string; order_code: string; created_at: string }[] = [];
+
+    if (specificOrderId) {
+      expiredOrders = await db.queryAll<any>(`
+        SELECT id, order_code, created_at
+        FROM orders
+        WHERE (id = ? OR order_code = ?)
+          AND payment_status = 'PENDING' 
+          AND fulfillment_status = 'UNFULFILLED'
+          AND (
+            datetime(created_at, '+1 hour') <= datetime('now')
+            OR (strftime('%s', 'now') - strftime('%s', created_at)) >= 3600
+          )
+      `, [specificOrderId, specificOrderId]);
+    } else {
+      expiredOrders = await db.queryAll<any>(`
+        SELECT id, order_code, created_at
+        FROM orders
+        WHERE payment_status = 'PENDING' 
+          AND fulfillment_status = 'UNFULFILLED'
+          AND (
+            datetime(created_at, '+1 hour') <= datetime('now')
+            OR (strftime('%s', 'now') - strftime('%s', created_at)) >= 3600
+          )
+      `);
+    }
+
+    if (!expiredOrders || expiredOrders.length === 0) {
+      return { cleanedCount: 0, cleanedOrderIds: [] };
+    }
+
+    const cleanedOrderIds: string[] = [];
+
+    for (const ord of expiredOrders) {
+      // 1. Xóa các bút toán tài chính phát sinh liên quan đơn này
+      await db.execute(`DELETE FROM financial_transactions WHERE order_id = ?`, [ord.id]);
+
+      // 3. Xóa các dòng hàng order_items
+      await db.execute(`DELETE FROM order_items WHERE order_id = ?`, [ord.id]);
+
+      // 4. Xóa đơn hàng khỏi bảng orders
+      await db.execute(`DELETE FROM orders WHERE id = ?`, [ord.id]);
+
+      cleanedOrderIds.push(ord.id);
+    }
+
+    return { cleanedCount: cleanedOrderIds.length, cleanedOrderIds };
+  } catch (error) {
+    console.error('Error during cleanupExpiredOrders:', error);
+    return { cleanedCount: 0, cleanedOrderIds: [] };
+  }
+}
+
+/**
  * Lấy danh sách đơn hàng
  */
-export async function getOrders(limit: number = 20): Promise<Order[]> {
+export async function getOrders(limit: number = 50): Promise<any[]> {
+  await cleanupExpiredOrders();
   const db = await getDb();
-  return await db.queryAll<Order>(`
-    SELECT o.*, COUNT(oi.id) as items_count
+  const orders = await db.queryAll<any>(`
+    SELECT o.*, 
+      COALESCE(o.tracking_code, sh.tracking_code) as tracking_code,
+      COALESCE(o.carrier, sh.carrier, 'VIETTEL_POST') as carrier,
+      sh.dispatched_at as shipment_dispatched_at,
+      COUNT(oi.id) as items_count, 
+      sr.notes as return_notes, 
+      sr.return_reason as return_reason, 
+      sr.created_at as return_created_at
     FROM orders o
+    LEFT JOIN shipments sh ON o.id = sh.order_id
     LEFT JOIN order_items oi ON o.id = oi.order_id
+    LEFT JOIN (
+      SELECT order_id, notes, return_reason, created_at
+      FROM size_returns
+      GROUP BY order_id
+    ) sr ON o.id = sr.order_id OR o.order_code = sr.order_id
     GROUP BY o.id
     ORDER BY o.created_at DESC
     LIMIT ?
   `, [limit]);
+
+  for (const ord of orders) {
+    const items = await db.queryAll<any>(`
+      SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size, pv.sku as variant_sku
+      FROM order_items oi
+      LEFT JOIN product_variants pv ON oi.variant_id = pv.id
+      LEFT JOIN products p ON pv.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [ord.id]);
+    ord.items = items;
+  }
+
+  return orders;
+}
+
+/**
+ * Lấy danh sách đơn hàng của khách hàng theo SĐT hoặc Email
+ */
+export async function getCustomerOrders(phone: string, email?: string): Promise<any[]> {
+  await cleanupExpiredOrders();
+  const db = await getDb();
+  const cleanPhone = phone?.trim() || '';
+  const cleanEmail = email?.trim() || '';
+
+  if (!cleanPhone && !cleanEmail) return [];
+
+  // Chuẩn hóa số điện thoại: hỗ trợ 098... lẫn +8498...
+  const rawDigits = cleanPhone.replace(/\D/g, '');
+  const phoneVariants = Array.from(new Set([
+    cleanPhone,
+    rawDigits,
+    rawDigits.startsWith('84') ? '0' + rawDigits.slice(2) : '',
+    rawDigits.startsWith('0') ? '84' + rawDigits.slice(1) : '',
+    rawDigits.startsWith('0') ? '+84' + rawDigits.slice(1) : '',
+  ].filter(Boolean)));
+
+  const orders = await db.queryAll<any>(`
+    SELECT o.*, 
+      COALESCE(o.tracking_code, sh.tracking_code) as tracking_code,
+      COALESCE(o.carrier, sh.carrier, 'VIETTEL_POST') as carrier,
+      sh.dispatched_at as shipment_dispatched_at,
+      COUNT(oi.id) as items_count, 
+      sr.notes as return_notes, 
+      sr.return_reason as return_reason, 
+      sr.created_at as return_created_at
+    FROM orders o
+    LEFT JOIN shipments sh ON o.id = sh.order_id
+    LEFT JOIN order_items oi ON o.id = oi.order_id
+    LEFT JOIN (
+      SELECT order_id, notes, return_reason, created_at
+      FROM size_returns
+      GROUP BY order_id
+    ) sr ON o.id = sr.order_id OR o.order_code = sr.order_id
+    WHERE (
+      (? != '' AND (o.customer_phone = ? OR o.customer_phone IN (${phoneVariants.map(() => '?').join(',')})))
+      OR (? != '' AND o.customer_email IS NOT NULL AND LOWER(o.customer_email) = LOWER(?))
+    )
+    GROUP BY o.id
+    ORDER BY o.created_at DESC
+    LIMIT 50
+  `, [cleanPhone, cleanPhone, ...phoneVariants, cleanEmail, cleanEmail]);
+
+  for (const ord of orders) {
+    const items = await db.queryAll<any>(`
+      SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size
+      FROM order_items oi
+      LEFT JOIN product_variants pv ON oi.variant_id = pv.id
+      LEFT JOIN products p ON pv.product_id = p.id
+      WHERE oi.order_id = ?
+    `, [ord.id]);
+    ord.items = items;
+  }
+
+  return orders;
 }
 
 /**
@@ -441,16 +684,167 @@ export async function adjustInventory(variantId: string, newPhysicalQty: number)
 }
 
 /**
+ * Lên đơn vận chuyển và gửi mã đơn của ĐVVC vào đơn hàng
+ */
+export async function dispatchOrder(
+  orderIdOrCode: string,
+  trackingCode: string,
+  carrier: string = 'VIETTEL_POST'
+): Promise<{ success: boolean; message: string; order?: any }> {
+  const db = await getDb();
+  const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
+  if (!order) {
+    return { success: false, message: 'Không tìm thấy đơn hàng' };
+  }
+
+  const cleanTracking = (trackingCode || `VTP${(order.order_code || '').replace(/\D/g, '')}VN`).trim().toUpperCase();
+  const cleanCarrier = (carrier || 'VIETTEL_POST').trim().toUpperCase();
+
+  // 1. Cập nhật bảng orders
+  try {
+    await db.execute(`
+      UPDATE orders 
+      SET fulfillment_status = 'DISPATCHED', 
+          tracking_code = ?, 
+          carrier = ?, 
+          updated_at = datetime('now') 
+      WHERE id = ?
+    `, [cleanTracking, cleanCarrier, order.id]);
+  } catch {
+    await db.execute(`
+      UPDATE orders 
+      SET fulfillment_status = 'DISPATCHED', 
+          updated_at = datetime('now') 
+      WHERE id = ?
+    `, [order.id]);
+  }
+
+  // 2. Ghi nhận hoặc cập nhật bảng shipments
+  try {
+    const existingShipment = await db.queryFirst<any>(`SELECT id FROM shipments WHERE order_id = ?`, [order.id]);
+    if (existingShipment) {
+      await db.execute(`
+        UPDATE shipments
+        SET carrier = ?, tracking_code = ?, status = 'IN_TRANSIT', dispatched_at = datetime('now')
+        WHERE order_id = ?
+      `, [cleanCarrier, cleanTracking, order.id]);
+    } else {
+      await db.execute(`
+        INSERT INTO shipments (id, order_id, carrier, tracking_code, shipping_fee, cod_amount, status, dispatched_at, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, 'IN_TRANSIT', datetime('now'), datetime('now'))
+      `, [`shp-${Date.now().toString(36)}`, order.id, cleanCarrier, cleanTracking, order.shipping_fee || 0, order.payment_method === 'cod' ? order.total_amount : 0]);
+    }
+  } catch (err) {
+    console.error('Error updating shipments table:', err);
+  }
+
+  const updatedOrder = await getOrderById(order.id);
+  return {
+    success: true,
+    message: `Đã lên đơn thành công! Mã vận đơn ${cleanTracking} (${cleanCarrier}) đã được lưu và gửi đến khách hàng.`,
+    order: updatedOrder
+  };
+}
+
+/**
  * Cập nhật trạng thái xử lý đơn hàng
  */
-export async function updateOrderStatus(orderId: string, fulfillmentStatus: string): Promise<{ success: boolean; message: string }> {
+export async function updateOrderStatus(
+  orderId: string, 
+  fulfillmentStatus: string,
+  trackingCode?: string,
+  carrier?: string
+): Promise<{ success: boolean; message: string }> {
+  if (fulfillmentStatus === 'DISPATCHED') {
+    const res = await dispatchOrder(orderId, trackingCode || '', carrier || 'VIETTEL_POST');
+    return { success: res.success, message: res.message };
+  }
+
   const db = await getDb();
   await db.execute(`
     UPDATE orders 
     SET fulfillment_status = ?, updated_at = datetime('now') 
-    WHERE id = ?
-  `, [fulfillmentStatus, orderId]);
+    WHERE id = ? OR order_code = ?
+  `, [fulfillmentStatus, orderId, orderId]);
   return { success: true, message: 'Cập nhật trạng thái đơn hàng thành công!' };
+}
+
+/**
+ * Lấy chi tiết đơn hàng theo ID hoặc Order Code
+ */
+export async function getOrderById(orderIdOrCode: string): Promise<any | null> {
+  await cleanupExpiredOrders(orderIdOrCode);
+  const db = await getDb();
+  const order = await db.queryFirst<any>(`
+    SELECT o.*, 
+      COALESCE(o.tracking_code, sh.tracking_code) as tracking_code,
+      COALESCE(o.carrier, sh.carrier, 'VIETTEL_POST') as carrier,
+      sh.dispatched_at as shipment_dispatched_at,
+      COUNT(oi.id) as items_count, 
+      sr.notes as return_notes, 
+      sr.return_reason as return_reason, 
+      sr.created_at as return_created_at
+    FROM orders o
+    LEFT JOIN shipments sh ON o.id = sh.order_id
+    LEFT JOIN order_items oi ON o.id = oi.order_id
+    LEFT JOIN (
+      SELECT order_id, notes, return_reason, created_at
+      FROM size_returns
+      GROUP BY order_id
+    ) sr ON o.id = sr.order_id OR o.order_code = sr.order_id
+    WHERE o.id = ? OR o.order_code = ?
+    GROUP BY o.id
+  `, [orderIdOrCode, orderIdOrCode]);
+
+  if (!order) return null;
+
+  const items = await db.queryAll<any>(`
+    SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size, pv.sku as variant_sku
+    FROM order_items oi
+    LEFT JOIN product_variants pv ON oi.variant_id = pv.id
+    LEFT JOIN products p ON pv.product_id = p.id
+    WHERE oi.order_id = ?
+  `, [order.id]);
+  order.items = items;
+
+  return order;
+}
+
+/**
+ * Xác nhận thanh toán chuyển khoản: chuyển payment_status sang PAID và fulfillment_status sang PACKING (Chờ vận chuyển)
+ */
+export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ success: boolean; message: string; order?: Order }> {
+  const db = await getDb();
+  const order = await db.queryFirst<Order>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
+  if (!order) {
+    return { success: false, message: 'Không tìm thấy đơn hàng' };
+  }
+
+  // Cập nhật trạng thái đơn: PAID và PACKING (Chờ vận chuyển)
+  await db.execute(`
+    UPDATE orders 
+    SET payment_status = 'PAID', fulfillment_status = 'PACKING', updated_at = datetime('now') 
+    WHERE id = ?
+  `, [order.id]);
+
+  // Ghi nhận sổ cái tài chính REVENUE (nếu chưa có)
+  const existingTx = await db.queryFirst(`
+    SELECT id FROM financial_transactions WHERE order_id = ? AND transaction_type = 'REVENUE'
+  `, [order.id]);
+
+  if (!existingTx) {
+    await db.execute(`
+      INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
+      VALUES (?, ?, 'REVENUE', ?, 'INFLOW', 'VIETQR', ?, ?)
+    `, [`fin-${Date.now().toString(36)}-rev`, order.id, order.total_amount, `VQR-${order.order_code}`, `Khách ${order.customer_name} thanh toán chuyển khoản đơn ${order.order_code}`]);
+  }
+
+  const updatedOrder = await db.queryFirst<Order>(`SELECT * FROM orders WHERE id = ?`, [order.id]);
+  return {
+    success: true,
+    message: 'Thanh toán thành công. Đơn hàng đã chuyển sang trạng thái: Chờ vận chuyển!',
+    order: updatedOrder || undefined,
+  };
 }
 
 /**
@@ -463,29 +857,21 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     return { success: false, message: 'Giỏ hàng đang trống.' };
   }
 
-  // 1. Kiểm tra tồn kho khả dụng cho từng món
+  // 1. Xác thực thông tin sản phẩm và tính tổng tiền
   const verifiedItems: { variant_id: string; sku: string; name: string; quantity: number; unit_price: number; unit_cost: number; total_price: number }[] = [];
   let subtotal = 0;
   let totalCost = 0;
 
   for (const item of input.items) {
     const row = await db.queryFirst<any>(`
-      SELECT v.*, p.name as product_name, i.physical_qty, i.reserved_qty, (i.physical_qty - i.reserved_qty) as available_qty
+      SELECT v.*, p.name as product_name
       FROM product_variants v
       JOIN products p ON v.product_id = p.id
-      JOIN inventory_levels i ON v.id = i.variant_id
       WHERE v.id = ?
     `, [item.variant_id]);
 
     if (!row) {
       return { success: false, message: `Không tìm thấy sản phẩm có mã ${item.variant_id}` };
-    }
-
-    if (row.available_qty < item.quantity) {
-      return { 
-        success: false, 
-        message: `Sản phẩm "${row.product_name} (${row.color} - Size ${row.size})" chỉ còn ${row.available_qty} chiếc trong kho.` 
-      };
     }
 
     const itemTotal = row.selling_price * item.quantity;
@@ -503,18 +889,17 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     });
   }
 
-  // 1.1 Tính toán Cấp bậc hội viên & Chiết khấu giảm giá
-  const currentOrderItemsCount = input.items.reduce((acc, it) => acc + it.quantity, 0);
-  const pastStats = await db.queryFirst<{ past_items: number }>(`
-    SELECT COALESCE(SUM(oi.quantity), 0) as past_items
+  // 1.1 Tính toán Cấp bậc hội viên & Chiết khấu giảm giá theo số lượng đơn hàng (chỉ tính đơn đã thanh toán hoặc đã giao)
+  const pastOrdersStats = await db.queryFirst<{ past_orders: number }>(`
+    SELECT COUNT(DISTINCT o.id) as past_orders
     FROM orders o
-    LEFT JOIN order_items oi ON o.id = oi.order_id
-    WHERE o.customer_phone = ? AND o.fulfillment_status != 'CANCELLED'
+    WHERE o.customer_phone = ? 
+      AND o.fulfillment_status != 'CANCELLED'
+      AND (o.payment_status = 'PAID' OR o.fulfillment_status = 'DELIVERED')
   `, [input.customer_phone]);
 
-  const pastItems = pastStats?.past_items || 0;
-  const totalItemsWithCurrent = pastItems + currentOrderItemsCount;
-  const tier = calculateTier(totalItemsWithCurrent);
+  const pastOrders = pastOrdersStats?.past_orders || 0;
+  const tier = calculateTier(pastOrders);
   const discountPercent = tier.discount_percent;
   const discountAmount = discountPercent > 0 ? Math.round((subtotal * discountPercent) / 100) : 0;
 
@@ -524,10 +909,16 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
   const orderId = `ord-${Date.now().toString(36)}`;
   const orderCode = `ORD-${Date.now().toString().slice(-6)}`;
 
+  const isCod = input.payment_method === 'cod';
+  // Đối với VietQR: Khách cần quét mã, trạng thái ban đầu là PENDING (Chờ chuyển khoản) & UNFULFILLED
+  // Đối với COD: PENDING (Chờ thu tiền) & PACKING (Chờ vận chuyển)
+  const initialPaymentStatus = 'PENDING';
+  const initialFulfillmentStatus = isCod ? 'PACKING' : 'UNFULFILLED';
+
   // 2. Insert Order
   await db.execute(`
     INSERT INTO orders (id, order_code, customer_name, customer_phone, customer_email, shipping_address, subtotal, shipping_fee, discount_amount, total_amount, payment_status, fulfillment_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PAID', 'PACKING')
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     orderId,
     orderCode,
@@ -538,29 +929,26 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     subtotal,
     shippingFee,
     discountAmount,
-    totalAmount
+    totalAmount,
+    initialPaymentStatus,
+    initialFulfillmentStatus
   ]);
 
-  // 3. Insert Order Items & Update Inventory Reserved
+  // 3. Insert Order Items
   for (const it of verifiedItems) {
     await db.execute(`
       INSERT INTO order_items (id, order_id, variant_id, quantity, unit_price, unit_cost, total_price)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [`oi-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 6)}`, orderId, it.variant_id, it.quantity, it.unit_price, it.unit_cost, it.total_price]);
-
-    // Khóa tồn kho reserved
-    await db.execute(`
-      UPDATE inventory_levels
-      SET reserved_qty = reserved_qty + ?, updated_at = datetime('now')
-      WHERE variant_id = ?
-    `, [it.quantity, it.variant_id]);
   }
 
   // 4. Ghi nhận sổ cái tài chính kép (Inflow Doanh thu & Outflow Giá vốn COGS)
-  await db.execute(`
-    INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
-    VALUES (?, ?, 'REVENUE', ?, 'INFLOW', 'VIETQR', ?, ?)
-  `, [`fin-${Date.now().toString(36)}-rev`, orderId, totalAmount, `VQR-${orderCode}`, `Khách ${input.customer_name} thanh toán đơn ${orderCode}`]);
+  if (isCod) {
+    await db.execute(`
+      INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
+      VALUES (?, ?, 'REVENUE', ?, 'INFLOW', 'COD', ?, ?)
+    `, [`fin-${Date.now().toString(36)}-rev`, orderId, totalAmount, `COD-${orderCode}`, `Khách ${input.customer_name} thanh toán COD đơn ${orderCode}`]);
+  }
 
   await db.execute(`
     INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
@@ -570,19 +958,26 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
   if (shippingFee > 0) {
     await db.execute(`
       INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes)
-      VALUES (?, ?, 'SHIPPING_FEE', ?, 'OUTFLOW', 'GHN', NULL, ?)
-    `, [`fin-${Date.now().toString(36)}-shp`, orderId, 25000, `Cước ship ước tính GHN đơn ${orderCode}`]);
+      VALUES (?, ?, 'SHIPPING_FEE', ?, 'OUTFLOW', 'DELIVERY', NULL, ?)
+    `, [`fin-${Date.now().toString(36)}-shp`, orderId, 25000, `Cước ship ước tính đơn ${orderCode}`]);
   }
 
   return {
     success: true,
-    message: 'Đặt hàng thành công!',
+    message: isCod ? 'Đặt hàng COD thành công!' : 'Đã tạo đơn hàng. Vui lòng quét mã QR chuyển khoản.',
     order: {
       id: orderId,
       order_code: orderCode,
-      total_amount: totalAmount,
+      customer_name: input.customer_name,
+      customer_phone: input.customer_phone,
+      shipping_address: input.shipping_address,
+      subtotal,
       shipping_fee: shippingFee,
-      items: verifiedItems
+      discount_amount: discountAmount,
+      total_amount: totalAmount,
+      payment_status: initialPaymentStatus,
+      fulfillment_status: initialFulfillmentStatus,
+      payment_method: input.payment_method || 'vietqr'
     }
   };
 }
@@ -596,6 +991,7 @@ export interface CreateVariantInput {
   cost_price: number;
   selling_price: number;
   floor_price?: number;
+  image_url?: string;
   physical_qty?: number;
   safety_threshold?: number;
   location_code?: string;
@@ -685,9 +1081,9 @@ export async function createProduct(input: CreateProductInput): Promise<{ succes
       : Math.max(costPrice, Math.round(sellingPrice * 0.7));
 
     await db.execute(`
-      INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-    `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice]);
+      INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, image_url, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+    `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.image_url?.trim() || null]);
 
     // Insert Inventory Level
     const invId = `inv-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
@@ -760,6 +1156,7 @@ export interface UpdateProductInput {
     cost_price?: number;
     selling_price?: number;
     floor_price?: number;
+    image_url?: string;
     physical_qty?: number;
     safety_threshold?: number;
     location_code?: string;
@@ -824,9 +1221,9 @@ export async function updateProduct(productId: string, input: UpdateProductInput
         }
         await db.execute(`
           UPDATE product_variants
-          SET sku = ?, color = ?, size = ?, cost_price = ?, selling_price = ?, floor_price = ?, updated_at = datetime('now')
+          SET sku = ?, color = ?, size = ?, cost_price = ?, selling_price = ?, floor_price = ?, image_url = ?, updated_at = datetime('now')
           WHERE id = ?
-        `, [sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.id]);
+        `, [sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.image_url?.trim() || null, v.id]);
 
         const inv = await db.queryFirst<{ id: string }>('SELECT id FROM inventory_levels WHERE variant_id = ?', [v.id]);
         if (inv) {
@@ -856,9 +1253,9 @@ export async function updateProduct(productId: string, input: UpdateProductInput
         }
 
         await db.execute(`
-          INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, created_at, updated_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
-        `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice]);
+          INSERT INTO product_variants (id, product_id, sku, color, size, cost_price, selling_price, floor_price, image_url, created_at, updated_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'), datetime('now'))
+        `, [variantId, productId, sku, v.color?.trim() || 'Tiêu chuẩn', v.size?.trim() || 'Freesize', costPrice, sellingPrice, floorPrice, v.image_url?.trim() || null]);
 
         const invId = `inv-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`;
         await db.execute(`

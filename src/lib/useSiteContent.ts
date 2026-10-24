@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 
+import { defaultSiteContent } from './defaultSiteContent';
+
 export interface HeaderMenuItem {
   id: string;
   label: string;
@@ -12,12 +14,7 @@ export interface HeaderMenuItem {
   active?: boolean;
 }
 
-const DEFAULT_HEADER_ITEMS: HeaderMenuItem[] = [
-  { id: 'h-1', label: 'NEW', href: '/#hero', order: 1, is_active: true },
-  { id: 'h-2', label: 'PRODUCT', href: '/products', order: 2, is_active: true },
-  { id: 'h-3', label: 'STUDIO', href: '/#studio', order: 3, is_active: true },
-  { id: 'h-4', label: 'ABOUT', href: '/#manifesto', order: 4, is_active: true },
-];
+const DEFAULT_HEADER_ITEMS: HeaderMenuItem[] = defaultSiteContent.header.menu_items;
 
 export function useHeaderNav() {
   const [items, setItems] = useState<HeaderMenuItem[]>(DEFAULT_HEADER_ITEMS);
@@ -57,8 +54,8 @@ export function useHeaderNav() {
 }
 
 export function useSiteContent() {
-  const [content, setContent] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState<any>(defaultSiteContent);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let isMounted = true;

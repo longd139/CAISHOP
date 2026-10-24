@@ -23,13 +23,16 @@ import {
   RefreshCw,
   Image as ImageIcon,
   Pencil,
-  CheckCircle2
+  CheckCircle2,
+  MoreVertical,
+  Upload
 } from 'lucide-react';
 import { ConfirmModal } from '@/components/ConfirmModal';
 import { BrandCollection } from '@/app/api/collections/route';
 import { BadgeInput } from '@/components/BadgeInput';
 import { VndInput } from '@/components/VndInput';
 import { CustomSelect } from '@/components/CustomSelect';
+import { useSiteContent } from '@/lib/useSiteContent';
 
 interface VariantItem {
   id?: string;
@@ -39,6 +42,7 @@ interface VariantItem {
   cost_price: number;
   selling_price: number;
   floor_price: number;
+  image_url?: string;
   physical_qty: number;
   safety_threshold: number;
   available_qty?: number;
@@ -130,6 +134,10 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
+
+  // Hook into site content to know which products are currently HOT
+  const { content: siteContent } = useSiteContent();
+  const hotProductIds: string[] = siteContent?.home?.collection_hot_product_ids || [];
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -231,6 +239,75 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
       safety_threshold: 5
     }
   ]);
+
+  // Variant Image Menu & Modals
+  const [imageMenuAnchor, setImageMenuAnchor] = useState<{
+    idx: number;
+    top: number;
+    left: number;
+  } | null>(null);
+  const [detailModalVariantIdx, setDetailModalVariantIdx] = useState<number | null>(null);
+  const [targetVariantIdxForUpload, setTargetVariantIdxForUpload] = useState<number | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!imageMenuAnchor) return;
+    const handleDismiss = () => setImageMenuAnchor(null);
+    window.addEventListener('click', handleDismiss);
+    window.addEventListener('scroll', handleDismiss, true);
+    return () => {
+      window.removeEventListener('click', handleDismiss);
+      window.removeEventListener('scroll', handleDismiss, true);
+    };
+  }, [imageMenuAnchor]);
+
+  const handleTriggerUpload = (idx: number) => {
+    setTargetVariantIdxForUpload(idx);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleVariantFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || targetVariantIdxForUpload === null) return;
+    const targetIdx = targetVariantIdxForUpload;
+
+    try {
+      showToast('Đang tải ảnh lên hệ thống...');
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      let finalUrl = '';
+      if (res.ok) {
+        const data = await res.json();
+        if (data.url) finalUrl = data.url;
+      }
+
+      if (!finalUrl) {
+        // Fallback to data URL
+        finalUrl = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      if (finalUrl) {
+        handleVariantChange(targetIdx, 'image_url', finalUrl);
+        showToast(`Đã cập nhật ảnh cho SKU ${variants[targetIdx]?.sku || ''}!`);
+      }
+    } catch (err) {
+      console.error('Lỗi khi tải ảnh:', err);
+      showAlert('Không thể tải ảnh lên. Vui lòng kiểm tra lại file.', 'LỖI TẢI ẢNH', 'warning');
+    }
+  };
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -371,6 +448,10 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
           const rand = Math.random().toString(36).substring(2, 5).toUpperCase();
           const sku = `${catCode}-${colCode}-${szCode}-${rand}`;
 
+          const sameColorVariant = variants.find(
+            v => v.color.trim().toLowerCase() === trimmedCol.toLowerCase() && v.image_url
+          );
+
           result.push({
             color: trimmedCol,
             size: trimmedSz,
@@ -378,6 +459,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
             cost_price: cost,
             selling_price: price,
             floor_price: floor,
+            image_url: sameColorVariant?.image_url || '',
             physical_qty: stock,
             safety_threshold: 5
           });
@@ -386,6 +468,18 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
     });
 
     return result;
+  };
+
+  const handleApplyImageToSameColor = (color: string, imageUrl: string) => {
+    if (!imageUrl) return;
+    setVariants(prev =>
+      prev.map(v =>
+        v.color.trim().toLowerCase() === color.trim().toLowerCase()
+          ? { ...v, image_url: imageUrl }
+          : v
+      )
+    );
+    showToast(`Đã đồng bộ ảnh cho tất cả các size màu "${color}"!`);
   };
 
   const handleColorsChange = (newColors: string[]) => {
@@ -417,6 +511,9 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
     const stock = batchInStock ? 20 : 0;
 
     selectedColors.forEach(col => {
+      const sameColorVariant = variants.find(
+        v => v.color.trim().toLowerCase() === col.trim().toLowerCase() && v.image_url
+      );
       selectedSizes.forEach(sz => {
         const colCode = col
           .normalize('NFD')
@@ -436,6 +533,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
           cost_price: cost,
           selling_price: price,
           floor_price: floor,
+          image_url: sameColorVariant?.image_url || '',
           physical_qty: stock,
           safety_threshold: 5
         });
@@ -478,6 +576,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
         cost_price: Number(batchCost) || 100000,
         selling_price: Number(batchPrice) || 250000,
         floor_price: Number(batchFloor) || 150000,
+        image_url: '',
         physical_qty: batchInStock ? 20 : 0,
         safety_threshold: 5
       }
@@ -552,6 +651,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
         cost_price: 120000,
         selling_price: 299000,
         floor_price: 180000,
+        image_url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop',
         physical_qty: 20,
         safety_threshold: 5
       },
@@ -562,6 +662,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
         cost_price: 120000,
         selling_price: 299000,
         floor_price: 180000,
+        image_url: 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=800&auto=format&fit=crop',
         physical_qty: 20,
         safety_threshold: 5
       }
@@ -701,6 +802,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
           color: v.color.trim(),
           size: v.size.trim(),
           sku: v.sku.trim(),
+          image_url: v.image_url?.trim() || '',
           cost_price: Number(v.cost_price) || 0,
           selling_price: Number(v.selling_price) || 0,
           floor_price: Number(v.floor_price) || 0,
@@ -983,22 +1085,21 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
       </div>
 
       {/* Product List Table */}
-      <div className="bg-white border border-slate-200 rounded-lg overflow-hidden shadow-2xs">
+      <div className="bg-white border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden shadow-2xs">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs whitespace-nowrap">
-            <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold">
+            <thead className="bg-slate-50 border-b border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400 font-semibold">
               <tr>
                 <th className="py-3 px-4 w-12 text-center">Ảnh</th>
                 <th className="py-3 px-4">Sản phẩm & Danh mục</th>
                 <th className="py-3 px-4">Màu sắc có sẵn</th>
                 <th className="py-3 px-4">Size có sẵn</th>
                 <th className="py-3 px-4">Khoảng giá bán</th>
-                <th className="py-3 px-4">Tình trạng kho CTV</th>
                 <th className="py-3 px-4 text-center">Trạng thái</th>
                 <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
               {loading && products.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="py-12 text-center text-slate-400">
@@ -1045,7 +1146,18 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
 
                         {/* Name & Category */}
                         <td className="py-2.5 px-4">
-                          <div className="font-semibold text-slate-900 text-sm">{p.name}</div>
+                          <div className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                            <span>{p.name}</span>
+                            {hotProductIds.includes(p.id) && (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0 font-mono flex items-center gap-0.5"
+                                title="Sản phẩm đang được ghim HOT trên khối Lookbook trang chủ"
+                              >
+                                <span>🔥</span>
+                                <span>HOT</span>
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-0.5 text-slate-500 text-[11px]">
                             <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded font-medium">
                               {p.category}
@@ -1091,36 +1203,6 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                               {formatMoney(minPrice)} ~ {formatMoney(maxPrice)}
                             </span>
                           )}
-                        </td>
-
-                        {/* CTV Stock Status */}
-                        <td className="py-2.5 px-4">
-                          {(() => {
-                            const totalVar = p.variants?.length || 0;
-                            const inStockVar = p.variants?.filter(v => (v.physical_qty || 0) > 0).length || 0;
-                            if (totalVar === 0 || inStockVar === 0) {
-                              return (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                  Tạm hết hàng
-                                </span>
-                              );
-                            }
-                            if (inStockVar === totalVar) {
-                              return (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  Còn hàng
-                                </span>
-                              );
-                            }
-                            return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                Còn {inStockVar}/{totalVar} size
-                              </span>
-                            );
-                          })()}
                         </td>
 
                         {/* Active toggle */}
@@ -1199,17 +1281,29 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                                       <th className="py-1.5 px-3">Giá vốn (COGS)</th>
                                       <th className="py-1.5 px-3">Giá sàn an toàn</th>
                                       <th className="py-1.5 px-3 font-semibold text-slate-700">Giá bán niêm yết</th>
-                                      <th className="py-1.5 px-3">Tình trạng hàng</th>
                                       <th className="py-1.5 px-3 text-right">Lợi nhuận gộp/chiếc</th>
                                     </tr>
                                   </thead>
-                                  <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                                  <tbody className="divide-y divide-slate-100 dark:divide-slate-800 font-mono text-[11px]">
                                     {p.variants.map(v => {
                                       const profit = v.selling_price - v.cost_price;
                                       const margin = v.selling_price > 0 ? Math.round((profit / v.selling_price) * 100) : 0;
                                       return (
                                         <tr key={v.id || v.sku} className="hover:bg-slate-50/50">
-                                          <td className="py-1.5 px-3 font-medium text-slate-900">{v.sku}</td>
+                                          <td className="py-1.5 px-3 font-medium text-slate-900 flex items-center gap-2">
+                                            {v.image_url ? (
+                                              <img
+                                                src={v.image_url}
+                                                alt={v.sku}
+                                                className="w-6 h-6 rounded object-cover border border-slate-200 shrink-0"
+                                              />
+                                            ) : (
+                                              <div className="w-6 h-6 rounded bg-slate-100 border border-slate-200 shrink-0 flex items-center justify-center">
+                                                <ImageIcon className="w-3 h-3 text-slate-300 stroke-1" />
+                                              </div>
+                                            )}
+                                            <span>{v.sku}</span>
+                                          </td>
                                           <td className="py-1.5 px-3 font-sans text-slate-700">{v.color}</td>
                                           <td className="py-1.5 px-3">
                                             <span className="px-1.5 py-0.2 bg-slate-100 rounded text-slate-900 font-bold">
@@ -1219,20 +1313,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                                           <td className="py-1.5 px-3 text-slate-500">{formatMoney(v.cost_price)}</td>
                                           <td className="py-1.5 px-3 text-slate-400">{formatMoney(v.floor_price)}</td>
                                           <td className="py-1.5 px-3 font-semibold text-slate-900">{formatMoney(v.selling_price)}</td>
-                                          <td className="py-1.5 px-3">
-                                            <button
-                                              type="button"
-                                              onClick={() => v.id && handleQuickToggleVariantStock(p.id, v.id, v.physical_qty)}
-                                              title="Bấm để chuyển nhanh Còn hàng / Tạm hết"
-                                              className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all inline-flex items-center gap-1 cursor-pointer ${v.physical_qty > 0
-                                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                                  : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                                                }`}
-                                            >
-                                              <span className={`w-1.5 h-1.5 rounded-full ${v.physical_qty > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                              <span className="whitespace-nowrap">{v.physical_qty > 0 ? 'Còn hàng' : 'Tạm hết'}</span>
-                                            </button>
-                                          </td>
+                                          
                                           <td className="py-1.5 px-3 text-right text-emerald-600 font-medium">
                                             +{formatMoney(profit)} ({margin}%)
                                           </td>
@@ -1657,19 +1738,75 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                     <table className="w-full text-left text-xs">
                       <thead className="bg-slate-50 text-slate-600 font-semibold sticky top-0 border-b border-slate-200">
                         <tr>
+                          <th className="py-2 px-3 w-14 text-center">Ảnh</th>
                           <th className="py-2 px-3">Màu sắc</th>
                           <th className="py-2 px-3 w-16">Size</th>
                           <th className="py-2 px-3">Mã SKU</th>
                           <th className="py-2 px-3">Giá vốn (đ)</th>
                           <th className="py-2 px-3">Giá sàn (đ)</th>
                           <th className="py-2 px-3">Giá niêm yết (đ)</th>
-                          <th className="py-2 px-3 w-36 text-center">Tình trạng</th>
                           <th className="py-2 px-3 w-10 text-center">Xóa</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {variants.map((v, idx) => (
                           <tr key={idx} className="hover:bg-slate-50/60">
+                            {/* Variant Image (Cột ảnh ra ngoài cùng bên trái) */}
+                            <td className="py-1.5 px-3">
+                              <div className="relative group w-10 h-10 rounded-md border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                                {v.image_url ? (
+                                  <>
+                                    <img
+                                      src={v.image_url}
+                                      alt={`${v.color} - ${v.size}`}
+                                      className="w-full h-full object-cover"
+                                      onError={(e: any) => { e.target.style.display = 'none'; }}
+                                    />
+                                    {/* Hover Overlay: 3 dots + Delete button */}
+                                    <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 z-10">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setImageMenuAnchor({
+                                            idx,
+                                            top: rect.bottom + 4,
+                                            left: Math.max(10, rect.left - 20)
+                                          });
+                                        }}
+                                        className="p-1 text-white hover:text-amber-300 hover:bg-white/20 rounded transition-colors cursor-pointer"
+                                        title="Tùy chọn: Xem chi tiết / Đổi ảnh"
+                                      >
+                                        <MoreVertical className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleVariantChange(idx, 'image_url', '');
+                                          showToast(`Đã xóa ảnh SKU ${v.sku}`);
+                                        }}
+                                        className="p-1 text-white hover:text-rose-400 hover:bg-white/20 rounded transition-colors cursor-pointer"
+                                        title="Xóa ảnh này"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTriggerUpload(idx)}
+                                    className="w-full h-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer group/add"
+                                    title="Bấm để tải ảnh lên cho SKU này"
+                                  >
+                                    <Upload className="w-3.5 h-3.5 stroke-[1.5] group-hover/add:scale-110 transition-transform" />
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+
                             {/* Color */}
                             <td className="py-1.5 px-3">
                               <input
@@ -1730,20 +1867,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                               />
                             </td>
 
-                            {/* In Stock / Out of Stock Toggle */}
-                            <td className="py-1.5 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleVariantChange(idx, 'physical_qty', v.physical_qty > 0 ? 0 : 20)}
-                                className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${v.physical_qty > 0
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                    : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
-                                  }`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full ${v.physical_qty > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                <span>{v.physical_qty > 0 ? 'Còn hàng' : 'Tạm hết'}</span>
-                              </button>
-                            </td>
+                            
 
                             {/* Remove button */}
                             <td className="py-1.5 px-3 text-center">
@@ -1794,7 +1918,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                   {isSubmitting ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>{editingProduct ? 'Đang lưu thay đổi...' : 'Đang lưu vào D1...'}</span>
+                      <span>{editingProduct ? 'Đang lưu thay đổi...' : 'Đang lưu sản phẩm...'}</span>
                     </>
                   ) : (
                     <>
@@ -1804,6 +1928,137 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                   )}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden File Input for Variant Image Upload */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleVariantFileSelected}
+        accept="image/*"
+        className="hidden"
+      />
+
+      {/* Floating 3-Dots Action Menu for Variant Image */}
+      {imageMenuAnchor && variants[imageMenuAnchor.idx] && (
+        <div
+          className="fixed z-50 bg-white border border-slate-200 rounded-lg shadow-xl py-1 w-48 text-xs font-sans animate-in fade-in zoom-in-95"
+          style={{ top: `${imageMenuAnchor.top}px`, left: `${imageMenuAnchor.left}px` }}
+          onClick={e => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              const idx = imageMenuAnchor.idx;
+              setImageMenuAnchor(null);
+              setDetailModalVariantIdx(idx);
+            }}
+            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+          >
+            <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+            <span>Xem chi tiết</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              const idx = imageMenuAnchor.idx;
+              setImageMenuAnchor(null);
+              handleTriggerUpload(idx);
+            }}
+            className="w-full px-3 py-2 text-left flex items-center gap-2 hover:bg-slate-50 text-slate-700 transition-colors cursor-pointer"
+          >
+            <Upload className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span>Thay đổi ảnh (Tải lên)</span>
+          </button>
+        </div>
+      )}
+
+      {/* Modal Xem chi tiết & Thay đổi ảnh */}
+      {detailModalVariantIdx !== null && variants[detailModalVariantIdx] && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
+            <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+              <div>
+                <h4 className="text-xs font-bold text-slate-900 uppercase">Chi tiết ảnh SKU</h4>
+                <p className="text-[11px] text-slate-500 font-mono">
+                  {variants[detailModalVariantIdx].sku} • Màu {variants[detailModalVariantIdx].color} - Size {variants[detailModalVariantIdx].size}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDetailModalVariantIdx(null)}
+                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 rounded-full transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-3">
+              <div className="aspect-square bg-slate-100 rounded-lg overflow-hidden border border-slate-200 flex items-center justify-center relative">
+                {variants[detailModalVariantIdx].image_url ? (
+                  <img
+                    src={variants[detailModalVariantIdx].image_url}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="text-center text-slate-400 text-xs">
+                    <ImageIcon className="w-10 h-10 stroke-1 mx-auto mb-2 text-slate-300" />
+                    Chưa có ảnh cho biến thể này
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleTriggerUpload(detailModalVariantIdx)}
+                    className="flex-1 py-2 px-3 bg-slate-900 hover:bg-black text-white text-xs font-semibold rounded-md flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Tải ảnh mới từ máy tính</span>
+                  </button>
+                  {variants[detailModalVariantIdx].image_url && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleVariantChange(detailModalVariantIdx, 'image_url', '');
+                        showToast('Đã xóa ảnh SKU');
+                      }}
+                      className="py-2 px-3 border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+                      title="Xóa ảnh này"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+
+                <div className="text-[11px]">
+                  <span className="text-slate-500 block mb-1">Hoặc dán đường link ảnh:</span>
+                  <input
+                    type="url"
+                    placeholder="https://..."
+                    value={variants[detailModalVariantIdx].image_url || ''}
+                    onChange={e => handleVariantChange(detailModalVariantIdx, 'image_url', e.target.value)}
+                    className="w-full px-2.5 py-1.5 text-xs font-mono border border-slate-200 rounded-md focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="px-4 py-2.5 border-t border-slate-200 bg-slate-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setDetailModalVariantIdx(null)}
+                className="px-4 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-md transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>

@@ -9,10 +9,10 @@ export async function GET(request: Request) {
     const email = searchParams.get('email')?.trim() || '';
     const cartCount = Math.max(0, parseInt(searchParams.get('cart_count') || '0', 10));
 
-    // If no phone or email provided, calculate tier strictly based on current cart count
+    // If no phone or email provided, calculate tier strictly based on order count (0)
     if (!phone && !email) {
-      const tier = calculateTier(cartCount);
-      const nextInfo = getNextTierInfo(cartCount);
+      const tier = calculateTier(0);
+      const nextInfo = getNextTierInfo(0);
       return NextResponse.json({
         success: true,
         data: {
@@ -41,23 +41,23 @@ export async function GET(request: Request) {
       LEFT JOIN order_items oi ON o.id = oi.order_id
       WHERE (o.customer_phone = ? OR (o.customer_email IS NOT NULL AND o.customer_email = ?))
         AND o.fulfillment_status != 'CANCELLED'
+        AND (o.payment_status = 'PAID' OR o.fulfillment_status = 'DELIVERED')
     `, [phone, email || phone]);
 
-    const pastItems = stats?.past_items || 0;
-    const totalItems = pastItems + cartCount;
-    const tier = calculateTier(totalItems);
-    const nextInfo = getNextTierInfo(totalItems);
+    const pastOrders = stats?.order_count || 0;
+    const tier = calculateTier(pastOrders);
+    const nextInfo = getNextTierInfo(pastOrders);
 
     return NextResponse.json({
       success: true,
       data: {
         phone,
         email,
-        past_items: pastItems,
+        past_items: stats?.past_items || 0,
         cart_items: cartCount,
-        total_items: totalItems,
+        total_items: stats?.past_items || 0,
         total_spent: stats?.total_spent || 0,
-        order_count: stats?.order_count || 0,
+        order_count: pastOrders,
         tier,
         next_tier_info: nextInfo,
         all_tiers: MEMBERSHIP_TIERS
