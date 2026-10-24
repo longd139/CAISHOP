@@ -16,5 +16,10 @@
       "database_name": "caishop-db",
       "database_id": "eabc574a-2bf1-4f1a-8dc4-89072f910ddb"
     }
-  ]
+  ],
+  "vars": {
+    "CLOUDINARY_CLOUD_NAME": "tkfku9hx",
+    "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME": "tkfku9hx",
+    "CLOUDINARY_API_KEY": "494821782296531"
+  }
 }

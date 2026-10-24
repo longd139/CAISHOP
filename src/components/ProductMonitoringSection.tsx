@@ -912,7 +912,7 @@ export default function ProductMonitoringSection({
                           src={getPrimaryImageUrl(prod.image_url)}
                           alt={prod.product_name}
                           className="w-full h-full object-cover"
-                          onError={(e: any) => { e.target.src = '/images/hero-atelier.jpg'; }}
+                          onError={(e: any) => { e.target.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'; }}
                         />
                       </div>
                       <div className="min-w-0">
@@ -1402,7 +1402,7 @@ export default function ProductMonitoringSection({
                     src={getPrimaryImageUrl(selectedReturnProduct.image_url)}
                     alt={selectedReturnProduct.product_name}
                     className="w-full h-full object-cover"
-                    onError={(e: any) => { e.target.src = '/images/hero-atelier.jpg'; }}
+                    onError={(e: any) => { e.target.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'; }}
                   />
                 </div>
                 <div className="min-w-0">

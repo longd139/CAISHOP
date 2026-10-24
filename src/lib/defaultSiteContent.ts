@@ -14,28 +14,28 @@ export const defaultSiteContent = {
     hero_description: 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.',
     hero_cta_1: 'Săn đồ hiệu ngay',
     hero_cta_2: 'Bảng chọn size chuẩn',
-    hero_image_url: '/images/hero-atelier-wide.jpg',
+    hero_image_url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863859/degent/hero-atelier-wide.jpg',
     
     // Dải 4 Khung Quy trình dưới Hero (4-Plate Process Strip)
     hero_plate1_num: '001',
     hero_plate1_tag: 'Áo Polo',
     hero_plate1_title: 'DÒNG CÁ SẤU',
-    hero_plate1_logo: '/image/lacoste.png',
+    hero_plate1_logo: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png',
 
     hero_plate2_num: '002',
     hero_plate2_tag: 'Denim & Tee',
     hero_plate2_title: 'DÒNG XI-KÊ',
-    hero_plate2_logo: '/image/CK.png',
+    hero_plate2_logo: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png',
 
     hero_plate3_num: '003',
     hero_plate3_tag: 'Phong cách Mỹ',
     hero_plate3_title: 'DÒNG TÔ-MÌ',
-    hero_plate3_logo: '/image/tommy.png',
+    hero_plate3_logo: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png',
 
     hero_plate4_num: '004',
     hero_plate4_tag: 'Jeans Đinh Tán',
     hero_plate4_title: 'DÒNG LÊ-VY',
-    hero_plate4_logo: '/image/LEVIS.png',
+    hero_plate4_logo: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png',
     
     // Khối 2: Marquee
     marquee_text: 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •',

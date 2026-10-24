@@ -1561,8 +1561,8 @@ export default function ExecutiveDashboard() {
                                 <div className="flex gap-2">
                                   <input
                                     type="text"
-                                    value={cmsContent?.home?.hero_image_url || '/images/hero-atelier.jpg'}
-                                    placeholder="/images/hero-atelier.jpg hoặc https://..."
+                                    value={cmsContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'}
+                                    placeholder="https://res.cloudinary.com/... hoặc https://..."
                                     onChange={(e) => setCmsContent({
                                       ...cmsContent,
                                       home: { ...cmsContent.home, hero_image_url: e.target.value }
@@ -1584,7 +1584,7 @@ export default function ExecutiveDashboard() {
                                 <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                                   <span className="text-[10px] text-slate-400">Gợi ý ảnh đẹp:</span>
                                   {[
-                                    { label: 'Atelier Model (Gốc)', url: '/images/hero-atelier.jpg' },
+                                    { label: 'Atelier Model (Gốc)', url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg' },
                                     { label: 'Áo măng tô Đen', url: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85' },
                                     { label: 'Minimal Tailoring', url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1200&q=85' },
                                     { label: 'Studio Monochrome', url: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1200&q=85' },
@@ -1688,8 +1688,8 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Logo hover:</label>
                                         <input
                                           type="text"
-                                          placeholder="/image/lacoste.png"
-                                          value={cmsContent?.home?.hero_plate1_logo || '/image/lacoste.png'}
+                                          placeholder="https://res.cloudinary.com/..."
+                                          value={cmsContent?.home?.hero_plate1_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate1_logo: e.target.value }
@@ -1747,8 +1747,8 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-400 block">Logo hover:</label>
                                         <input
                                           type="text"
-                                          placeholder="/image/CK.png"
-                                          value={cmsContent?.home?.hero_plate2_logo || '/image/CK.png'}
+                                          placeholder="https://res.cloudinary.com/..."
+                                          value={cmsContent?.home?.hero_plate2_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate2_logo: e.target.value }
@@ -1806,8 +1806,8 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Logo hover:</label>
                                         <input
                                           type="text"
-                                          placeholder="/image/tommy.png"
-                                          value={cmsContent?.home?.hero_plate3_logo || '/image/tommy.png'}
+                                          placeholder="https://res.cloudinary.com/..."
+                                          value={cmsContent?.home?.hero_plate3_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate3_logo: e.target.value }
@@ -1865,8 +1865,8 @@ export default function ExecutiveDashboard() {
                                         <label className="text-[10px] text-slate-500 block">Logo hover:</label>
                                         <input
                                           type="text"
-                                          placeholder="/image/LEVIS.png"
-                                          value={cmsContent?.home?.hero_plate4_logo || '/image/LEVIS.png'}
+                                          placeholder="https://res.cloudinary.com/..."
+                                          value={cmsContent?.home?.hero_plate4_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png'}
                                           onChange={(e) => setCmsContent({
                                             ...cmsContent,
                                             home: { ...cmsContent.home, hero_plate4_logo: e.target.value }
@@ -2051,7 +2051,7 @@ export default function ExecutiveDashboard() {
                                         const minPrice = prod.variants?.length
                                           ? Math.min(...prod.variants.map((v: any) => v.selling_price))
                                           : 0;
-                                        const thumbImg = prod.image_url ? prod.image_url.split(',')[0] : '/images/placeholder.jpg';
+                                        const thumbImg = prod.image_url ? prod.image_url.split(',')[0] : 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg';
 
                                         const toggleHot = () => {
                                           let updated = [...hotIds];
@@ -2502,10 +2502,10 @@ export default function ExecutiveDashboard() {
                             {/* Background Image Layer */}
                             <div className="absolute inset-0 z-0 pointer-events-none select-none">
                               <img
-                                src={cmsContent?.home?.hero_image_url || '/images/hero-atelier.jpg'}
+                                src={cmsContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'}
                                 alt="Hero Background"
                                 className="w-full h-full object-cover object-center contrast-105 brightness-[0.7]"
-                                onError={(e: any) => { e.target.src = '/images/hero-atelier.jpg'; }}
+                                onError={(e: any) => { e.target.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'; }}
                               />
                               <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/30" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
@@ -2541,7 +2541,7 @@ export default function ExecutiveDashboard() {
                                 <div className="group relative overflow-hidden p-2.5 flex flex-col justify-between h-20 bg-white/5 hover:bg-white transition-all cursor-pointer">
                                   <div className="h-4 flex items-center">
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                      <img src={cmsContent?.home?.hero_plate1_logo || '/image/lacoste.png'} alt="Lacoste" className="max-h-4 max-w-[28px] object-contain" />
+                                      <img src={cmsContent?.home?.hero_plate1_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png'} alt="Lacoste" className="max-h-4 max-w-[28px] object-contain" />
                                     </div>
                                   </div>
                                   <div>
@@ -2558,7 +2558,7 @@ export default function ExecutiveDashboard() {
                                 <div className="group relative overflow-hidden p-2.5 flex flex-col justify-between h-20 bg-white/5 hover:bg-white transition-all cursor-pointer">
                                   <div className="h-4 flex items-center">
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                      <img src={cmsContent?.home?.hero_plate2_logo || '/image/CK.png'} alt="Calvin Klein" className="max-h-4 max-w-[28px] object-contain" />
+                                      <img src={cmsContent?.home?.hero_plate2_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png'} alt="Calvin Klein" className="max-h-4 max-w-[28px] object-contain" />
                                     </div>
                                   </div>
                                   <div>
@@ -2575,7 +2575,7 @@ export default function ExecutiveDashboard() {
                                 <div className="group relative overflow-hidden p-2.5 flex flex-col justify-between h-20 bg-white/5 hover:bg-white transition-all cursor-pointer">
                                   <div className="h-4 flex items-center">
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                      <img src={cmsContent?.home?.hero_plate3_logo || '/image/tommy.png'} alt="Tommy Hilfiger" className="max-h-4 max-w-[28px] object-contain" />
+                                      <img src={cmsContent?.home?.hero_plate3_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png'} alt="Tommy Hilfiger" className="max-h-4 max-w-[28px] object-contain" />
                                     </div>
                                   </div>
                                   <div>
@@ -2592,7 +2592,7 @@ export default function ExecutiveDashboard() {
                                 <div className="group relative overflow-hidden p-2.5 flex flex-col justify-between h-20 bg-white/5 hover:bg-white transition-all cursor-pointer">
                                   <div className="h-4 flex items-center">
                                     <div className="opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                                      <img src={cmsContent?.home?.hero_plate4_logo || '/image/LEVIS.png'} alt="Levi's" className="max-h-4 max-w-[28px] object-contain" />
+                                      <img src={cmsContent?.home?.hero_plate4_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png'} alt="Levi's" className="max-h-4 max-w-[28px] object-contain" />
                                     </div>
                                   </div>
                                   <div>
@@ -2658,7 +2658,7 @@ export default function ExecutiveDashboard() {
                                   const minPrice = prod.variants?.length
                                     ? Math.min(...prod.variants.map((v: any) => v.selling_price))
                                     : 0;
-                                  const imgUrl = prod.image_url ? prod.image_url.split(',')[0] : '/images/placeholder.jpg';
+                                  const imgUrl = prod.image_url ? prod.image_url.split(',')[0] : 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg';
 
                                   return (
                                     <div key={prod.id || idx} className="border border-neutral-200 rounded p-2 bg-neutral-50/50 space-y-1.5 relative overflow-hidden group">
@@ -4534,7 +4534,7 @@ export default function ExecutiveDashboard() {
                     <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 font-mono flex items-center gap-1.5">
                       <img
                         src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
                         alt="ĐVVC"
                         className="w-3.5 h-3.5 rounded object-cover inline-block"
                       />
@@ -4815,7 +4815,7 @@ export default function ExecutiveDashboard() {
                         {c.hasLogo ? (
                           <img
                             src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
                             alt="Viettel Post"
                             className="w-4 h-4 rounded object-cover shrink-0"
                           />

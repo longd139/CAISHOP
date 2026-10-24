@@ -234,7 +234,7 @@ export async function GET() {
         productReturnMap[pid] = {
           product_id: pid,
           product_name: prod?.name || ret.product_name,
-          image_url: prod?.image_url || '/images/hero-atelier.jpg',
+          image_url: prod?.image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg',
           category: prod?.category || 'Thời trang',
           units_sold: productUnitsSoldMap[pid] || 0,
           total: 0,

@@ -525,7 +525,7 @@ export default function LoginPage() {
         {/* Full-bleed Lookbook Visual Anchor */}
         <div
           className="absolute inset-0 bg-cover bg-center opacity-40 mix-blend-luminosity contrast-110"
-          style={{ backgroundImage: `url('/images/hero-atelier.jpg')` }}
+          style={{ backgroundImage: `url('https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg')` }}
         />
         {/* Editorial Gradients */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/80 to-slate-950/40" />

@@ -915,7 +915,7 @@ export function UserProfileModal({
                                 {ord.carrier === 'VIETTEL_POST' || !ord.carrier ? (
                                   <img
                                     src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
                                     alt="Viettel Post"
                                     className="w-5 h-5 rounded object-cover shadow-2xs border border-red-200 shrink-0"
                                   />

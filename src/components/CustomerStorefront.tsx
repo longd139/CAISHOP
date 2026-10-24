@@ -622,7 +622,7 @@ export default function CustomerStorefront() {
         {/* Full-Bleed Background Image */}
         <div className="absolute inset-0 z-0 select-none pointer-events-none">
           <img
-            src={siteContent?.home?.hero_image_url || '/images/hero-atelier-wide.jpg'}
+            src={siteContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863859/degent/hero-atelier-wide.jpg'}
             alt="Hero Background"
             className="w-full h-full object-cover object-center contrast-105 brightness-[0.75]"
           />
@@ -699,10 +699,10 @@ export default function CustomerStorefront() {
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
-                    src={siteContent?.home?.hero_plate1_logo || '/image/lacoste.png'}
+                    src={siteContent?.home?.hero_plate1_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png'}
                     alt="Lacoste Logo"
                     className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
-                    onError={(e: any) => { e.currentTarget.src = '/images/lacoste.png'; }}
+                    onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png'; }}
                   />
                 </div>
               </div>
@@ -727,10 +727,10 @@ export default function CustomerStorefront() {
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
-                    src={siteContent?.home?.hero_plate2_logo || '/image/CK.png'}
+                    src={siteContent?.home?.hero_plate2_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png'}
                     alt="Calvin Klein Logo"
                     className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
-                    onError={(e: any) => { e.currentTarget.src = '/images/CK.png'; }}
+                    onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png'; }}
                   />
                 </div>
               </div>
@@ -755,10 +755,10 @@ export default function CustomerStorefront() {
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
-                    src={siteContent?.home?.hero_plate3_logo || '/image/tommy.png'}
+                    src={siteContent?.home?.hero_plate3_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png'}
                     alt="Tommy Hilfiger Logo"
                     className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
-                    onError={(e: any) => { e.currentTarget.src = '/images/tommy.png'; }}
+                    onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png'; }}
                   />
                 </div>
               </div>
@@ -783,10 +783,10 @@ export default function CustomerStorefront() {
               <div className="flex items-center h-8 min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
-                    src={siteContent?.home?.hero_plate4_logo || '/image/LEVIS.png'}
+                    src={siteContent?.home?.hero_plate4_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png'}
                     alt="Levi's Logo"
                     className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
-                    onError={(e: any) => { e.currentTarget.src = '/images/LEVIS.png'; }}
+                    onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png'; }}
                   />
                 </div>
               </div>
