@@ -869,26 +869,25 @@ export default function CustomerStorefront() {
                     </div>
 
                     {/* Metadata & Title */}
-                    <div className="pt-2 flex items-baseline justify-between gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-                            {product.category}
-                          </span>
-                          <span className="text-[10px] font-mono text-[#0a0a0a]/40">•</span>
-                          <span className="text-[10px] font-mono text-[#0a0a0a]/50">
-                            {product.variants.length} Sizes
-                          </span>
-                        </div>
-                        <Link
-                          href={`/products/${product.id}`}
-                          className="font-wide uppercase text-base md:text-lg font-semibold cursor-pointer group-hover:opacity-70 transition-opacity block min-h-[3.25rem] line-clamp-2"
-                        >
-                          {product.name}
-                        </Link>
+                    <div className="pt-2.5 space-y-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
+                          {product.category}
+                        </span>
+                        <span className="text-[10px] font-mono text-[#0a0a0a]/40">•</span>
+                        <span className="text-[10px] font-mono text-[#0a0a0a]/50">
+                          {product.variants.length} Sizes
+                        </span>
                       </div>
-                      <div className="text-right shrink-0">
-                        <span className="text-[14px] font-mono font-semibold">
+                      <Link
+                        href={`/products/${product.id}`}
+                        className="font-wide uppercase text-base md:text-lg font-semibold cursor-pointer group-hover:opacity-70 transition-opacity block min-h-[2.5rem] line-clamp-2 leading-snug text-slate-950"
+                      >
+                        {product.name}
+                      </Link>
+                      {/* Price moved below title & enlarged */}
+                      <div className="pt-0.5">
+                        <span className="text-lg md:text-xl font-mono font-bold text-slate-950 tracking-tight">
                           {formatMoney(minPrice)}
                         </span>
                       </div>

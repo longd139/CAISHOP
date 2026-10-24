@@ -1239,7 +1239,7 @@ export default function ProductCatalog() {
                           </Link>
 
                           {/* Price - perfectly aligned horizontally */}
-                          <div className="text-sm font-semibold tracking-tight text-[#0a0a0a] pt-1">
+                          <div className="text-base md:text-lg font-mono font-bold tracking-tight text-slate-950 pt-1">
                             {minPrice === maxPrice
                               ? formatMoney(minPrice)
                               : `${formatMoney(minPrice)} — ${formatMoney(maxPrice)}`}
