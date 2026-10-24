@@ -301,7 +301,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
 
       if (finalUrl) {
         handleVariantChange(targetIdx, 'image_url', finalUrl);
-        showToast(`Đã cập nhật ảnh cho SKU ${variants[targetIdx]?.sku || ''}!`);
+        showToast(`Đã cập nhật ảnh đại diện cho màu "${variants[targetIdx]?.color || ''}"!`);
       }
     } catch (err) {
       console.error('Lỗi khi tải ảnh:', err);
@@ -620,14 +620,51 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
     setVariants(variants.filter((_, i) => i !== index));
   };
 
-  // Update specific variant field
+  // Update specific variant field (1 màu = 1 ảnh đại diện đồng bộ)
   const handleVariantChange = (index: number, field: keyof VariantItem, value: any) => {
-    const updated = [...variants];
-    updated[index] = {
-      ...updated[index],
-      [field]: value
-    };
-    setVariants(updated);
+    const currentVariant = variants[index];
+    if (!currentVariant) return;
+
+    if (field === 'image_url') {
+      const targetColor = (currentVariant.color || '').trim().toLowerCase();
+      // Đồng bộ ảnh cho tất cả biến thể có cùng màu sắc
+      setVariants(prev => prev.map((v, i) => {
+        if (i === index || (targetColor && v.color.trim().toLowerCase() === targetColor)) {
+          return { ...v, image_url: value };
+        }
+        return v;
+      }));
+      return;
+    }
+
+    if (field === 'color') {
+      const newColor = String(value).trim().toLowerCase();
+      // Nếu màu mới đã có ảnh đại diện ở biến thể khác, tự động gán ảnh đó
+      const existingImgForNewColor = variants.find(
+        (v, i) => i !== index && v.color.trim().toLowerCase() === newColor && v.image_url
+      )?.image_url;
+
+      setVariants(prev => prev.map((v, i) => {
+        if (i === index) {
+          return {
+            ...v,
+            color: value,
+            ...(existingImgForNewColor ? { image_url: existingImgForNewColor } : {})
+          };
+        }
+        return v;
+      }));
+      return;
+    }
+
+    setVariants(prev => {
+      const updated = [...prev];
+      updated[index] = {
+        ...updated[index],
+        [field]: value
+      };
+      return updated;
+    });
   };
 
   // Reset form
@@ -1743,154 +1780,191 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                   </div>
 
                   <div className="max-h-64 overflow-y-auto">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-600 font-semibold sticky top-0 border-b border-slate-200">
-                        <tr>
-                          <th className="py-2 px-3 w-14 text-center">Ảnh</th>
-                          <th className="py-2 px-3">Màu sắc</th>
-                          <th className="py-2 px-3 w-16">Size</th>
-                          <th className="py-2 px-3">Mã SKU</th>
-                          <th className="py-2 px-3">Giá vốn (đ)</th>
-                          <th className="py-2 px-3">Giá sàn (đ)</th>
-                          <th className="py-2 px-3">Giá niêm yết (đ)</th>
-                          <th className="py-2 px-3 w-10 text-center">Xóa</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {variants.map((v, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50/60">
-                            {/* Variant Image (Cột ảnh ra ngoài cùng bên trái) */}
-                            <td className="py-1.5 px-3">
-                              <div className="relative group w-10 h-10 rounded-md border border-slate-200 bg-slate-100 overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
-                                {v.image_url ? (
-                                  <>
-                                    <img
-                                      src={v.image_url}
-                                      alt={`${v.color} - ${v.size}`}
-                                      className="w-full h-full object-cover"
-                                      onError={(e: any) => { e.target.style.display = 'none'; }}
-                                    />
-                                    {/* Hover Overlay: 3 dots + Delete button */}
-                                    <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 z-10">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          const rect = e.currentTarget.getBoundingClientRect();
-                                          setImageMenuAnchor({
-                                            idx,
-                                            top: rect.bottom + 4,
-                                            left: Math.max(10, rect.left - 20)
-                                          });
-                                        }}
-                                        className="p-1 text-white hover:text-amber-300 hover:bg-white/20 rounded transition-colors cursor-pointer"
-                                        title="Tùy chọn: Xem chi tiết / Đổi ảnh"
-                                      >
-                                        <MoreVertical className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleVariantChange(idx, 'image_url', '');
-                                          showToast(`Đã xóa ảnh SKU ${v.sku}`);
-                                        }}
-                                        className="p-1 text-white hover:text-rose-400 hover:bg-white/20 rounded transition-colors cursor-pointer"
-                                        title="Xóa ảnh này"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                      </button>
+                    {(() => {
+                      // Tính toán số dòng gộp (rowSpan) cho ảnh đại diện theo từng nhóm màu liền kề
+                      const colorSpans: number[] = new Array(variants.length).fill(1);
+                      const skipImageCell: boolean[] = new Array(variants.length).fill(false);
+
+                      for (let i = 0; i < variants.length; i++) {
+                        if (skipImageCell[i]) continue;
+                        const col = (variants[i].color || '').trim().toLowerCase();
+                        let span = 1;
+                        for (let j = i + 1; j < variants.length; j++) {
+                          if ((variants[j].color || '').trim().toLowerCase() === col) {
+                            span++;
+                            skipImageCell[j] = true;
+                          } else {
+                            break;
+                          }
+                        }
+                        colorSpans[i] = span;
+                      }
+
+                      return (
+                        <table className="w-full text-left text-xs">
+                          <thead className="bg-slate-50 text-slate-600 font-semibold sticky top-0 border-b border-slate-200 z-10">
+                            <tr>
+                              <th className="py-2 px-2 text-center w-20">
+                                <div>Ảnh màu</div>
+                                <div className="text-[9px] font-normal text-slate-400 font-mono leading-none mt-0.5">(1 ảnh/màu)</div>
+                              </th>
+                              <th className="py-2 px-3">Màu sắc</th>
+                              <th className="py-2 px-3 w-16">Size</th>
+                              <th className="py-2 px-3">Mã SKU</th>
+                              <th className="py-2 px-3">Giá vốn (đ)</th>
+                              <th className="py-2 px-3">Giá sàn (đ)</th>
+                              <th className="py-2 px-3">Giá niêm yết (đ)</th>
+                              <th className="py-2 px-3 w-10 text-center">Xóa</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {variants.map((v, idx) => (
+                              <tr key={idx} className="hover:bg-slate-50/60">
+                                {/* Variant Image: Gộp dòng theo màu (1 màu = 1 ảnh đại diện) */}
+                                {!skipImageCell[idx] && (
+                                  <td
+                                    rowSpan={colorSpans[idx]}
+                                    className="py-2 px-2 align-middle bg-slate-50/60 border-r border-slate-200 text-center"
+                                  >
+                                    <div className="flex flex-col items-center justify-center gap-1 mx-auto">
+                                      <div className="relative group w-11 h-13 rounded-md border border-slate-200 bg-white overflow-hidden flex items-center justify-center shrink-0 shadow-2xs">
+                                        {v.image_url ? (
+                                          <>
+                                            <img
+                                              src={v.image_url}
+                                              alt={v.color}
+                                              className="w-full h-full object-cover"
+                                              onError={(e: any) => { e.target.style.display = 'none'; }}
+                                            />
+                                            {/* Hover Overlay: 3 dots + Delete button */}
+                                            <div className="absolute inset-0 bg-black/65 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1 z-10">
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  const rect = e.currentTarget.getBoundingClientRect();
+                                                  setImageMenuAnchor({
+                                                    idx,
+                                                    top: rect.bottom + 4,
+                                                    left: Math.max(10, rect.left - 20)
+                                                  });
+                                                }}
+                                                className="p-1 text-white hover:text-amber-300 hover:bg-white/20 rounded transition-colors cursor-pointer"
+                                                title="Tùy chọn: Xem chi tiết / Đổi ảnh"
+                                              >
+                                                <MoreVertical className="w-3.5 h-3.5" />
+                                              </button>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  handleVariantChange(idx, 'image_url', '');
+                                                  showToast(`Đã xóa ảnh cho màu "${v.color}"`);
+                                                }}
+                                                className="p-1 text-white hover:text-rose-400 hover:bg-white/20 rounded transition-colors cursor-pointer"
+                                                title="Xóa ảnh màu này"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                              </button>
+                                            </div>
+                                          </>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleTriggerUpload(idx)}
+                                            className="w-full h-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer group/add p-1 text-center"
+                                            title={`Bấm để tải ảnh đại diện cho màu "${v.color}"`}
+                                          >
+                                            <Upload className="w-3.5 h-3.5 stroke-[1.5] group-hover/add:scale-110 transition-transform mb-0.5" />
+                                            <span className="text-[8px] font-medium leading-none text-slate-500">Tải ảnh</span>
+                                          </button>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] font-semibold text-slate-700 max-w-[65px] truncate leading-tight" title={v.color}>
+                                        {v.color}
+                                      </span>
                                     </div>
-                                  </>
-                                ) : (
+                                  </td>
+                                )}
+
+                                {/* Color */}
+                                <td className="py-1.5 px-3">
+                                  <input
+                                    type="text"
+                                    value={v.color}
+                                    onChange={e => handleVariantChange(idx, 'color', e.target.value)}
+                                    className="w-24 px-2 py-1 text-xs border border-slate-200 rounded font-medium"
+                                  />
+                                </td>
+
+                                {/* Size */}
+                                <td className="py-1.5 px-3">
+                                  <input
+                                    type="text"
+                                    value={v.size}
+                                    onChange={e => handleVariantChange(idx, 'size', e.target.value)}
+                                    className="w-14 px-2 py-1 text-xs border border-slate-200 rounded font-mono font-bold text-center"
+                                  />
+                                </td>
+
+                                {/* SKU */}
+                                <td className="py-1.5 px-3">
+                                  <input
+                                    type="text"
+                                    value={v.sku}
+                                    onChange={e => handleVariantChange(idx, 'sku', e.target.value)}
+                                    className="w-32 px-2 py-1 text-xs border border-slate-200 rounded font-mono text-slate-700"
+                                  />
+                                </td>
+
+                                {/* Cost Price */}
+                                <td className="py-1.5 px-3">
+                                  <VndInput
+                                    value={v.cost_price}
+                                    onChange={val => handleVariantChange(idx, 'cost_price', val)}
+                                    className="w-28 px-2 py-1"
+                                    inputClassName="font-mono"
+                                  />
+                                </td>
+
+                                {/* Floor Price */}
+                                <td className="py-1.5 px-3">
+                                  <VndInput
+                                    value={v.floor_price}
+                                    onChange={val => handleVariantChange(idx, 'floor_price', val)}
+                                    className="w-28 px-2 py-1"
+                                    inputClassName="font-mono text-slate-600"
+                                  />
+                                </td>
+
+                                {/* Selling Price */}
+                                <td className="py-1.5 px-3">
+                                  <VndInput
+                                    value={v.selling_price}
+                                    onChange={val => handleVariantChange(idx, 'selling_price', val)}
+                                    className="w-28 px-2 py-1"
+                                    inputClassName="font-mono font-bold text-slate-900"
+                                  />
+                                </td>
+
+                                
+
+                                {/* Remove button */}
+                                <td className="py-1.5 px-3 text-center">
                                   <button
                                     type="button"
-                                    onClick={() => handleTriggerUpload(idx)}
-                                    className="w-full h-full flex flex-col items-center justify-center text-slate-400 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer group/add"
-                                    title="Bấm để tải ảnh lên cho SKU này"
+                                    onClick={() => handleRemoveVariant(idx)}
+                                    className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
                                   >
-                                    <Upload className="w-3.5 h-3.5 stroke-[1.5] group-hover/add:scale-110 transition-transform" />
+                                    <Trash2 className="w-3.5 h-3.5" />
                                   </button>
-                                )}
-                              </div>
-                            </td>
-
-                            {/* Color */}
-                            <td className="py-1.5 px-3">
-                              <input
-                                type="text"
-                                value={v.color}
-                                onChange={e => handleVariantChange(idx, 'color', e.target.value)}
-                                className="w-24 px-2 py-1 text-xs border border-slate-200 rounded font-medium"
-                              />
-                            </td>
-
-                            {/* Size */}
-                            <td className="py-1.5 px-3">
-                              <input
-                                type="text"
-                                value={v.size}
-                                onChange={e => handleVariantChange(idx, 'size', e.target.value)}
-                                className="w-14 px-2 py-1 text-xs border border-slate-200 rounded font-mono font-bold text-center"
-                              />
-                            </td>
-
-                            {/* SKU */}
-                            <td className="py-1.5 px-3">
-                              <input
-                                type="text"
-                                value={v.sku}
-                                onChange={e => handleVariantChange(idx, 'sku', e.target.value)}
-                                className="w-32 px-2 py-1 text-xs border border-slate-200 rounded font-mono text-slate-700"
-                              />
-                            </td>
-
-                            {/* Cost Price */}
-                            <td className="py-1.5 px-3">
-                              <VndInput
-                                value={v.cost_price}
-                                onChange={val => handleVariantChange(idx, 'cost_price', val)}
-                                className="w-28 px-2 py-1"
-                                inputClassName="font-mono"
-                              />
-                            </td>
-
-                            {/* Floor Price */}
-                            <td className="py-1.5 px-3">
-                              <VndInput
-                                value={v.floor_price}
-                                onChange={val => handleVariantChange(idx, 'floor_price', val)}
-                                className="w-28 px-2 py-1"
-                                inputClassName="font-mono text-slate-600"
-                              />
-                            </td>
-
-                            {/* Selling Price */}
-                            <td className="py-1.5 px-3">
-                              <VndInput
-                                value={v.selling_price}
-                                onChange={val => handleVariantChange(idx, 'selling_price', val)}
-                                className="w-28 px-2 py-1"
-                                inputClassName="font-mono font-bold text-slate-900"
-                              />
-                            </td>
-
-                            
-
-                            {/* Remove button */}
-                            <td className="py-1.5 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveVariant(idx)}
-                                className="p-1 text-slate-400 hover:text-rose-600 rounded transition-colors cursor-pointer"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      );
+                    })()}
                   </div>
                 </div>
               </section>
@@ -1991,9 +2065,9 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
           <div className="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200">
             <div className="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
               <div>
-                <h4 className="text-xs font-bold text-slate-900 uppercase">Chi tiết ảnh SKU</h4>
-                <p className="text-[11px] text-slate-500 font-mono">
-                  {variants[detailModalVariantIdx].sku} • Màu {variants[detailModalVariantIdx].color} - Size {variants[detailModalVariantIdx].size}
+                <h4 className="text-xs font-bold text-slate-900 uppercase">Ảnh đại diện theo màu sắc</h4>
+                <p className="text-[11px] text-slate-500">
+                  Màu: <strong className="text-slate-900 font-semibold">{variants[detailModalVariantIdx].color}</strong> • Áp dụng đồng bộ cho tất cả size của màu này
                 </p>
               </div>
               <button
@@ -2016,7 +2090,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                 ) : (
                   <div className="text-center text-slate-400 text-xs">
                     <ImageIcon className="w-10 h-10 stroke-1 mx-auto mb-2 text-slate-300" />
-                    Chưa có ảnh cho biến thể này
+                    Chưa có ảnh đại diện cho màu này
                   </div>
                 )}
               </div>
@@ -2036,7 +2110,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                       type="button"
                       onClick={() => {
                         handleVariantChange(detailModalVariantIdx, 'image_url', '');
-                        showToast('Đã xóa ảnh SKU');
+                        showToast(`Đã xóa ảnh cho màu "${variants[detailModalVariantIdx].color}"`);
                       }}
                       className="py-2 px-3 border border-rose-200 hover:bg-rose-50 text-rose-600 text-xs font-semibold rounded-md transition-colors cursor-pointer"
                       title="Xóa ảnh này"
