@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useHeaderNav } from '@/lib/useSiteContent';
-import { ChevronLeft, ChevronRight, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag, Trash2 } from 'lucide-react';
 import { getProductGallery, getPrimaryImageUrl, ProductImagePlate } from '@/lib/productImages';
 import { calculateTier, getNextTierInfo } from '@/lib/membership';
 import { useAuth } from '@/lib/useAuth';
@@ -83,6 +83,17 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
       document.body.style.overflow = '';
     };
   }, [isBagOpen]);
+
+  // Tự động ghi nhận lượt xem sản phẩm
+  useEffect(() => {
+    if (product?.id) {
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'view', product_id: product.id })
+      }).catch(() => {});
+    }
+  }, [product?.id]);
 
   // Selection states
   const [selectedColor, setSelectedColor] = useState<string>('');
@@ -254,17 +265,12 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
   const handleAddToBag = () => {
     if (!product || !activeVariant) return;
 
-    if (activeVariant.available_qty <= 0) {
-      showToast('Sản phẩm đã hết hàng trong kho.');
-      return;
-    }
-
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === activeVariant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === activeVariant.id
-            ? { ...item, quantity: Math.min(item.available_qty, item.quantity + selectedQty) }
+            ? { ...item, quantity: item.quantity + selectedQty }
             : item
         );
       }
@@ -279,7 +285,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
           size: activeVariant.size,
           price: activeVariant.selling_price,
           quantity: selectedQty,
-          available_qty: activeVariant.available_qty,
+          available_qty: 999999,
         },
       ];
     });
@@ -293,7 +299,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
         .map((item) => {
           if (item.variant_id === variantId) {
             const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: Math.min(item.available_qty, newQty) } : null;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
           return item;
         })
@@ -409,7 +415,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
         className={`sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b hairline transition-all duration-300 ${scrolled ? 'shadow-[0_1px_0_rgba(10,10,10,0.06)]' : ''
           }`}
       >
-        <nav className="max-w-[1400px] mx-auto px-6 md:px-10">
+        <nav className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="relative flex items-center justify-between h-[68px] md:h-[84px]">
 
             {/* Left Nav */}
@@ -451,7 +457,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
               href="/"
               className="wordmark absolute left-1/2 -translate-x-1/2 font-wide text-[19px] md:text-[23px] font-medium uppercase select-none whitespace-nowrap text-[#0a0a0a] tracking-mono"
             >
-              ATELIER
+              DE&apos;GENT
             </Link>
 
             {/* Right Cluster */}
@@ -662,7 +668,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
 
       {/* ================= 2. BREADCRUMB & METADATA BAR ================= */}
       <div className="border-b hairline bg-white">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-4 flex flex-wrap items-center justify-between gap-4 text-[10px] md:text-[11px] font-mono uppercase text-[#0a0a0a]/50">
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-4 flex flex-wrap items-center justify-between gap-4 text-[10px] md:text-[11px] font-mono uppercase text-[#0a0a0a]/50">
           <div className="flex items-center gap-2">
             <Link href="/" className="hover:text-black">Trang chủ</Link>
             <span>/</span>
@@ -674,7 +680,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
       </div>
 
       {/* ================= 3. MAIN PRODUCT DETAIL VIEWPORT ================= */}
-      <main className="max-w-[1400px] mx-auto px-6 md:px-10 py-10 md:py-16">
+      <main className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 md:py-12">
         {loading ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 animate-pulse">
             <div className="lg:col-span-7 aspect-[4/5] bg-black/5" />
@@ -727,18 +733,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                     <Maximize2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-
-                {/* Cảnh báo tồn kho thời gian thực */}
-                {activeVariant && activeVariant.available_qty <= 5 && activeVariant.available_qty > 0 && (
-                  <span className="absolute bottom-4 left-4 text-[10px] font-mono tracking-wider uppercase bg-[#0a0a0a] text-white px-2.5 py-1 z-10 shadow-xs">
-                    Cảnh báo sắp hết: Còn {activeVariant.available_qty} chiếc
-                  </span>
-                )}
-                {activeVariant && activeVariant.available_qty <= 0 && (
-                  <span className="absolute bottom-4 left-4 text-[10px] font-mono tracking-wider uppercase bg-black text-white px-2.5 py-1 z-10 shadow-xs">
-                    Hết hàng
-                  </span>
-                )}
 
                 {/* Nút lật ảnh Trước / Sau (Prev/Next) */}
                 <button
@@ -827,7 +821,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 <div className="flex flex-wrap gap-2.5">
                   {uniqueColors.map((color) => {
                     const isSelected = selectedColor === color;
-                    const colorImg = product.variants.find((v) => v.color === color && v.image_url)?.image_url;
                     return (
                       <button
                         key={color}
@@ -837,19 +830,12 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                           if (matched) setSelectedSize(matched.size);
                           setActiveImageIndex(0);
                         }}
-                        className={`px-3.5 py-1.5 text-xs font-mono uppercase border transition-all cursor-pointer flex items-center gap-2 ${isSelected
+                        className={`px-3.5 py-1.5 text-xs font-mono uppercase border transition-all cursor-pointer ${isSelected
                           ? 'bg-[#0a0a0a] text-white border-[#0a0a0a] shadow-xs'
                           : 'bg-white text-black/70 border-black/15 hover:border-black'
                           }`}
                       >
-                        {colorImg && (
-                          <img
-                            src={colorImg}
-                            alt={color}
-                            className={`w-4 h-4 rounded-full object-cover border ${isSelected ? 'border-white' : 'border-black/20'}`}
-                          />
-                        )}
-                        <span>{color}</span>
+                        {color}
                       </button>
                     );
                   })}
@@ -865,29 +851,24 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {availableSizesForColor.map((v) => {
                     const isSelected = selectedSize === v.size;
-                    const isOutOfStock = v.available_qty <= 0;
 
                     return (
                       <button
                         key={v.size}
-                        disabled={isOutOfStock}
                         onClick={() => setSelectedSize(v.size)}
-                        className={`p-2.5 text-center border transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed ${isSelected
+                        className={`p-2.5 text-center border transition-colors cursor-pointer ${isSelected
                           ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                           : 'bg-white text-black/80 border-black/15 hover:border-black'
                           }`}
                       >
                         <div className="text-xs font-bold font-mono uppercase">Size {v.size}</div>
-                        <div className={`text-[10px] font-mono mt-0.5 ${isSelected ? 'text-white/70' : 'text-black/50'}`}>
-                          {isOutOfStock ? 'Hết hàng' : `Còn ${v.available_qty}`}
-                        </div>
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Quantity Stepper & Stock status */}
+              {/* Quantity Stepper */}
               <div className="space-y-2 pt-2">
                 <div className="flex items-center justify-between text-xs font-mono uppercase">
                   <span className="text-[#0a0a0a]/60">Số lượng đặt:</span>
@@ -900,22 +881,13 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                     </button>
                     <span className="px-4 py-1 text-xs font-mono font-bold">{selectedQty}</span>
                     <button
-                      onClick={() => {
-                        if (activeVariant && selectedQty < activeVariant.available_qty) {
-                          setSelectedQty(selectedQty + 1);
-                        }
-                      }}
-                      disabled={!activeVariant || selectedQty >= activeVariant.available_qty}
+                      onClick={() => setSelectedQty(selectedQty + 1)}
+                      disabled={!activeVariant}
                       className="px-3 py-1 text-sm hover:bg-black/5 font-mono cursor-pointer disabled:opacity-30"
                     >
                       +
                     </button>
                   </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[11px] font-mono text-[#0a0a0a]/60 pt-1">
-                  <span>Vị trí kho xuất hàng:</span>
-                  <span>{activeVariant?.location_code || 'WH-HN-01'}</span>
                 </div>
               </div>
 
@@ -923,14 +895,12 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
               <div className="pt-2">
                 <button
                   onClick={handleAddToBag}
-                  disabled={!activeVariant || activeVariant.available_qty <= 0}
+                  disabled={!activeVariant}
                   className="w-full py-4 bg-[#0a0a0a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {!activeVariant
                     ? 'Chọn quy cách'
-                    : activeVariant.available_qty <= 0
-                      ? 'Tạm hết hàng'
-                      : `Thêm vào giỏ hàng • ${formatMoney(activeVariant.selling_price * selectedQty)}`}
+                    : `Thêm vào giỏ hàng • ${formatMoney(activeVariant.selling_price * selectedQty)}`}
                 </button>
               </div>
 
@@ -946,7 +916,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 </div>
                 <div className="flex items-center gap-2.5">
                   <span>✓</span>
-                  <span>Khóa tồn kho an toàn & xác thực thanh toán tức thì qua VietQR.</span>
+                  <span>Xác thực thanh toán tức thì qua VietQR hoặc COD tận nơi.</span>
                 </div>
               </div>
 
@@ -1103,17 +1073,18 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                             <span className="px-2 py-0.5 tabular-nums">{item.quantity}</span>
                             <button
                               onClick={() => handleUpdateQty(item.variant_id, 1)}
-                              disabled={item.quantity >= item.available_qty}
-                              className="px-2 py-0.5 hover:bg-black/5 disabled:opacity-30 cursor-pointer"
+                              className="px-2 py-0.5 hover:bg-black/5 cursor-pointer"
                             >
                               +
                             </button>
                           </div>
                           <button
                             onClick={() => handleRemoveItem(item.variant_id)}
-                            className="text-[10px] uppercase text-black/40 hover:text-black underline cursor-pointer"
+                            className="p-1 text-black/40 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Xóa sản phẩm khỏi giỏ hàng"
+                            aria-label="Xóa sản phẩm khỏi giỏ hàng"
                           >
-                            Xóa
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -1595,9 +1566,9 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
 
       {/* ================= 10. FOOTER ================= */}
       <footer className="border-t hairline bg-white py-12 px-6 md:px-10 mt-20">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-mono tracking-wider uppercase text-[#0a0a0a]/60">
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-mono tracking-wider uppercase text-[#0a0a0a]/60">
           <div>
-            © 2026 CAISHOP ATELIER • AUTONOMOUS MONOCHROME COMMERCE
+            © 2026 DE&apos;GENT • AUTONOMOUS MONOCHROME COMMERCE
           </div>
           <div className="flex items-center gap-6">
             <Link href="/" className="hover:text-black">Storefront</Link>

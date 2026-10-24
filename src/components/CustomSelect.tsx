@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check } from 'lucide-react';
 
 export interface SelectOption {
@@ -36,12 +37,70 @@ export function CustomSelect({
   disabled = false,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; minWidth: number }>({
+    top: 0,
+    left: 0,
+    minWidth: 0,
+  });
+
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Update floating position when open or on scroll/resize
+  useEffect(() => {
+    if (!isOpen || !triggerRef.current) return;
+
+    const updatePosition = () => {
+      if (!triggerRef.current) return;
+      const rect = triggerRef.current.getBoundingClientRect();
+      const menuHeight = menuRef.current?.offsetHeight || 150;
+      const menuWidth = menuRef.current?.offsetWidth || Math.max(rect.width, 140);
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      // If not enough room below and more room above, pop upwards
+      const openUp = spaceBelow < menuHeight && spaceAbove > spaceBelow;
+
+      const top = openUp ? Math.max(8, rect.top - menuHeight - 4) : rect.bottom + 4;
+      const left = Math.min(
+        Math.max(8, rect.left),
+        Math.max(8, window.innerWidth - menuWidth - 12)
+      );
+
+      setCoords({
+        top,
+        left,
+        minWidth: Math.max(rect.width, 130),
+      });
+    };
+
+    updatePosition();
+    const rafId = requestAnimationFrame(updatePosition);
+
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
+    return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
+    };
+  }, [isOpen]);
 
   // Close when clicking outside
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(target) &&
+        (!menuRef.current || !menuRef.current.contains(target))
+      ) {
         setIsOpen(false);
       }
     };
@@ -107,10 +166,128 @@ export function CustomSelect({
     } font-mono tracking-wide uppercase border hairline bg-white text-[#0a0a0a] hover:border-black transition-colors cursor-pointer select-none`;
   })();
 
+  const dropdownMenu = isOpen && (
+    <div
+      ref={menuRef}
+      className={`fixed z-[9999] overflow-hidden shadow-2xl border ${
+        isAtelier
+          ? 'bg-white border-[#0a0a0a] rounded-none py-1 animate-in fade-in zoom-in-95 duration-150'
+          : 'bg-white border-slate-200 rounded-md py-1 animate-in fade-in zoom-in-95 duration-150'
+      } ${dropdownClassName}`}
+      style={{
+        top: `${coords.top}px`,
+        left: `${coords.left}px`,
+        minWidth: `${coords.minWidth}px`,
+        maxHeight: '320px',
+        overflowY: 'auto',
+      }}
+    >
+      {groupedOptions ? (
+        Object.entries(groupedOptions).map(([groupTitle, items]) => (
+          <div key={groupTitle} className="border-b last:border-b-0 border-slate-100">
+            <div
+              className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
+                isAtelier ? 'text-black/40 font-mono bg-black/[0.02]' : 'text-slate-400 bg-slate-50'
+              }`}
+            >
+              {groupTitle}
+            </div>
+            {items.map((opt) => {
+              const isSelected = opt.value === value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full text-left flex items-center justify-between gap-3 px-3 py-2 text-xs transition-colors cursor-pointer ${
+                    isSelected
+                      ? isAtelier
+                        ? 'bg-slate-100 text-[#0a0a0a] font-semibold'
+                        : 'bg-slate-100 text-slate-900 font-semibold hover:bg-slate-200/70'
+                      : isAtelier
+                      ? 'text-[#0a0a0a] hover:bg-black/5 font-mono uppercase text-[11px]'
+                      : 'text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 truncate">
+                    <span>{opt.label}</span>
+                    {opt.count !== undefined && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded ${
+                          isSelected ? 'bg-slate-200 text-slate-800' : 'bg-black/5 text-black/60'
+                        }`}
+                      >
+                        {opt.count}
+                      </span>
+                    )}
+                  </div>
+                  {isSelected && (
+                    <Check className="w-3.5 h-3.5 shrink-0 text-slate-700 stroke-[2.5]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        ))
+      ) : (
+        options.map((opt) => {
+          const isSelected = opt.value === value;
+          return (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => {
+                onChange(opt.value);
+                setIsOpen(false);
+              }}
+              className={`w-full text-left flex items-center justify-between gap-3 px-3 py-2 transition-colors cursor-pointer ${
+                isAtelier
+                  ? isSelected
+                    ? 'bg-slate-100 text-[#0a0a0a] font-semibold font-mono text-[11px] uppercase tracking-wide'
+                    : 'text-[#0a0a0a] hover:bg-black/5 font-mono text-[11px] uppercase tracking-wide'
+                  : isSelected
+                  ? 'bg-slate-100 hover:bg-slate-200/70 text-slate-900 font-semibold text-xs'
+                  : 'text-slate-700 hover:bg-slate-50 text-xs'
+              }`}
+            >
+              <div className="flex items-center gap-2 truncate">
+                {opt.badgeClass ? (
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${opt.badgeClass}`}>
+                    {opt.label}
+                  </span>
+                ) : (
+                  <span>{opt.label}</span>
+                )}
+                {opt.count !== undefined && (
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
+                      isSelected ? 'bg-slate-200 text-slate-800' : 'bg-black/5 text-black/60'
+                    }`}
+                  >
+                    ({opt.count})
+                  </span>
+                )}
+              </div>
+              {isSelected && (
+                <Check
+                  className="w-3.5 h-3.5 shrink-0 text-slate-700 stroke-[2.5]"
+                />
+              )}
+            </button>
+          );
+        })
+      )}
+    </div>
+  );
+
   return (
     <div ref={containerRef} className={`relative inline-block text-left ${className}`}>
       {/* Trigger Button */}
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
@@ -126,116 +303,10 @@ export function CustomSelect({
         />
       </button>
 
-      {/* Dropdown Menu */}
-      {isOpen && (
-        <div
-          className={`absolute left-0 mt-1 min-w-full w-max z-50 overflow-hidden shadow-xl border ${
-            isAtelier
-              ? 'bg-white border-[#0a0a0a] rounded-none py-1 animate-in fade-in zoom-in-95 duration-150'
-              : 'bg-white border-slate-200 rounded-md py-1 animate-in fade-in zoom-in-95 duration-150'
-          } ${dropdownClassName}`}
-          style={{ maxHeight: '320px', overflowY: 'auto' }}
-        >
-          {groupedOptions ? (
-            Object.entries(groupedOptions).map(([groupTitle, items]) => (
-              <div key={groupTitle} className="border-b last:border-b-0 border-slate-100">
-                <div
-                  className={`px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider ${
-                    isAtelier ? 'text-black/40 font-mono bg-black/[0.02]' : 'text-slate-400 bg-slate-50'
-                  }`}
-                >
-                  {groupTitle}
-                </div>
-                {items.map((opt) => {
-                  const isSelected = opt.value === value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => {
-                        onChange(opt.value);
-                        setIsOpen(false);
-                      }}
-                      className={`w-full text-left flex items-center justify-between gap-3 px-3 py-2 text-xs transition-colors cursor-pointer ${
-                        isSelected
-                          ? isAtelier
-                            ? 'bg-black text-white font-medium'
-                            : 'bg-slate-900 text-white font-medium'
-                          : isAtelier
-                          ? 'text-[#0a0a0a] hover:bg-black/5 font-mono uppercase text-[11px]'
-                          : 'text-slate-700 hover:bg-slate-50'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <span>{opt.label}</span>
-                        {opt.count !== undefined && (
-                          <span
-                            className={`text-[10px] px-1.5 py-0.2 rounded ${
-                              isSelected ? 'bg-white/20 text-white' : 'bg-black/5 text-black/60'
-                            }`}
-                          >
-                            {opt.count}
-                          </span>
-                        )}
-                      </div>
-                      {isSelected && (
-                        <Check className="w-3.5 h-3.5 shrink-0" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            ))
-          ) : (
-            options.map((opt) => {
-              const isSelected = opt.value === value;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(opt.value);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full text-left flex items-center justify-between gap-3 px-3.5 py-2.5 transition-colors cursor-pointer ${
-                    isAtelier
-                      ? isSelected
-                        ? 'bg-[#0a0a0a] text-white font-semibold font-mono text-[11px] uppercase tracking-wide'
-                        : 'text-[#0a0a0a] hover:bg-black/5 font-mono text-[11px] uppercase tracking-wide'
-                      : isSelected
-                      ? 'bg-slate-900 text-white font-medium text-xs'
-                      : 'text-slate-700 hover:bg-slate-50 text-xs'
-                  }`}
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    {opt.badgeClass ? (
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${opt.badgeClass}`}>
-                        {opt.label}
-                      </span>
-                    ) : (
-                      <span>{opt.label}</span>
-                    )}
-                    {opt.count !== undefined && (
-                      <span
-                        className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${
-                          isSelected ? 'bg-white/20 text-white' : 'bg-black/5 text-black/60'
-                        }`}
-                      >
-                        ({opt.count})
-                      </span>
-                    )}
-                  </div>
-                  {isSelected && (
-                    <Check
-                      className={`w-3.5 h-3.5 shrink-0 ${isSelected && isAtelier ? 'text-white' : ''}`}
-                    />
-                  )}
-                </button>
-              );
-            })
-          )}
-        </div>
-      )}
+      {/* Dropdown Menu rendered via Portal to escape table overflow clipping */}
+      {mounted && typeof document !== 'undefined' && dropdownMenu
+        ? createPortal(dropdownMenu, document.body)
+        : null}
     </div>
   );
 }

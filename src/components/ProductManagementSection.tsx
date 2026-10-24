@@ -32,6 +32,7 @@ import { BrandCollection } from '@/app/api/collections/route';
 import { BadgeInput } from '@/components/BadgeInput';
 import { VndInput } from '@/components/VndInput';
 import { CustomSelect } from '@/components/CustomSelect';
+import { useSiteContent } from '@/lib/useSiteContent';
 
 interface VariantItem {
   id?: string;
@@ -133,6 +134,10 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [expandedProductId, setExpandedProductId] = useState<string | null>(null);
+
+  // Hook into site content to know which products are currently HOT
+  const { content: siteContent } = useSiteContent();
+  const hotProductIds: string[] = siteContent?.home?.collection_hot_product_ids || [];
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -1090,7 +1095,6 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                 <th className="py-3 px-4">Màu sắc có sẵn</th>
                 <th className="py-3 px-4">Size có sẵn</th>
                 <th className="py-3 px-4">Khoảng giá bán</th>
-                <th className="py-3 px-4">Tình trạng kho CTV</th>
                 <th className="py-3 px-4 text-center">Trạng thái</th>
                 <th className="py-3 px-4 text-right">Thao tác</th>
               </tr>
@@ -1142,7 +1146,18 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
 
                         {/* Name & Category */}
                         <td className="py-2.5 px-4">
-                          <div className="font-semibold text-slate-900 text-sm">{p.name}</div>
+                          <div className="font-semibold text-slate-900 text-sm flex items-center gap-2">
+                            <span>{p.name}</span>
+                            {hotProductIds.includes(p.id) && (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0 font-mono flex items-center gap-0.5"
+                                title="Sản phẩm đang được ghim HOT trên khối Lookbook trang chủ"
+                              >
+                                <span>🔥</span>
+                                <span>HOT</span>
+                              </span>
+                            )}
+                          </div>
                           <div className="flex items-center gap-2 mt-0.5 text-slate-500 text-[11px]">
                             <span className="px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded font-medium">
                               {p.category}
@@ -1188,36 +1203,6 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                               {formatMoney(minPrice)} ~ {formatMoney(maxPrice)}
                             </span>
                           )}
-                        </td>
-
-                        {/* CTV Stock Status */}
-                        <td className="py-2.5 px-4">
-                          {(() => {
-                            const totalVar = p.variants?.length || 0;
-                            const inStockVar = p.variants?.filter(v => (v.physical_qty || 0) > 0).length || 0;
-                            if (totalVar === 0 || inStockVar === 0) {
-                              return (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                                  Tạm hết hàng
-                                </span>
-                              );
-                            }
-                            if (inStockVar === totalVar) {
-                              return (
-                                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                                  Còn hàng
-                                </span>
-                              );
-                            }
-                            return (
-                              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                                Còn {inStockVar}/{totalVar} size
-                              </span>
-                            );
-                          })()}
                         </td>
 
                         {/* Active toggle */}
@@ -1296,7 +1281,6 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                                       <th className="py-1.5 px-3">Giá vốn (COGS)</th>
                                       <th className="py-1.5 px-3">Giá sàn an toàn</th>
                                       <th className="py-1.5 px-3 font-semibold text-slate-700">Giá bán niêm yết</th>
-                                      <th className="py-1.5 px-3">Tình trạng hàng</th>
                                       <th className="py-1.5 px-3 text-right">Lợi nhuận gộp/chiếc</th>
                                     </tr>
                                   </thead>
@@ -1329,20 +1313,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                                           <td className="py-1.5 px-3 text-slate-500">{formatMoney(v.cost_price)}</td>
                                           <td className="py-1.5 px-3 text-slate-400">{formatMoney(v.floor_price)}</td>
                                           <td className="py-1.5 px-3 font-semibold text-slate-900">{formatMoney(v.selling_price)}</td>
-                                          <td className="py-1.5 px-3">
-                                            <button
-                                              type="button"
-                                              onClick={() => v.id && handleQuickToggleVariantStock(p.id, v.id, v.physical_qty)}
-                                              title="Bấm để chuyển nhanh Còn hàng / Tạm hết"
-                                              className={`px-2 py-0.5 text-[10px] font-semibold rounded-full border transition-all inline-flex items-center gap-1 cursor-pointer ${v.physical_qty > 0
-                                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
-                                                  : 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100'
-                                                }`}
-                                            >
-                                              <span className={`w-1.5 h-1.5 rounded-full ${v.physical_qty > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                              <span className="whitespace-nowrap">{v.physical_qty > 0 ? 'Còn hàng' : 'Tạm hết'}</span>
-                                            </button>
-                                          </td>
+                                          
                                           <td className="py-1.5 px-3 text-right text-emerald-600 font-medium">
                                             +{formatMoney(profit)} ({margin}%)
                                           </td>
@@ -1774,7 +1745,6 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                           <th className="py-2 px-3">Giá vốn (đ)</th>
                           <th className="py-2 px-3">Giá sàn (đ)</th>
                           <th className="py-2 px-3">Giá niêm yết (đ)</th>
-                          <th className="py-2 px-3 w-36 text-center">Tình trạng</th>
                           <th className="py-2 px-3 w-10 text-center">Xóa</th>
                         </tr>
                       </thead>
@@ -1897,20 +1867,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                               />
                             </td>
 
-                            {/* In Stock / Out of Stock Toggle */}
-                            <td className="py-1.5 px-3 text-center">
-                              <button
-                                type="button"
-                                onClick={() => handleVariantChange(idx, 'physical_qty', v.physical_qty > 0 ? 0 : 20)}
-                                className={`px-3 py-1 text-xs font-semibold rounded-full border transition-all inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 ${v.physical_qty > 0
-                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100'
-                                    : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100'
-                                  }`}
-                              >
-                                <span className={`w-1.5 h-1.5 rounded-full ${v.physical_qty > 0 ? 'bg-emerald-500' : 'bg-rose-500'}`} />
-                                <span>{v.physical_qty > 0 ? 'Còn hàng' : 'Tạm hết'}</span>
-                              </button>
-                            </td>
+                            
 
                             {/* Remove button */}
                             <td className="py-1.5 px-3 text-center">
@@ -1961,7 +1918,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                   {isSubmitting ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>{editingProduct ? 'Đang lưu thay đổi...' : 'Đang lưu vào D1...'}</span>
+                      <span>{editingProduct ? 'Đang lưu thay đổi...' : 'Đang lưu sản phẩm...'}</span>
                     </>
                   ) : (
                     <>

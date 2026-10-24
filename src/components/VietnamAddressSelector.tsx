@@ -698,7 +698,7 @@ export function VietnamAddressSelector({
                 <div className="pt-2 border-t border-slate-200/70 flex items-center gap-2 text-[11px] text-slate-600">
                   <Truck className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                   <span>
-                    Nội thành TP.HCM (Trước sáp nhập): Shipper riêng CAISHOP (Ship thường 40k • Ship nhanh mốc giờ 100k) • Hỗ trợ COD &amp; QR.
+                    Nội thành TP.HCM (Trước sáp nhập): Shipper riêng DE&apos;GENT (Ship thường 40k • Ship nhanh mốc giờ 100k) • Hỗ trợ COD &amp; QR.
                   </span>
                 </div>
               ) : (

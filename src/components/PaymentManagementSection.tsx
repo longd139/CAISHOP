@@ -200,15 +200,20 @@ export default function PaymentManagementSection() {
                   <p className="text-[11px] text-slate-500">Tự sinh mã QR và tự động nhận diện tiền về qua Webhook sau 2 giây</p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
-                <input
-                  type="checkbox"
-                  checked={settings.is_payos_enabled}
-                  onChange={(e) => setSettings({ ...settings, is_payos_enabled: e.target.checked })}
-                  className="sr-only peer"
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({ ...prev, is_payos_enabled: !prev.is_payos_enabled }))}
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer shrink-0 ml-3 ${
+                  settings.is_payos_enabled ? 'bg-slate-900' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+                aria-label="Bật tắt PayOS"
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                    settings.is_payos_enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
+              </button>
             </div>
 
             {settings.is_payos_enabled ? (
@@ -301,7 +306,7 @@ export default function PaymentManagementSection() {
                     </button>
                   </div>
                   <div className="px-2.5 py-1.5 bg-white border border-slate-200 rounded-md text-[11px] font-mono text-slate-700 truncate select-all">
-                    {origin ? `${origin}/api/payos/webhook` : 'https://caishop.vn/api/payos/webhook'}
+                    {origin ? `${origin}/api/payos/webhook` : 'https://degent.vn/api/payos/webhook'}
                   </div>
                   <p className="text-[11px] text-slate-500 leading-relaxed">
                     Dán URL này vào mục <strong>Webhook URL</strong> trên <a href="https://dashboard.payos.vn" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-semibold">dashboard.payos.vn</a> để PayOS tự động báo tiền về ngay khi khách quét mã chuyển khoản.
@@ -335,15 +340,20 @@ export default function PaymentManagementSection() {
                   </div>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
-                <input
-                  type="checkbox"
-                  checked={settings.is_vietqr_enabled}
-                  onChange={(e) => setSettings({ ...settings, is_vietqr_enabled: e.target.checked })}
-                  className="sr-only peer"
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({ ...prev, is_vietqr_enabled: !prev.is_vietqr_enabled }))}
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer shrink-0 ml-3 ${
+                  settings.is_vietqr_enabled ? 'bg-slate-900' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+                aria-label="Bật tắt VietQR"
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                    settings.is_vietqr_enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
+              </button>
             </div>
 
             {/* COD Toggle */}
@@ -359,15 +369,20 @@ export default function PaymentManagementSection() {
                   </div>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer shrink-0 ml-3">
-                <input
-                  type="checkbox"
-                  checked={settings.is_cod_enabled}
-                  onChange={(e) => setSettings({ ...settings, is_cod_enabled: e.target.checked })}
-                  className="sr-only peer"
+              <button
+                type="button"
+                onClick={() => setSettings(prev => ({ ...prev, is_cod_enabled: !prev.is_cod_enabled }))}
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-200 ease-in-out cursor-pointer shrink-0 ml-3 ${
+                  settings.is_cod_enabled ? 'bg-slate-900' : 'bg-slate-300 dark:bg-slate-700'
+                }`}
+                aria-label="Bật tắt COD"
+              >
+                <div
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-200 ease-in-out ${
+                    settings.is_cod_enabled ? 'translate-x-5' : 'translate-x-0'
+                  }`}
                 />
-                <div className="w-10 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
-              </label>
+              </button>
             </div>
 
             {/* COD Sub-settings */}

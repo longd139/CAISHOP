@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Link from 'next/link';
-import { ArrowRight, Ruler, X, Check, Sparkles, ShoppingBag, ChevronRight, User, Tag } from 'lucide-react';
+import { ArrowRight, Ruler, X, Check, Sparkles, ShoppingBag, ChevronRight, User, Tag, Trash2 } from 'lucide-react';
 import { useHeaderNav, useSiteContent } from '@/lib/useSiteContent';
 import { getProductGallery, getPrimaryImageUrl } from '@/lib/productImages';
 import { useAuth } from '@/lib/useAuth';
@@ -61,6 +61,27 @@ export default function CustomerStorefront() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Compute Hot Products for Home Lookbook Section
+  const hotProductIds: string[] = siteContent?.home?.collection_hot_product_ids || [];
+  const hotMode: string = siteContent?.home?.collection_hot_products_mode || 'manual';
+
+  const displayedProducts = useMemo(() => {
+    if (products.length === 0) return [];
+    if (hotMode === 'all') return products;
+
+    if (hotProductIds && hotProductIds.length > 0) {
+      const productMap = new Map(products.map((p) => [p.id, p]));
+      const selected = hotProductIds
+        .map((id) => productMap.get(id))
+        .filter((p): p is Product => Boolean(p));
+      if (selected.length > 0) return selected;
+    }
+
+    // Default fallback to first 3 products
+    return products.slice(0, 3);
+  }, [products, hotProductIds, hotMode]);
+
   const [scrolled, setScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBagOpen, setIsBagOpen] = useState(false);
@@ -200,17 +221,12 @@ export default function CustomerStorefront() {
   const handleAddToBag = () => {
     if (!activeProduct || !activeVariant) return;
 
-    if (activeVariant.available_qty <= 0) {
-      showToast('Sản phẩm này hiện đang tạm hết hàng.');
-      return;
-    }
-
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === activeVariant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === activeVariant.id
-            ? { ...item, quantity: Math.min(item.available_qty, item.quantity + 1) }
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -225,7 +241,7 @@ export default function CustomerStorefront() {
           size: activeVariant.size,
           price: activeVariant.selling_price,
           quantity: 1,
-          available_qty: activeVariant.available_qty,
+          available_qty: 999999,
         },
       ];
     });
@@ -238,18 +254,15 @@ export default function CustomerStorefront() {
     e.preventDefault();
     e.stopPropagation();
 
-    const variant = product.variants.find((v) => v.available_qty > 0);
-    if (!variant) {
-      showToast('Sản phẩm này hiện đang tạm hết hàng.');
-      return;
-    }
+    const variant = product.variants[0];
+    if (!variant) return;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === variant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === variant.id
-            ? { ...item, quantity: Math.min(item.available_qty, item.quantity + 1) }
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -264,7 +277,7 @@ export default function CustomerStorefront() {
           size: variant.size,
           price: variant.selling_price,
           quantity: 1,
-          available_qty: variant.available_qty,
+          available_qty: 999999,
         },
       ];
     });
@@ -280,7 +293,6 @@ export default function CustomerStorefront() {
           if (item.variant_id === variantId) {
             const nextQty = item.quantity + delta;
             if (nextQty <= 0) return null;
-            if (nextQty > item.available_qty) return item;
             return { ...item, quantity: nextQty };
           }
           return item;
@@ -355,7 +367,7 @@ export default function CustomerStorefront() {
         className={`sticky top-0 z-50 w-full bg-white/90 backdrop-blur-md border-b hairline transition-all duration-500 ${scrolled ? 'shadow-[0_1px_0_rgba(10,10,10,0.06)]' : ''
           }`}
       >
-        <nav className="max-w-[1400px] mx-auto px-6 md:px-10">
+        <nav className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="relative flex items-center justify-between h-[68px] md:h-[88px]">
 
             {/* Zone 1: Left uppercase nav links + mobile hamburger */}
@@ -392,7 +404,7 @@ export default function CustomerStorefront() {
               href="#"
               className="wordmark absolute left-1/2 -translate-x-1/2 font-wide text-[19px] md:text-[24px] font-medium uppercase select-none whitespace-nowrap text-[#0a0a0a] tracking-mono"
             >
-              ATELIER
+              DE&apos;GENT
             </a>
 
             {/* Zone 3: Right utility cluster */}
@@ -620,7 +632,7 @@ export default function CustomerStorefront() {
         </div>
 
         {/* Content Container (Centered in available viewport space) */}
-        <div className="relative z-10 max-w-[1400px] w-full mx-auto px-6 md:px-10 my-auto py-6 md:py-8">
+        <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 my-auto py-6 md:py-8">
           <div className="space-y-4 md:space-y-6 max-w-3xl">
             <div className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/90 flex items-center gap-2.5 font-medium">
               <span>{siteContent?.home?.hero_badge || 'TUYỂN TẬP ĐỒ HIỆU ĐƯƠNG ĐẠI / CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}</span>
@@ -799,17 +811,17 @@ export default function CustomerStorefront() {
         <div className="marquee-track">
           {/* Group 1 */}
           <div className="flex items-center text-[11px] md:text-[12px] tracking-mono uppercase text-[#0a0a0a]/70">
-            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • KHO D1 THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
+            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
           </div>
           {/* Group 2 (Duplicate for infinite seamless loop) */}
           <div aria-hidden="true" className="flex items-center text-[11px] md:text-[12px] tracking-mono uppercase text-[#0a0a0a]/70">
-            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • KHO D1 THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
+            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
           </div>
         </div>
       </section>
 
       {/* ================= 4. EDITORIAL PRODUCT GRID ================= */}
-      <section id="product" className="max-w-[1400px] mx-auto px-6 md:px-10 py-20 md:py-28">
+      <section id="product" className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-16 md:py-24">
 
         {/* Section Header */}
         <div className="reveal flex flex-col sm:flex-row sm:items-end justify-between border-b hairline pb-6 mb-12 gap-4">
@@ -832,10 +844,8 @@ export default function CustomerStorefront() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
-            {products.map((product, idx) => {
+            {displayedProducts.map((product, idx) => {
               const minPrice = Math.min(...product.variants.map((v) => v.selling_price));
-              const totalStock = product.variants.reduce((sum, v) => sum + v.available_qty, 0);
-              const plateNumber = String(idx + 1).padStart(2, '0');
 
               return (
                 <article
@@ -855,32 +865,21 @@ export default function CustomerStorefront() {
                           alt={product.name}
                           className="w-full h-full object-cover contrast-105 group-hover:scale-105 transition-transform duration-700 ease-out"
                         />
-
-                        {/* Corner Number */}
-                        <span className="absolute top-4 left-4 text-[10px] font-mono tracking-widest bg-white/90 backdrop-blur-sm px-2 py-1 uppercase text-[#0a0a0a]">
-                          No. {plateNumber}
-                        </span>
-
-                        {/* Stock badge if low */}
-                        {totalStock <= 5 && totalStock > 0 && (
-                          <span className="absolute top-4 right-4 text-[10px] tracking-wide-1 font-mono uppercase bg-[#0a0a0a] text-white px-2 py-1">
-                            Low Stock: {totalStock}
-                          </span>
-                        )}
-                        {totalStock === 0 && (
-                          <span className="absolute top-4 right-4 text-[10px] tracking-wide-1 font-mono uppercase bg-[#0a0a0a] text-white px-2 py-1">
-                            Sold Out
-                          </span>
-                        )}
                       </Link>
                     </div>
 
                     {/* Metadata & Title */}
                     <div className="pt-2 flex items-baseline justify-between gap-4">
                       <div>
-                        <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-                          {product.category}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
+                            {product.category}
+                          </span>
+                          <span className="text-[10px] font-mono text-[#0a0a0a]/40">•</span>
+                          <span className="text-[10px] font-mono text-[#0a0a0a]/50">
+                            {product.variants.length} Sizes
+                          </span>
+                        </div>
                         <Link
                           href={`/products/${product.id}`}
                           className="font-wide uppercase text-base md:text-lg font-semibold cursor-pointer group-hover:opacity-70 transition-opacity block min-h-[3.25rem] line-clamp-2"
@@ -901,28 +900,15 @@ export default function CustomerStorefront() {
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-4 space-y-2">
+                  <div className="pt-4">
                     <button
                       type="button"
                       onClick={(e) => handleQuickAddToCart(e, product)}
-                      disabled={totalStock === 0}
-                      className="w-full py-2.5 bg-[#0a0a0a] text-white text-[11px] font-mono uppercase tracking-wider hover:bg-black/85 flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                      className="w-full py-2.5 bg-[#0a0a0a] text-white text-[11px] font-mono uppercase tracking-wider hover:bg-black/85 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
-                      <span>{totalStock === 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ hàng'}</span>
+                      <span>Thêm vào giỏ hàng</span>
                     </button>
-
-                    <div className="flex items-center justify-between pt-1">
-                      <Link
-                        href={`/products/${product.id}`}
-                        className="nav-link text-[11px] tracking-wide-2 uppercase font-medium text-[#0a0a0a]"
-                      >
-                        Xem chi tiết →
-                      </Link>
-                      <span className="text-[11px] font-mono text-[#0a0a0a]/50">
-                        {product.variants.length} Sizes
-                      </span>
-                    </div>
                   </div>
                 </article>
               );
@@ -934,7 +920,7 @@ export default function CustomerStorefront() {
                 href="/products"
                 className="inline-flex items-center gap-3 px-8 py-3.5 border hairline uppercase text-[11px] tracking-wide-2 font-medium hover:bg-black hover:text-white transition-colors"
               >
-                <span>Explore Full Product Archive ({products.length} Collections)</span>
+                <span>Xem thêm</span>
                 <span>→</span>
               </Link>
             </div>
@@ -944,7 +930,7 @@ export default function CustomerStorefront() {
 
       {/* ================= 5. DARK SPLIT STUDIO SECTION ================= */}
       <section id="studio" className="w-full bg-[#0a0a0a] text-white border-y hairline-dark">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-24 md:py-32">
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-20 md:py-28">
           <div className="grid md:grid-cols-12 gap-12 lg:gap-16 items-start">
 
             {/* Left Column: Big Headline */}
@@ -960,7 +946,7 @@ export default function CustomerStorefront() {
             {/* Right Column: Narrative + DL Definition List */}
             <div className="reveal md:col-span-6 space-y-8" style={{ transitionDelay: '150ms' }}>
               <p className="text-[15px] md:text-[16px] leading-relaxed text-white/70 font-light">
-                {siteContent?.home?.studio_narrative || siteContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, sổ cái D1 xác thực giao dịch sau 3 giây để đóng gói giao ngay.'}
+                {siteContent?.home?.studio_narrative || siteContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, hệ thống tự động xác thực thanh toán sau 3 giây để đóng gói giao ngay.'}
               </p>
 
               <dl className="border-b hairline-dark">
@@ -970,7 +956,7 @@ export default function CustomerStorefront() {
                 </div>
                 <div className="flex justify-between py-5 border-t hairline-dark text-xs">
                   <dt className="text-white/60 uppercase tracking-wide-2">Kho hàng thực tế</dt>
-                  <dd className="font-mono text-white">{siteContent?.home?.studio_ledger || siteContent?.studio?.spec_ledger || 'Kho hàng thực tế D1 (Singapore)'}</dd>
+                  <dd className="font-mono text-white">{siteContent?.home?.studio_ledger || siteContent?.studio?.spec_ledger || 'Hệ thống kho vận toàn quốc (Hà Nội & TP.HCM)'}</dd>
                 </div>
                 <div className="flex justify-between py-5 border-t hairline-dark text-xs">
                   <dt className="text-white/60 uppercase tracking-wide-2">Vận chuyển</dt>
@@ -1035,13 +1021,13 @@ export default function CustomerStorefront() {
 
       {/* ================= 8. DARK EDITORIAL FOOTER ================= */}
       <footer className="w-full bg-[#0a0a0a] text-white border-t hairline-dark px-6 md:px-10 py-16">
-        <div className="max-w-[1400px] mx-auto space-y-12">
+        <div className="max-w-[1760px] mx-auto space-y-12">
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-6 space-y-2">
               <div className="font-wide text-2xl uppercase tracking-mono">{siteContent?.home?.footer_brand || 'CÁI SHOP - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN'}</div>
               <p className="text-xs text-white/50 max-w-sm font-light">
-                {siteContent?.home?.footer_address || 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận Cloudflare D1'}
+                {siteContent?.home?.footer_address || 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận toàn quốc'}
               </p>
             </div>
 
@@ -1065,18 +1051,18 @@ export default function CustomerStorefront() {
               </div>
 
               <div className="space-y-3">
-                <div className="text-white/40">Colophon</div>
+                <div className="text-white/40">Cam kết</div>
                 <ul className="space-y-2 font-mono text-[10px] text-white/60">
-                  <li>APAC SIN</li>
-                  <li>D1 SQLite</li>
-                  <li>Version 1.0</li>
+                  <li>100% Chính hãng</li>
+                  <li>Đổi trả 7 ngày</li>
+                  <li>Giao nhanh toàn quốc</li>
                 </ul>
               </div>
             </div>
           </div>
 
           <div className="pt-8 border-t hairline-dark flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-white/40 gap-4">
-            <div>{siteContent?.home?.footer_copyright || '© 2026 CAISHOP ATELIER. ALL RIGHTS RESERVED.'}</div>
+            <div>{siteContent?.home?.footer_copyright || "© 2026 DE'GENT. ALL RIGHTS RESERVED."}</div>
             <div>MONOCHROME HIGH-FASHION EDITORIAL ENGINE</div>
           </div>
 
@@ -1198,30 +1184,15 @@ export default function CustomerStorefront() {
                       ))}
                     </div>
                   </div>
-
-                  {/* Stock Availability */}
-                  <div className="text-[11px] font-mono pt-1">
-                    {activeVariant ? (
-                      activeVariant.available_qty > 0 ? (
-                        <span className="text-[#0a0a0a]">
-                          ✓ {activeVariant.available_qty} units in stock ({activeVariant.sku})
-                        </span>
-                      ) : (
-                        <span className="text-black/40">
-                          ✕ Currently out of stock
-                        </span>
-                      )
-                    ) : null}
-                  </div>
                 </div>
 
                 {/* Add to Bag Action */}
                 <button
                   onClick={handleAddToBag}
-                  disabled={!activeVariant || activeVariant.available_qty <= 0}
+                  disabled={!activeVariant}
                   className="w-full py-3.5 bg-[#0a0a0a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black/80 disabled:bg-black/10 disabled:text-black/30 transition-colors"
                 >
-                  {activeVariant && activeVariant.available_qty > 0 ? 'Thêm vào giỏ hàng' : 'Tạm hết hàng'}
+                  {activeVariant ? 'Thêm vào giỏ hàng' : 'Chọn quy cách'}
                 </button>
               </div>
             </div>
@@ -1300,9 +1271,11 @@ export default function CustomerStorefront() {
                         </div>
                         <button
                           onClick={() => updateCartQty(item.variant_id, -item.quantity)}
-                          className="text-[11px] tracking-wide-1 uppercase text-[#0a0a0a]/50 hover:text-black"
+                          className="p-1 text-[#0a0a0a]/40 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Xóa sản phẩm khỏi giỏ hàng"
+                          aria-label="Xóa sản phẩm khỏi giỏ hàng"
                         >
-                          Remove
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1421,7 +1394,7 @@ export default function CustomerStorefront() {
               <div className="p-6 border-t hairline bg-white shrink-0 space-y-3 shadow-[0_-4px_16px_rgba(0,0,0,0.04)]">
                 <div className="space-y-1.5 text-xs">
                   <div className="flex justify-between text-[#0a0a0a]/60">
-                    <span>Subtotal</span>
+                    <span>Tạm tính</span>
                     <span className="tabular-nums">{formatMoney(cartSubtotal)}</span>
                   </div>
                   {Boolean(dealDiscount > 0 && appliedDeal) && (
@@ -1451,12 +1424,12 @@ export default function CustomerStorefront() {
                       {isFreeshipDeal
                         ? '0 ₫ (Voucher Freeship)'
                         : cartShippingFee === 0
-                          ? 'Complimentary'
+                          ? 'Miễn phí'
                           : formatMoney(cartShippingFee)}
                     </span>
                   </div>
                   <div className="flex justify-between text-sm font-semibold pt-2 border-t hairline text-[#0a0a0a]">
-                    <span>Total</span>
+                    <span>Tổng cộng</span>
                     <span className="tabular-nums">{formatMoney(cartTotal)}</span>
                   </div>
                 </div>
@@ -1504,13 +1477,13 @@ export default function CustomerStorefront() {
 
             <div className="flex items-center justify-between border-b hairline pb-4">
               <div>
-                <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block">Settlement</span>
-                <h3 className="font-wide uppercase text-base font-semibold">Recipient & Delivery</h3>
+                <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">Thanh toán</span>
+                <h3 className="font-wide uppercase text-base font-semibold">Thông tin Người nhận & Giao hàng</h3>
               </div>
               <button
                 onClick={() => setIsCheckingOut(false)}
                 className="p-1 hover:opacity-50 text-[#0a0a0a]"
-                aria-label="Close"
+                aria-label="Đóng"
               >
                 ✕
               </button>
@@ -1524,10 +1497,10 @@ export default function CustomerStorefront() {
 
             <form onSubmit={handlePlaceOrder} className="space-y-4 text-xs font-mono">
               <div className="space-y-1">
-                <label className="uppercase text-[#0a0a0a]/70">Full Name</label>
+                <label className="uppercase text-[#0a0a0a]/70">Họ và tên</label>
                 <input
                   type="text"
-                  placeholder="e.g. Nguyen Van An"
+                  placeholder="Ví dụ: Nguyễn Văn An"
                   value={customerName}
                   onChange={(e) => setCustomerName(e.target.value)}
                   className="w-full h-10 border hairline px-3 bg-white focus:outline-none focus:border-black font-sans"
@@ -1536,10 +1509,10 @@ export default function CustomerStorefront() {
               </div>
 
               <div className="space-y-1">
-                <label className="uppercase text-[#0a0a0a]/70">Telephone</label>
+                <label className="uppercase text-[#0a0a0a]/70">Số điện thoại</label>
                 <input
                   type="tel"
-                  placeholder="e.g. 0912345678"
+                  placeholder="Ví dụ: 0912345678"
                   value={customerPhone}
                   onChange={(e) => setCustomerPhone(e.target.value)}
                   className="w-full h-10 border hairline px-3 bg-white focus:outline-none focus:border-black font-sans"
@@ -1548,9 +1521,9 @@ export default function CustomerStorefront() {
               </div>
 
               <div className="space-y-1">
-                <label className="uppercase text-[#0a0a0a]/70">Shipping Address</label>
+                <label className="uppercase text-[#0a0a0a]/70">Địa chỉ nhận hàng</label>
                 <textarea
-                  placeholder="Street, ward, district, city..."
+                  placeholder="Số nhà, tên đường, phường/xã, quận/huyện, tỉnh/thành..."
                   value={shippingAddress}
                   onChange={(e) => setShippingAddress(e.target.value)}
                   rows={2}
@@ -1561,15 +1534,15 @@ export default function CustomerStorefront() {
 
               <div className="p-4 bg-[#0a0a0a]/[0.03] border hairline space-y-1.5">
                 <div className="flex justify-between">
-                  <span>Items Total ({totalBagCount}):</span>
+                  <span>Tổng tiền hàng ({totalBagCount}):</span>
                   <span>{formatMoney(cartSubtotal)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Shipping:</span>
-                  <span>{cartShippingFee === 0 ? 'Complimentary' : formatMoney(cartShippingFee)}</span>
+                  <span>Phí giao hàng:</span>
+                  <span>{cartShippingFee === 0 ? 'Miễn phí' : formatMoney(cartShippingFee)}</span>
                 </div>
                 <div className="flex justify-between font-bold pt-1 border-t hairline text-sm">
-                  <span>Total Due:</span>
+                  <span>Tổng thanh toán:</span>
                   <span>{formatMoney(cartTotal)}</span>
                 </div>
               </div>
@@ -1580,13 +1553,13 @@ export default function CustomerStorefront() {
                   onClick={() => setIsCheckingOut(false)}
                   className="px-4 py-2.5 border hairline uppercase text-[11px] tracking-wide-1 hover:bg-black/5"
                 >
-                  Cancel
+                  Hủy
                 </button>
                 <button
                   type="submit"
                   className="px-6 py-2.5 bg-[#0a0a0a] text-white uppercase text-[11px] tracking-wide-2 font-medium hover:bg-black/90"
                 >
-                  Confirm & Generate VietQR
+                  Xác nhận & Tạo mã VietQR
                 </button>
               </div>
             </form>
@@ -1628,9 +1601,49 @@ export default function CustomerStorefront() {
               </div>
 
               <p className="text-[10px] font-mono text-[#0a0a0a]/50">
-                Auto-reconciled within 3 seconds. Cloudflare D1 inventory reserved.
+                Đơn hàng tự động xác nhận trong 3 giây. Đã giữ hàng thành công.
               </p>
             </div>
+
+            {process.env.NEXT_PUBLIC_ENABLE_MOCK_PAYMENT === 'true' && (
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded text-left space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-mono font-bold text-indigo-900 uppercase tracking-wide">
+                    🧪 Mock Payment (Dev Mode)
+                  </span>
+                  <span className="text-[9px] font-mono text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded font-semibold">
+                    NEXT_PUBLIC_ENABLE_MOCK_PAYMENT
+                  </span>
+                </div>
+                <p className="text-[11px] text-indigo-800 leading-tight">
+                  Biến môi trường test đang bật. Bấm nút dưới để giả lập ngân hàng đã nhận đủ tiền và hoàn tất đơn:
+                </p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      const res = await fetch('/api/orders', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ order_id: orderSuccess.id || orderSuccess.order_code, action: 'CONFIRM_PAYMENT' })
+                      });
+                      const d = await res.json();
+                      if (d.success) {
+                        alert('✅ [TEST THANH TOÁN] Thanh toán ảo thành công! Đơn hàng đã chuyển sang trạng thái "Đã thanh toán" & "Đang xử lý".');
+                        setOrderSuccess(null);
+                      } else {
+                        alert(d.message || 'Lỗi khi thanh toán thử.');
+                      }
+                    } catch (e: any) {
+                      alert('Lỗi: ' + e.message);
+                    }
+                  }}
+                  className="w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-mono text-xs font-semibold rounded flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <span>⚡ Giả lập quét mã thanh toán 0₫</span>
+                </button>
+              </div>
+            )}
 
             <div className="flex flex-col sm:flex-row items-center gap-3">
               <button

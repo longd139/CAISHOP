@@ -137,10 +137,6 @@ export default function OverviewSection({
   themeColor = '#0f172a'
 }: OverviewSectionProps) {
   // Calculations
-  const criticalItems = inventory.filter(item => item.is_critical);
-  const lowStockItems = inventory.filter(item => item.is_low_stock && !item.is_critical);
-  const totalStockAttention = criticalItems.length + lowStockItems.length;
-
   const pendingOrders = orders.filter(o => o.fulfillment_status === 'UNFULFILLED' || o.payment_status === 'PENDING');
   const shippingOrders = orders.filter(o => o.fulfillment_status === 'SHIPPING');
   const paidOrders = orders.filter(o => o.payment_status === 'PAID');
@@ -328,7 +324,7 @@ export default function OverviewSection({
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-1">
-            Báo cáo tài chính, hiệu suất xử lý đơn hàng và giám sát an toàn tồn kho theo thời gian thực
+            Báo cáo tài chính, hiệu suất xử lý đơn hàng và hiệu quả kinh doanh theo thời gian thực
           </p>
         </div>
 
@@ -408,26 +404,22 @@ export default function OverviewSection({
             </div>
           </div>
 
-          {/* Metric 4: Tồn kho & Cảnh báo an toàn */}
+          {/* Metric 4: Danh mục biến thể kinh doanh */}
           <div className="p-4 sm:p-5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-slate-500">Tồn kho cần bổ sung</span>
+              <span className="text-xs font-medium text-slate-500">Mã SKU kinh doanh</span>
               <Package className="w-4 h-4 text-slate-400" />
             </div>
             <div className="mt-1.5 text-2xl font-semibold text-slate-900 font-mono tracking-tight flex items-baseline gap-2">
-              <span className={criticalItems.length > 0 ? 'text-rose-700' : 'text-slate-900'}>
-                {totalStockAttention}
+              <span className="text-slate-900">
+                {inventory.length}
               </span>
               <span className="text-xs font-normal text-slate-400 font-sans">SKU</span>
             </div>
             <div className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
-              {criticalItems.length > 0 ? (
-                <span className="text-rose-700 font-medium">{criticalItems.length} SKU cạn hàng</span>
-              ) : (
-                <span className="text-emerald-700 font-medium">Kho ổn định</span>
-              )}
+              <span className="text-emerald-700 font-medium">Luôn sẵn bán</span>
               <span>•</span>
-              <span>{inventory.length} tổng biến thể</span>
+              <span>Không giới hạn tồn kho</span>
             </div>
           </div>
 
@@ -435,7 +427,7 @@ export default function OverviewSection({
       </section>
 
       {/* ================= 3. OPERATIONAL ACTION NOTICE ================= */}
-      {(pendingOrders.length > 0 || criticalItems.length > 0) ? (
+      {pendingOrders.length > 0 ? (
         <div className="rounded-lg border border-amber-200 dark:border-amber-800/60 bg-amber-50 dark:bg-amber-950/40 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-colors">
           <div className="flex items-start gap-3">
             <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
@@ -444,38 +436,26 @@ export default function OverviewSection({
                 Các mục cần quản trị viên xử lý ngay
               </h2>
               <p className="text-xs text-amber-800 dark:text-amber-300/90 mt-0.5">
-                {pendingOrders.length > 0 && `${pendingOrders.length} đơn hàng đang chờ xác nhận hoặc thanh toán. `}
-                {criticalItems.length > 0 && `${criticalItems.length} mã sản phẩm đã chạm mức báo động hết tồn kho khả dụng.`}
+                {pendingOrders.length} đơn hàng đang chờ xác nhận hoặc thanh toán.
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            {pendingOrders.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onNavigateTab('orders')}
-                className="inline-flex h-8 items-center justify-center rounded-md bg-amber-700 hover:bg-amber-800 dark:bg-amber-500 dark:hover:bg-amber-400 px-3 text-xs font-medium text-white dark:text-slate-950 transition-colors cursor-pointer font-sans"
-              >
-                Xử lý đơn hàng
-              </button>
-            )}
-            {criticalItems.length > 0 && (
-              <button
-                type="button"
-                onClick={() => onNavigateTab('products')}
-                className="inline-flex h-8 items-center justify-center rounded-md border border-amber-300 dark:border-amber-700/80 bg-white dark:bg-amber-900/40 px-3 text-xs font-medium text-amber-900 dark:text-amber-200 hover:bg-amber-100/60 dark:hover:bg-amber-900/60 transition-colors cursor-pointer font-sans shadow-2xs"
-              >
-                Nhập kho SKU
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => onNavigateTab('orders')}
+              className="inline-flex h-8 items-center justify-center rounded-md bg-amber-700 hover:bg-amber-800 dark:bg-amber-500 dark:hover:bg-amber-400 px-3 text-xs font-medium text-white dark:text-slate-950 transition-colors cursor-pointer font-sans"
+            >
+              Xử lý đơn hàng
+            </button>
           </div>
         </div>
       ) : (
         <div className="rounded-lg border border-slate-200 bg-slate-50/60 px-4 py-3 flex items-center justify-between text-xs text-slate-600">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-            <span>Tất cả quy trình kinh doanh đang ở trạng thái an toàn. Không có đơn tồn đọng và kho đủ cung ứng.</span>
+            <span>Tất cả quy trình kinh doanh đang ở trạng thái an toàn. Không có đơn hàng tồn đọng.</span>
           </div>
           <span className="font-mono text-slate-400 text-[11px]">Sẵn sàng tiếp nhận đơn</span>
         </div>
@@ -1063,7 +1043,7 @@ export default function OverviewSection({
                                   : 'bg-rose-50 text-rose-700 border border-rose-200'
                               }`}
                             >
-                              {isDelivered ? 'Đã giao' : isShipping ? 'Đang giao' : 'Chưa giao'}
+                              {isDelivered ? 'Đã nhận' : isShipping ? 'Đang giao' : 'Chưa giao'}
                             </span>
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
@@ -1085,104 +1065,6 @@ export default function OverviewSection({
                   className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
                 >
                   Xem thêm {orders.length - 6} đơn hàng khác trong kho lưu trữ →
-                </button>
-              </footer>
-            )}
-          </section>
-
-          {/* SECTION B: CẢNH BÁO TỒN KHO & MỨC AN TOÀN */}
-          <section className="rounded-lg border border-slate-200 bg-white">
-            <header className="border-b border-slate-200 px-4 py-3 flex items-center justify-between bg-slate-50/50">
-              <div>
-                <h2 className="text-sm font-semibold text-slate-900">
-                  Giám sát điểm đặt hàng lại (Safety Stock Threshold)
-                </h2>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Các mặt hàng có lượng tồn thực tế hoặc khả dụng dưới ngưỡng kiểm soát an toàn
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => onNavigateTab('products')}
-                className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-              >
-                <span>Quản lý kho biến thể</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </header>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-600">
-                  <tr>
-                    <th className="py-2.5 px-4 font-mono">SKU</th>
-                    <th className="py-2.5 px-4">Sản phẩm & Biến thể</th>
-                    <th className="py-2.5 px-4 text-center">Tồn khả dụng</th>
-                    <th className="py-2.5 px-4 text-center">Ngưỡng an toàn</th>
-                    <th className="py-2.5 px-4">Vị trí kho</th>
-                    <th className="py-2.5 px-4 text-right">Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 text-xs">
-                  {totalStockAttention === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-slate-500">
-                        <div className="flex flex-col items-center justify-center gap-1.5">
-                          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                          <span className="font-medium text-slate-700">Tồn kho đạt mức an toàn</span>
-                          <span className="text-xs text-slate-400">Không có biến thể nào vi phạm ngưỡng cảnh báo đặt lại hàng.</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    [...criticalItems, ...lowStockItems].slice(0, 5).map((item) => (
-                      <tr key={item.variant_id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="py-3 px-4 font-mono font-semibold text-slate-900">
-                          {item.sku}
-                        </td>
-                        <td className="py-3 px-4">
-                          <div className="font-medium text-slate-900">{item.product_name}</div>
-                          <div className="text-[11px] text-slate-500 font-mono">
-                            Màu: {item.color} • Size: {item.size}
-                          </div>
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono font-semibold">
-                          <span className={item.available_qty <= 0 ? 'text-rose-700 font-bold' : 'text-slate-900'}>
-                            {item.available_qty}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-center font-mono text-slate-500">
-                          {item.safety_threshold}
-                        </td>
-                        <td className="py-3 px-4 font-mono text-slate-500 text-[11px]">
-                          {item.location_code || 'KHO-CHINH'}
-                        </td>
-                        <td className="py-3 px-4 text-right whitespace-nowrap">
-                          {item.is_critical ? (
-                            <span className="inline-flex items-center rounded-sm bg-rose-50 px-2 py-0.5 text-[11px] font-semibold text-rose-700 border border-rose-200">
-                              Nguy cấp (Cạn kho)
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center rounded-sm bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 border border-amber-200">
-                              Dưới ngưỡng
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-
-            {totalStockAttention > 5 && (
-              <footer className="border-t border-slate-100 px-4 py-2.5 bg-slate-50/30 text-right">
-                <button
-                  type="button"
-                  onClick={() => onNavigateTab('products')}
-                  className="text-xs font-medium text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
-                >
-                  Xem thêm {totalStockAttention - 5} mặt hàng khác cần bổ sung tồn kho →
                 </button>
               </footer>
             )}
@@ -1257,7 +1139,7 @@ export default function OverviewSection({
               <div className="pt-3 border-t border-slate-100 space-y-2 font-mono text-[11px] text-slate-500">
                 <div className="flex items-center justify-between">
                   <span>Tài khoản đối soát:</span>
-                  <span className="font-semibold text-slate-700">VIETINBANK CAISHOP</span>
+                  <span className="font-semibold text-slate-700">VIETINBANK DE&apos;GENT</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Khóa giá sàn an toàn:</span>

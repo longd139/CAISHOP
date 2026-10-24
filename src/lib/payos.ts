@@ -109,7 +109,7 @@ export function formatPayOSDescription(orderCode: string): string {
     .trim();
 
   const result = `DH ${clean}`.slice(0, 25);
-  return result || 'DH CAISHOP';
+  return result || 'DH DEGENT';
 }
 
 /**

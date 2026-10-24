@@ -12,11 +12,14 @@ import {
   X,
   Package,
   CheckCircle2,
+  Check,
   ArrowRight,
   Loader2,
   CreditCard,
   Clock,
   AlertCircle,
+  RotateCcw,
+  Truck,
 } from 'lucide-react';
 import { useCart, AVAILABLE_DEALS } from '@/lib/useCart';
 import { getPrimaryImageUrl } from '@/lib/productImages';
@@ -175,6 +178,32 @@ export function UserProfileModal({
       window.location.href = `/checkout?order_id=${encodeURIComponent(ord.id)}`;
     } finally {
       setRedirectingOrderId(null);
+    }
+  };
+
+  const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
+
+  const handleConfirmDelivered = async (orderId: string) => {
+    setConfirmingOrderId(orderId);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId,
+          action: 'CONFIRM_DELIVERY',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await fetchOrders();
+      } else {
+        alert(data.message || 'Không thể xác nhận nhận hàng');
+      }
+    } catch (e: any) {
+      alert(e.message || 'Lỗi khi xác nhận nhận hàng');
+    } finally {
+      setConfirmingOrderId(null);
     }
   };
 
@@ -747,7 +776,7 @@ export function UserProfileModal({
                   <div className="space-y-1">
                     <h4 className="text-sm font-bold text-slate-800">Bạn chưa có đơn hàng nào</h4>
                     <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                      Các đơn hàng bạn đặt tại CAISHOP sẽ được lưu trữ và cập nhật trạng thái chi tiết tại đây.
+                      Các đơn hàng bạn đặt tại DE&apos;GENT sẽ được lưu trữ và cập nhật trạng thái chi tiết tại đây.
                     </p>
                   </div>
                   <Link
@@ -764,8 +793,18 @@ export function UserProfileModal({
                   {orders.map((ord: any) => {
                     const isPaid = ord.payment_status === 'PAID';
                     const isDelivered = ord.fulfillment_status === 'DELIVERED';
+                    const isReturned = ord.fulfillment_status === 'RETURNED' || ord.fulfillment_status === 'RETURNING' || ord.fulfillment_status === 'RETURN_REQUESTED' || !!ord.return_status;
+                    const returnNotesLower = (ord.return_notes || '').toLowerCase();
+                    const isExchange = isReturned && (
+                      ord.return_notes?.includes('ĐỔI HÀNG') || 
+                      returnNotesLower.includes('đổi size') || 
+                      returnNotesLower.includes('đổi mẫu') ||
+                      returnNotesLower.includes('đổi hàng')
+                    );
+                    const isRefund = isReturned && !isExchange;
                     const isCancelled = ord.fulfillment_status === 'CANCELLED';
-                    const isPacking = ord.fulfillment_status === 'PACKING';
+                    const isDispatched = ord.fulfillment_status === 'DISPATCHED';
+                    const isPacking = ord.fulfillment_status === 'PACKING' || (!isDispatched && !isDelivered && !isCancelled && !isReturned && isPaid);
 
                     return (
                       <div
@@ -774,24 +813,19 @@ export function UserProfileModal({
                       >
                         {/* Order Header */}
                         <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2.5 flex-wrap">
-                          <div className="space-y-0.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-bold text-slate-900 font-mono tracking-wide">
-                                #{ord.order_code}
-                              </span>
-                              <span className="text-[10px] text-slate-400 font-medium">
-                                {new Date(ord.created_at).toLocaleDateString('vi-VN', {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                  day: '2-digit',
-                                  month: '2-digit',
-                                  year: 'numeric',
-                                })}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-slate-500 truncate max-w-md">
-                              {ord.shipping_address}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold text-slate-900 font-mono tracking-wide">
+                              #{ord.order_code}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {new Date(ord.created_at).toLocaleDateString('vi-VN', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                              })}
+                            </span>
                           </div>
 
                           {/* Status Badges */}
@@ -819,8 +853,14 @@ export function UserProfileModal({
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 isCancelled
                                   ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : isExchange
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                  : isRefund
+                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
                                   : isDelivered
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : isDispatched
+                                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
                                   : isPacking
                                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                   : 'bg-slate-100 text-slate-700 border border-slate-200'
@@ -828,8 +868,14 @@ export function UserProfileModal({
                             >
                               {isCancelled
                                 ? 'Đã hủy'
+                                : isExchange
+                                ? 'Đang đổi hàng'
+                                : isRefund
+                                ? 'Đang trả hàng'
                                 : isDelivered
-                                ? 'Đã giao'
+                                ? 'Đã nhận'
+                                : isDispatched
+                                ? 'Đang vận chuyển'
                                 : isPacking
                                 ? 'Chờ vận chuyển'
                                 : 'Chưa xử lý'}
@@ -861,6 +907,79 @@ export function UserProfileModal({
                           ))}
                         </div>
 
+                        {/* 🚚 Shipment / Tracking Code Info for customer */}
+                        {ord.tracking_code && (isDispatched || isDelivered) ? (
+                          <div className="p-3 bg-red-50/70 border border-red-200/90 rounded-xl space-y-2">
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <div className="flex items-center gap-2">
+                                {ord.carrier === 'VIETTEL_POST' || !ord.carrier ? (
+                                  <img
+                                    src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                                    alt="Viettel Post"
+                                    className="w-5 h-5 rounded object-cover shadow-2xs border border-red-200 shrink-0"
+                                  />
+                                ) : (
+                                  <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                                    <Truck className="w-3.5 h-3.5" />
+                                  </div>
+                                )}
+                                <span className="text-xs font-bold text-slate-900">
+                                  {ord.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : ord.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : ord.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                                {isDelivered ? 'Đã giao thành công' : 'Đang vận chuyển'}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-red-100 flex-wrap">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-slate-500 text-[11px]">Mã vận đơn:</span>
+                                <span className="font-mono font-bold text-xs text-slate-950 bg-white px-2 py-0.5 rounded border border-slate-200 tracking-wider">
+                                  {ord.tracking_code}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(ord.tracking_code);
+                                    alert(`Đã sao chép mã vận đơn: ${ord.tracking_code}`);
+                                  }}
+                                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-white px-2 py-1 rounded border border-blue-200 shadow-2xs hover:bg-blue-50 transition-colors cursor-pointer"
+                                  title="Sao chép mã"
+                                >
+                                  Sao chép
+                                </button>
+                                <a
+                                  href={
+                                    ord.carrier === 'GHTK' ? `https://i.ghtk.vn/${ord.tracking_code}` :
+                                    ord.carrier === 'GHN' ? `https://tracking.ghn.vn/?order_code=${ord.tracking_code}` :
+                                    `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${ord.tracking_code}`
+                                  }
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="text-[11px] font-semibold text-red-700 hover:text-red-900 bg-white px-2 py-1 rounded border border-red-200 shadow-2xs hover:bg-red-50 transition-colors flex items-center gap-1"
+                                >
+                                  <span>Tra cứu bưu gửi</span>
+                                  <ExternalLink className="w-3 h-3 text-red-500" />
+                                </a>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (isPaid || ord.payment_method === 'cod') && !isDelivered && !isCancelled && !isReturned ? (
+                          <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-center justify-between gap-2 flex-wrap text-xs text-amber-900">
+                            <div className="flex items-center gap-2">
+                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+                              <span className="text-slate-600">Trạng thái vận chuyển:</span>
+                              <span className="font-bold text-amber-950">Đang chờ bàn giao với ĐVVC</span>
+                            </div>
+                            <span className="text-[11px] text-amber-700 font-medium">DE&apos;GENT đang chuẩn bị gói hàng</span>
+                          </div>
+                        ) : null}
+
                         {/* Order Footer & Actions */}
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                           <div className="text-xs">
@@ -871,7 +990,29 @@ export function UserProfileModal({
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {!isPaid && !isCancelled && (
+                            {/* Quick Action: Confirm Received if active, not delivered, and not in return/exchange */}
+                            {!isDelivered && !isCancelled && !isReturned && (isPaid || ord.payment_method === 'cod') && (
+                              <button
+                                type="button"
+                                disabled={confirmingOrderId === ord.id}
+                                onClick={() => handleConfirmDelivered(ord.id)}
+                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                              >
+                                {confirmingOrderId === ord.id ? (
+                                   <>
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    <span>Đang xử lý...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                    <span>Đã nhận hàng</span>
+                                  </>
+                                )}
+                              </button>
+                            )}
+
+                            {!isPaid && !isCancelled && !isReturned && (
                               <button
                                 type="button"
                                 disabled={redirectingOrderId === ord.id}
@@ -890,6 +1031,17 @@ export function UserProfileModal({
                                   </>
                                 )}
                               </button>
+                            )}
+
+                            {isDelivered && !isReturned && (
+                              <Link
+                                href={`/checkout?order_id=${ord.id}&open_return=1`}
+                                onClick={onClose}
+                                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              >
+                                <RotateCcw className="w-3 h-3 text-amber-700" />
+                                <span>Yêu cầu</span>
+                              </Link>
                             )}
 
                             <Link
@@ -916,17 +1068,19 @@ export function UserProfileModal({
           <span className="text-[11px] text-slate-400">
             Phiên ID: #{user.id.slice(-6).toUpperCase()}
           </span>
-          <button
-            type="button"
-            onClick={async () => {
-              await logout();
-              onClose();
-            }}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>Đăng xuất</span>
-          </button>
+          {activeTab !== 'orders' && (
+            <button
+              type="button"
+              onClick={async () => {
+                await logout();
+                onClose();
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Đăng xuất</span>
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -28,7 +28,7 @@ export const defaultCollections: BrandCollection[] = [
     id: 'col-atelier',
     brand: 'Atelier Originals',
     slug: 'atelier-originals',
-    description: 'Dòng sản phẩm may đo độc bản cao cấp Atelier CAISHOP',
+    description: "Dòng sản phẩm may đo độc bản cao cấp DE'GENT",
     groups: [
       {
         id: 'grp-atelier-ao',

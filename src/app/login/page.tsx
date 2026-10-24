@@ -537,7 +537,7 @@ export default function LoginPage() {
             href="/"
             className="inline-block font-wide text-2xl tracking-widest uppercase text-white hover:opacity-80 transition-opacity"
           >
-            ATELIER
+            DE&apos;GENT
           </Link>
         </div>
 
@@ -599,7 +599,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md mx-auto my-auto py-10 sm:py-14">
           <div className="mb-8 space-y-1.5">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-slate-900">
-              Chào mừng bạn đến với Atelier
+              Chào mừng bạn đến với DE&apos;GENT
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-light">
               Đăng nhập để quản lý đơn hàng hoặc tiếp tục thanh toán giỏ hàng.
@@ -613,7 +613,7 @@ export default function LoginPage() {
 
         {/* Footer inside right column */}
         <div className="pt-6 border-t border-slate-100 text-center sm:text-left flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-400">
-          <span>© 2026 CAISHOP. Bảo mật thông tin tuyệt đối.</span>
+          <span>© 2026 DE&apos;GENT. Bảo mật thông tin tuyệt đối.</span>
           <div className="flex items-center gap-4 text-slate-500 text-xs">
             <Link href="/" className="hover:text-slate-900">Trang chủ</Link>
             <Link href="/products" className="hover:text-slate-900">Sản phẩm</Link>

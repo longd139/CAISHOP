@@ -38,19 +38,21 @@ export const defaultSiteContent = {
     hero_plate4_logo: '/image/LEVIS.png',
     
     // Khối 2: Marquee
-    marquee_text: 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • KHO D1 THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •',
+    marquee_text: 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •',
     
     // Khối 3: Bộ sưu tập
     collection_badge: 'LOOKBOOK 4 HÃNG NỔI TIẾNG',
     collection_title: 'THIẾT KẾ ĐƯỢC CHĂM CHÚT NHẤT',
-    collection_subtitle: '● Xác thực tồn kho thực tế Cloudflare D1',
+    collection_subtitle: '● Xác thực tồn kho thực tế toàn hệ thống',
+    collection_hot_products_mode: 'manual', // 'manual' | 'all'
+    collection_hot_product_ids: ['prod-1', 'prod-2', 'prod-3'],
     
     // Khối 4: Studio Fitting Room
     studio_badge: 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC',
     studio_title: 'Chất vải nguyên bản. Form dáng vừa vặn từng centimet.',
-    studio_narrative: 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, sổ cái D1 xác thực giao dịch sau 3 giây để đóng gói giao ngay.',
+    studio_narrative: 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, hệ thống tự động xác thực thanh toán sau 3 giây để đóng gói giao ngay.',
     studio_canvas: 'Form Á / Âu chuẩn size',
-    studio_ledger: 'Kho hàng thực tế D1 (Singapore)',
+    studio_ledger: 'Hệ thống kho vận toàn quốc (Hà Nội & TP.HCM)',
     
     // Khối 5: Tuyên ngôn
     manifesto_badge: 'CAM KẾT TẠI CÁI SHOP',
@@ -65,22 +67,22 @@ export const defaultSiteContent = {
     
     // Khối 7: Chân trang Storefront
     footer_brand: 'CÁI SHOP - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN',
-    footer_address: 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận Cloudflare D1',
+    footer_address: 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận toàn quốc',
     footer_copyright: '© 2026 CÁI SHOP. ĐỒNG HÀNH CÙNG CÁ SẤU, XI-KÊ, TÔ-MÌ VÀ LÊ-VY.'
   },
   products: {
     badge: 'COLLECTION 01 • EDITIONS CATALOGUE',
     title: 'THE PRODUCT ARCHIVE',
-    subhead: 'Tuyển tập trang phục tối giản, chất liệu cao cấp chuẩn hãng. Đồng bộ tồn kho thời gian thực với Cloudflare D1.',
+    subhead: 'Tuyển tập trang phục tối giản, chất liệu cao cấp chuẩn hãng. Đồng bộ tồn kho thời gian thực.',
     fulfillment_tag: 'WH-HN-01 (KHO HÀ NỘI)',
     empty_state_text: 'Không tìm thấy sản phẩm phù hợp với bộ lọc.'
   },
   studio: {
     badge: 'Phòng Thử Size & May Đo',
     title: 'Đo may chính xác. Chuẩn form dáng.',
-    narrative: 'Từng sản phẩm được liên kết trực tiếp với cơ sở dữ liệu phân tán Cloudflare D1. Kiểm kho thời gian thực, đối soát dòng tiền tự động.',
+    narrative: 'Từng sản phẩm được quản lý chặt chẽ theo mã định danh riêng biệt. Kiểm kho thời gian thực, đối soát đơn hàng tự động.',
     spec_canvas: 'Giao diện tối giản toàn màn hình',
-    spec_ledger: 'Cloudflare D1 APAC (Singapore)',
+    spec_ledger: 'Kho vận trung tâm (Hà Nội & TP.HCM)',
     spec_sla: 'Khớp lệnh tự động dưới 3 giây'
   },
   about: {

@@ -6,7 +6,7 @@ import { verifyPayOSWebhook, PayOSWebhookPayload } from '@/lib/payos';
 export async function GET() {
   return NextResponse.json({
     success: true,
-    message: 'CAISHOP PayOS Webhook endpoint is online & ready.'
+    message: "DE'GENT PayOS Webhook endpoint is online & ready."
   });
 }
 

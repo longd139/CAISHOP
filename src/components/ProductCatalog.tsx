@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useHeaderNav } from '@/lib/useSiteContent';
-import { FolderTree, ChevronDown, ChevronRight, Layers, Tag, Filter, X, Sparkles, Package, ShoppingBag, Award, Crown, TrendingUp, User } from 'lucide-react';
+import { FolderTree, ChevronDown, ChevronRight, Layers, Tag, Filter, X, Sparkles, Package, ShoppingBag, Award, Crown, TrendingUp, User, Trash2 } from 'lucide-react';
 import { BrandCollection } from '@/app/api/collections/route';
 import { calculateTier, getNextTierInfo } from '@/lib/membership';
 import { getPrimaryImageUrl } from '@/lib/productImages';
@@ -253,12 +253,6 @@ export default function ProductCatalog() {
           if (!matchesName && !matchesDesc && !matchesSku) return false;
         }
 
-        // In-stock only
-        if (inStockOnly) {
-          const totalAvail = p.variants.reduce((sum, v) => sum + v.available_qty, 0);
-          if (totalAvail <= 0) return false;
-        }
-
         return true;
       })
       .sort((a, b) => {
@@ -270,7 +264,7 @@ export default function ProductCatalog() {
         if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
         return 0;
       });
-  }, [products, selectedCategory, selectedBrandId, selectedGroupId, selectedSubId, collections, searchQuery, sortBy, inStockOnly]);
+  }, [products, selectedCategory, selectedBrandId, selectedGroupId, selectedSubId, collections, searchQuery, sortBy]);
 
   // Active collection label helpers
   const activeBrandObj = collections.find((c) => c.id === selectedBrandId);
@@ -278,8 +272,58 @@ export default function ProductCatalog() {
   const activeSubObj = activeGroupObj?.items.find((s) => s.id === selectedSubId);
   const hasActiveCollectionFilter = selectedBrandId !== 'ALL' || selectedGroupId !== 'ALL' || selectedSubId !== 'ALL';
 
-  // Quick view handler
+  // Quick view handler & Search Duration Tracking
+  const searchStartTimeRef = React.useRef<number | null>(null);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      if (!searchStartTimeRef.current) {
+        searchStartTimeRef.current = Date.now();
+      }
+    } else {
+      searchStartTimeRef.current = null;
+    }
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (!searchQuery.trim() || !searchStartTimeRef.current) return;
+    const timer = setTimeout(() => {
+      if (searchStartTimeRef.current && searchQuery.trim()) {
+        const duration = Number(((Date.now() - searchStartTimeRef.current) / 1000).toFixed(1));
+        fetch('/api/analytics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            type: 'search',
+            query: searchQuery.trim(),
+            duration_seconds: duration,
+            results_count: filteredProducts.length,
+            selected_product_id: null
+          })
+        }).catch(() => {});
+        searchStartTimeRef.current = null;
+      }
+    }, 4500);
+    return () => clearTimeout(timer);
+  }, [searchQuery, filteredProducts.length]);
+
   const handleOpenProduct = (product: Product) => {
+    if (searchQuery.trim() && searchStartTimeRef.current) {
+      const duration = Number(((Date.now() - searchStartTimeRef.current) / 1000).toFixed(1));
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'search',
+          query: searchQuery.trim(),
+          duration_seconds: duration,
+          results_count: filteredProducts.length,
+          selected_product_id: product.id
+        })
+      }).catch(() => {});
+      searchStartTimeRef.current = null;
+    }
+
     setActiveProduct(product);
     if (product.variants.length > 0) {
       setSelectedColor(product.variants[0].color);
@@ -302,17 +346,12 @@ export default function ProductCatalog() {
   const handleAddToBag = () => {
     if (!activeProduct || !activeVariant) return;
 
-    if (activeVariant.available_qty <= 0) {
-      showToast('Sản phẩm đã hết hàng trong kho.');
-      return;
-    }
-
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === activeVariant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === activeVariant.id
-            ? { ...item, quantity: Math.min(item.available_qty, item.quantity + 1) }
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -327,7 +366,7 @@ export default function ProductCatalog() {
           size: activeVariant.size,
           price: activeVariant.selling_price,
           quantity: 1,
-          available_qty: activeVariant.available_qty,
+          available_qty: 999999,
         },
       ];
     });
@@ -341,18 +380,15 @@ export default function ProductCatalog() {
     e.preventDefault();
     e.stopPropagation();
 
-    const variant = product.variants.find((v) => v.available_qty > 0);
-    if (!variant) {
-      showToast('Sản phẩm này hiện đang tạm hết hàng.');
-      return;
-    }
+    const variant = product.variants[0];
+    if (!variant) return;
 
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === variant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === variant.id
-            ? { ...item, quantity: Math.min(item.available_qty, item.quantity + 1) }
+            ? { ...item, quantity: item.quantity + 1 }
             : item
         );
       }
@@ -367,7 +403,7 @@ export default function ProductCatalog() {
           size: variant.size,
           price: variant.selling_price,
           quantity: 1,
-          available_qty: variant.available_qty,
+          available_qty: 999999,
         },
       ];
     });
@@ -381,7 +417,7 @@ export default function ProductCatalog() {
         .map((item) => {
           if (item.variant_id === variantId) {
             const newQty = item.quantity + delta;
-            return newQty > 0 ? { ...item, quantity: Math.min(item.available_qty, newQty) } : null;
+            return newQty > 0 ? { ...item, quantity: newQty } : null;
           }
           return item;
         })
@@ -494,7 +530,7 @@ export default function ProductCatalog() {
         className={`sticky top-0 z-50 w-full bg-white/95 backdrop-blur-md border-b hairline transition-all duration-300 ${scrolled ? 'shadow-[0_1px_0_rgba(10,10,10,0.06)]' : ''
           }`}
       >
-        <nav className="max-w-[1400px] mx-auto px-6 md:px-10">
+        <nav className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
           <div className="relative flex items-center justify-between h-[68px] md:h-[84px]">
 
             {/* Left Nav */}
@@ -536,7 +572,7 @@ export default function ProductCatalog() {
               href="/"
               className="wordmark absolute left-1/2 -translate-x-1/2 font-wide text-[19px] md:text-[23px] font-medium uppercase select-none whitespace-nowrap text-[#0a0a0a] tracking-mono"
             >
-              ATELIER
+              DE&apos;GENT
             </Link>
 
             {/* Right Utility Cluster */}
@@ -747,7 +783,7 @@ export default function ProductCatalog() {
 
       {/* ================= 2. PAGE HEADER & EDITORIAL HERO ================= */}
       <section className="border-b hairline bg-white">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 pt-10 pb-8 md:pt-14 md:pb-10">
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 pt-8 pb-6 md:pt-10 md:pb-8">
 
 
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -767,7 +803,7 @@ export default function ProductCatalog() {
 
       {/* ================= 3. FILTER & SEARCH CONTROL TOOLBAR ================= */}
       <section className="sticky top-[68px] md:top-[84px] z-40 bg-white/95 backdrop-blur-md border-b hairline">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-10 py-4">
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-3.5">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
 
             {/* Category tabs */}
@@ -831,18 +867,6 @@ export default function ProductCatalog() {
                 ]}
                 variant="atelier"
               />
-
-              {/* In-Stock Toggle */}
-              <label className="flex items-center gap-2 h-9 px-3 border hairline text-[11px] font-mono uppercase cursor-pointer select-none hover:bg-black/[0.02]">
-                <input
-                  type="checkbox"
-                  checked={inStockOnly}
-                  onChange={(e) => setInStockOnly(e.target.checked)}
-                  className="accent-black w-3.5 h-3.5 rounded-none"
-                />
-                <span>Còn hàng</span>
-              </label>
-
             </div>
 
           </div>
@@ -850,7 +874,7 @@ export default function ProductCatalog() {
       </section>
 
       {/* ================= 4. PRODUCT VIEWPORT WITH COLLECTIONS SIDEBAR ================= */}
-      <main className="max-w-[1400px] mx-auto px-6 md:px-10 py-10 md:py-16">
+      <main className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 md:py-12">
 
         {/* Mobile Filter & Collection Drawer Trigger */}
         <div className="lg:hidden mb-6 flex items-center justify-between border hairline p-3 bg-[#0a0a0a]/[0.02]">
@@ -1197,18 +1221,6 @@ export default function ProductCatalog() {
                               alt={product.name}
                               className="w-full h-full object-cover contrast-105 group-hover:scale-105 transition-transform duration-700 ease-out"
                             />
-
-                            {/* Stock Badge */}
-                            {totalStock <= 5 && totalStock > 0 && (
-                              <span className="absolute top-3 right-3 text-[10px] font-mono tracking-wider uppercase bg-[#0a0a0a] text-white px-2 py-0.5">
-                                Low Stock: {totalStock}
-                              </span>
-                            )}
-                            {totalStock === 0 && (
-                              <span className="absolute top-3 right-3 text-[10px] font-mono tracking-wider uppercase bg-black text-white px-2 py-0.5">
-                                Sold Out
-                              </span>
-                            )}
                           </Link>
                         </div>
 
@@ -1248,23 +1260,15 @@ export default function ProductCatalog() {
                       </div>
 
                       {/* Actions */}
-                      <div className="pt-5 space-y-2">
+                      <div className="pt-5">
                         <button
                           type="button"
                           onClick={(e) => handleQuickAddToCart(e, product)}
-                          disabled={totalStock === 0}
-                          className="w-full py-2.5 bg-[#0a0a0a] text-white text-[11px] font-mono uppercase tracking-wider hover:bg-black/85 flex items-center justify-center gap-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                          className="w-full py-2.5 bg-[#0a0a0a] text-white text-[11px] font-mono uppercase tracking-wider hover:bg-black/85 flex items-center justify-center gap-2 transition-colors cursor-pointer"
                         >
                           <ShoppingBag className="w-3.5 h-3.5" />
-                          <span>{totalStock === 0 ? 'Tạm hết hàng' : 'Thêm vào giỏ hàng'}</span>
+                          <span>Thêm vào giỏ hàng</span>
                         </button>
-
-                        <Link
-                          href={`/products/${product.id}`}
-                          className="w-full block text-center py-2 border hairline uppercase text-[11px] tracking-wide-2 font-medium hover:bg-black hover:text-white transition-colors"
-                        >
-                          {totalStock === 0 ? 'Tạm hết hàng' : 'Xem chi tiết →'}
-                        </Link>
                       </div>
                     </article>
                   );
@@ -1444,17 +1448,18 @@ export default function ProductCatalog() {
                             <span className="px-2 py-0.5 tabular-nums">{item.quantity}</span>
                             <button
                               onClick={() => handleUpdateQty(item.variant_id, 1)}
-                              disabled={item.quantity >= item.available_qty}
-                              className="px-2 py-0.5 hover:bg-black/5 disabled:opacity-30 cursor-pointer"
+                              className="px-2 py-0.5 hover:bg-black/5 cursor-pointer"
                             >
                               +
                             </button>
                           </div>
                           <button
                             onClick={() => handleRemoveItem(item.variant_id)}
-                            className="text-[10px] uppercase text-black/40 hover:text-black underline cursor-pointer"
+                            className="p-1 text-black/40 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Xóa sản phẩm khỏi giỏ hàng"
+                            aria-label="Xóa sản phẩm khỏi giỏ hàng"
                           >
-                            Xóa
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -1844,9 +1849,9 @@ export default function ProductCatalog() {
 
       {/* ================= 10. EDITORIAL FOOTER ================= */}
       <footer className="border-t hairline bg-white py-12 px-6 md:px-10">
-        <div className="max-w-[1400px] mx-auto flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-mono tracking-wider uppercase text-[#0a0a0a]/60">
+        <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-mono tracking-wider uppercase text-[#0a0a0a]/60">
           <div>
-            © 2026 CAISHOP ATELIER • AUTONOMOUS MONOCHROME COMMERCE
+            © 2026 DE&apos;GENT • AUTONOMOUS MONOCHROME COMMERCE
           </div>
           <div className="flex items-center gap-6">
             <Link href="/" className="hover:text-black">Storefront</Link>

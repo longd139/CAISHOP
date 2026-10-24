@@ -349,6 +349,39 @@ html {
   color: #93c5fd !important;
 }
 
+/* Sky / Cyan accents in dark mode */
+[data-theme="dark"] [class*="bg-sky-50"],
+[data-theme="dark"] [class*="bg-sky-100"] {
+  background-color: rgba(14, 165, 233, 0.18) !important;
+}
+[data-theme="dark"] [class*="border-sky-100"],
+[data-theme="dark"] [class*="border-sky-200"],
+[data-theme="dark"] [class*="border-sky-300"] {
+  border-color: rgba(56, 189, 248, 0.3) !important;
+}
+[data-theme="dark"] [class*="text-sky-900"],
+[data-theme="dark"] [class*="text-sky-800"] {
+  color: #e0f2fe !important;
+}
+[data-theme="dark"] [class*="text-sky-700"] {
+  color: #7dd3fc !important;
+}
+[data-theme="dark"] [class*="text-sky-600"] {
+  color: #38bdf8 !important;
+}
+
+[data-theme="dark"] [class*="border-rose-100"] {
+  border-color: rgba(244, 63, 94, 0.25) !important;
+}
+
+/* Fallback for Tailwind linear gradients with white stops */
+[data-theme="dark"] [class*="via-white"] {
+  --tw-gradient-via: #0f172a !important;
+}
+[data-theme="dark"] [class*="to-white"] {
+  --tw-gradient-to: #0f172a !important;
+}
+
 /* Tables in dark mode */
 [data-theme="dark"] table thead {
   background-color: #1e293b !important;

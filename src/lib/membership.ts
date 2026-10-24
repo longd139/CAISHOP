@@ -196,7 +196,7 @@ export const MEMBERSHIP_TIERS: MembershipTier[] = [
       {
         id: 'p-diamond-4',
         title: 'Mức chiết khấu cao nhất',
-        desc: 'Bạn đã đạt mốc giảm giá tối đa trong hệ thống CAISHOP.',
+        desc: "Bạn đã đạt mốc giảm giá tối đa trong hệ thống DE'GENT.",
         badge: 'Cấp tối đa',
         category: 'discount'
       }

@@ -46,14 +46,27 @@ import {
   LayoutDashboard,
   Palette,
   Sun,
-  Moon
+  Moon,
+  Activity,
+  RotateCcw,
+  Zap,
+  Sparkles,
+  MessageCircle,
+  Clock,
+  Copy,
+  Download,
+  ExternalLink,
+  ZoomIn,
+  Loader2
 } from 'lucide-react';
 import OverviewSection from '@/components/OverviewSection';
 import ProductManagementSection from '@/components/ProductManagementSection';
 import CollectionManagementSection from '@/components/CollectionManagementSection';
+import ProductMonitoringSection from '@/components/ProductMonitoringSection';
 import PaymentManagementSection from '@/components/PaymentManagementSection';
 import DealManagementSection from '@/components/DealManagementSection';
 import { CustomSelect } from '@/components/CustomSelect';
+import { getPrimaryImageUrl } from '@/lib/productImages';
 
 interface InventoryItem {
   variant_id: string;
@@ -104,9 +117,17 @@ interface Order {
   shipping_address: string;
   total_amount: number;
   payment_status: string;
+  payment_method?: string;
   fulfillment_status: string;
   created_at: string;
   items_count?: number;
+  items?: any[];
+  return_notes?: string;
+  return_reason?: string;
+  return_created_at?: string;
+  customer_email?: string;
+  tracking_code?: string;
+  carrier?: string;
 }
 
 interface UserAccount {
@@ -150,13 +171,14 @@ export interface AdminProfile {
 
 const DEFAULT_ADMIN_PROFILE: AdminProfile = {
   name: 'Admin Quản trị',
-  email: 'admin@caishop.vn',
+  email: 'admin@degent.vn',
   phone: '0988 123 456',
-  address: 'Tầng 5, Tòa nhà Atelier, 12 Phố Tràng Tiền, Hoàn Kiếm, Hà Nội',
+  address: 'Tầng 5, Tòa nhà DE\'GENT, 12 Phố Tràng Tiền, Hoàn Kiếm, Hà Nội',
 };
 
-type AdminTab = 'overview' | 'products' | 'collections' | 'cashflow' | 'orders' | 'pricing' | 'deals' | 'customers' | 'content' | 'payment' | 'settings';
+type AdminTab = 'overview' | 'products' | 'collections' | 'monitor' | 'cashflow' | 'orders' | 'pricing' | 'deals' | 'customers' | 'content' | 'payment' | 'settings';
 type ContentSubTab = 'header' | 'home' | 'products' | 'studio' | 'about';
+export type MonitorSubTab = 'returns' | 'behavior';
 
 export type ThemeMode = 'light' | 'dark';
 
@@ -198,6 +220,7 @@ export const getTransactionTypeInfo = (type: string) => {
 export default function ExecutiveDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [contentSubTab, setContentSubTab] = useState<ContentSubTab>('header');
+  const [monitorSubTab, setMonitorSubTab] = useState<MonitorSubTab>('returns');
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -268,6 +291,215 @@ export default function ExecutiveDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [customers, setCustomers] = useState<CustomerRankItem[]>([]);
+  const [orderStatusFilter, setOrderStatusFilter] = useState<'ALL' | 'RETURNED' | 'PACKING' | 'DELIVERED' | 'UNFULFILLED'>('ALL');
+  const [availableProducts, setAvailableProducts] = useState<any[]>([]);
+
+  // Order Detail Modal State
+  const [selectedOrderForDetail, setSelectedOrderForDetail] = useState<any | null>(null);
+  const [loadingOrderDetail, setLoadingOrderDetail] = useState(false);
+
+  useEffect(() => {
+    if (selectedOrderForDetail?.id) {
+      if (!Array.isArray(selectedOrderForDetail.items) || selectedOrderForDetail.items.length === 0) {
+        setLoadingOrderDetail(true);
+        fetch(`/api/orders?id=${encodeURIComponent(selectedOrderForDetail.id)}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.success && data.data) {
+              setSelectedOrderForDetail((prev: any) => ({
+                ...prev,
+                ...data.data,
+              }));
+            }
+          })
+          .catch(console.error)
+          .finally(() => setLoadingOrderDetail(false));
+      }
+    }
+  }, [selectedOrderForDetail?.id]);
+
+  // Zoomed Image Lightbox State
+  const [zoomedImage, setZoomedImage] = useState<{ url: string; title?: string; subtitle?: string } | null>(null);
+  const [copyImageToast, setCopyImageToast] = useState<string | null>(null);
+  const [isCopyingImage, setIsCopyingImage] = useState(false);
+
+  // Dispatch / Tracking Modal State
+  const [dispatchOrderModal, setDispatchOrderModal] = useState<{
+    order: any;
+    carrier: string;
+    trackingCode: string;
+  } | null>(null);
+  const [isSubmittingDispatch, setIsSubmittingDispatch] = useState(false);
+
+  const handleOpenDispatchModal = (order: any) => {
+    const rawOrderCode = (order.order_code || '').replace(/\D/g, '') || '881865';
+    const initialCarrier = order.carrier || 'VIETTEL_POST';
+    const defaultTracking = order.tracking_code || (
+      initialCarrier === 'VIETTEL_POST' ? `VTP${rawOrderCode}VN` :
+      initialCarrier === 'GHTK' ? `S${rawOrderCode}.GHTK` :
+      initialCarrier === 'GHN' ? `GHN${rawOrderCode}` :
+      `DGT-SHIP-${rawOrderCode}`
+    );
+    setDispatchOrderModal({
+      order,
+      carrier: initialCarrier,
+      trackingCode: defaultTracking,
+    });
+  };
+
+  const handleCarrierChange = (newCarrier: string) => {
+    if (!dispatchOrderModal) return;
+    const rawOrderCode = (dispatchOrderModal.order.order_code || '').replace(/\D/g, '') || '881865';
+    let suggestedCode = dispatchOrderModal.trackingCode;
+    if (!suggestedCode || suggestedCode.startsWith('VTP') || suggestedCode.startsWith('S') || suggestedCode.startsWith('GHN') || suggestedCode.startsWith('DGT')) {
+      suggestedCode = newCarrier === 'VIETTEL_POST' ? `VTP${rawOrderCode}VN` :
+        newCarrier === 'GHTK' ? `S${rawOrderCode}.GHTK` :
+        newCarrier === 'GHN' ? `GHN${rawOrderCode}` :
+        `DGT-SHIP-${rawOrderCode}`;
+    }
+    setDispatchOrderModal({
+      ...dispatchOrderModal,
+      carrier: newCarrier,
+      trackingCode: suggestedCode,
+    });
+  };
+
+  const handleSubmitDispatch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!dispatchOrderModal) return;
+    const { order, carrier, trackingCode } = dispatchOrderModal;
+    if (!trackingCode.trim()) {
+      alert('Vui lòng nhập mã vận đơn.');
+      return;
+    }
+
+    setIsSubmittingDispatch(true);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'DISPATCH_ORDER',
+          order_id: order.id,
+          carrier,
+          tracking_code: trackingCode.trim().toUpperCase(),
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrders(prev => prev.map(o => o.id === order.id ? {
+          ...o,
+          fulfillment_status: 'DISPATCHED',
+          carrier,
+          tracking_code: trackingCode.trim().toUpperCase(),
+        } : o));
+
+        if (selectedOrderForDetail?.id === order.id) {
+          setSelectedOrderForDetail((prev: any) => ({
+            ...prev,
+            fulfillment_status: 'DISPATCHED',
+            carrier,
+            tracking_code: trackingCode.trim().toUpperCase(),
+          }));
+        }
+        setDispatchOrderModal(null);
+        alert(`✓ ${data.message || 'Đã lên đơn và gửi mã vận đơn thành công!'}`);
+      } else {
+        alert(data.message || 'Lỗi khi lên đơn.');
+      }
+    } catch (err: any) {
+      alert('Lỗi kết nối máy chủ: ' + err.message);
+    } finally {
+      setIsSubmittingDispatch(false);
+    }
+  };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && zoomedImage) {
+        setZoomedImage(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [zoomedImage]);
+
+  const handleCopyImageToClipboard = async (imageUrl: string) => {
+    setIsCopyingImage(true);
+    try {
+      const fullUrl = imageUrl.startsWith('http')
+        ? imageUrl
+        : (typeof window !== 'undefined' ? window.location.origin + imageUrl : imageUrl);
+
+      const res = await fetch(fullUrl);
+      const blob = await res.blob();
+
+      let pngBlob: Blob = blob;
+      if (blob.type !== 'image/png') {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.src = fullUrl;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+        });
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth || img.width;
+        canvas.height = img.naturalHeight || img.height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0);
+          const converted = await new Promise<Blob | null>(r => canvas.toBlob(r, 'image/png'));
+          if (converted) pngBlob = converted;
+        }
+      }
+
+      if (navigator.clipboard && typeof ClipboardItem !== 'undefined') {
+        await navigator.clipboard.write([
+          new ClipboardItem({ 'image/png': pngBlob })
+        ]);
+        setCopyImageToast('✓ Đã sao chép hình ảnh vào Clipboard! Bạn có thể dán (Ctrl+V) vào Zalo, chat.');
+      } else {
+        await navigator.clipboard.writeText(fullUrl);
+        setCopyImageToast('✓ Đã sao chép liên kết hình ảnh vào Clipboard!');
+      }
+    } catch (err) {
+      console.warn('Direct image copy failed, copying URL fallback:', err);
+      try {
+        const fullUrl = imageUrl.startsWith('http') ? imageUrl : window.location.origin + imageUrl;
+        await navigator.clipboard.writeText(fullUrl);
+        setCopyImageToast('✓ Đã sao chép link ảnh (hoặc nhấp chuột phải vào ảnh chọn "Sao chép hình ảnh")');
+      } catch {
+        setCopyImageToast('Vui lòng nhấp chuột phải vào ảnh và chọn "Sao chép hình ảnh" (Copy image).');
+      }
+    } finally {
+      setIsCopyingImage(false);
+      setTimeout(() => setCopyImageToast(null), 3500);
+    }
+  };
+
+  const handleCopyImageUrl = async (imageUrl: string) => {
+    try {
+      const fullUrl = imageUrl.startsWith('http') ? imageUrl : window.location.origin + imageUrl;
+      await navigator.clipboard.writeText(fullUrl);
+      setCopyImageToast('✓ Đã sao chép liên kết hình ảnh!');
+      setTimeout(() => setCopyImageToast(null), 3000);
+    } catch {
+      setCopyImageToast('Không thể sao chép liên kết.');
+      setTimeout(() => setCopyImageToast(null), 3000);
+    }
+  };
+
+  const handleDownloadImage = (imageUrl: string, title?: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = (title || 'san-pham').toLowerCase().replace(/\s+/g, '-') + '.jpg';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
 
   // CMS Content States
   const [cmsContent, setCmsContent] = useState<any>(null);
@@ -329,12 +561,13 @@ export default function ExecutiveDashboard() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [cfRes, invRes, ordRes, usrRes, cntRes] = await Promise.all([
+      const [cfRes, invRes, ordRes, usrRes, cntRes, prdRes] = await Promise.all([
         fetch('/api/cashflow'),
         fetch('/api/inventory'),
         fetch('/api/orders'),
         fetch('/api/users'),
-        fetch('/api/content')
+        fetch('/api/content'),
+        fetch('/api/pricing')
       ]);
 
       const cfData = await cfRes.json();
@@ -342,6 +575,7 @@ export default function ExecutiveDashboard() {
       const ordData = await ordRes.json();
       const usrData = await usrRes.json().catch(() => ({ success: false, data: [] }));
       const cntData = await cntRes.json().catch(() => ({ success: false, data: null }));
+      const prdData = await prdRes.json().catch(() => ({ success: false, data: [] }));
 
       if (cfData.success) {
         setCashflow(cfData.summary);
@@ -361,6 +595,9 @@ export default function ExecutiveDashboard() {
       }
       if (cntData.success && cntData.data) {
         setCmsContent(cntData.data);
+      }
+      if (prdData.success && prdData.data) {
+        setAvailableProducts(prdData.data);
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -430,6 +667,53 @@ export default function ExecutiveDashboard() {
     }
   };
 
+  const isMockPaymentEnabled = process.env.NEXT_PUBLIC_ENABLE_MOCK_PAYMENT === 'true';
+  const [mockLoadingId, setMockLoadingId] = useState<string | null>(null);
+
+  const handleMockPayOrder = async (orderId: string) => {
+    setMockLoadingId(orderId);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, action: 'CONFIRM_PAYMENT' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        await fetchData();
+      } else {
+        alert(data.message || 'Không thể thực hiện thanh toán ảo.');
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi giả lập thanh toán:', err);
+      alert('Lỗi kết nối khi giả lập thanh toán.');
+    } finally {
+      setMockLoadingId(null);
+    }
+  };
+
+  const handleCreateMockOrder = async () => {
+    setMockLoadingId('CREATE_NEW');
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'CREATE_MOCK_ORDER' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        await fetchData();
+      } else {
+        alert(data.message || 'Không thể tạo đơn test.');
+      }
+    } catch (err: any) {
+      console.error('Lỗi khi tạo đơn test:', err);
+      alert('Lỗi kết nối khi tạo đơn test.');
+    } finally {
+      setMockLoadingId(null);
+    }
+  };
+
   const handleStockUpdate = async (variantId: string) => {
     const qtyNum = Number(newStockQty);
     if (isNaN(qtyNum) || qtyNum < 0) return;
@@ -466,7 +750,7 @@ export default function ExecutiveDashboard() {
         if (resData.data) {
           setCmsContent((prev: any) => ({ ...prev, [section]: resData.data }));
         }
-        setContentToast(`✓ Đã lưu thay đổi cho mục "${section.toUpperCase()}" vào Cloudflare D1 thành công!`);
+        setContentToast(`✓ Đã lưu thay đổi cho mục "${section.toUpperCase()}" thành công!`);
         setTimeout(() => setContentToast(null), 3500);
       } else {
         setContentToast(`⚠ ${resData.error || 'Lỗi khi lưu nội dung.'}`);
@@ -495,6 +779,7 @@ export default function ExecutiveDashboard() {
     overview: 'Tổng quan điều hành',
     products: 'Quản lý sản phẩm & Biến thể',
     collections: 'Quản lý Bộ sưu tập & Phân cấp danh mục',
+    monitor: 'Giám sát Sản phẩm & Hành vi Khách hàng',
     cashflow: 'Dòng tiền & Lợi nhuận',
     orders: 'Đơn hàng vận hành',
     pricing: 'Bộ điều khiển giá',
@@ -502,7 +787,7 @@ export default function ExecutiveDashboard() {
     customers: 'Khách hàng & Hội viên',
     content: 'Quản lý nội dung & Giao diện (CMS)',
     payment: 'Cấu hình thanh toán & Mã VietQR',
-    settings: 'Cấu hình hạ tầng & D1'
+    settings: 'Cấu hình hạ tầng & Cơ sở dữ liệu'
   };
 
   return (
@@ -532,10 +817,10 @@ export default function ExecutiveDashboard() {
               className={`w-7 h-7 flex items-center justify-center rounded text-xs font-semibold tracking-wider transition-colors shadow-2xs ${themeMode === 'dark' ? 'bg-sky-500 text-slate-950 font-bold' : 'bg-slate-900 text-white'
                 }`}
             >
-              CS
+              DG
             </div>
             <div>
-              <div className="font-semibold text-sm tracking-tight text-slate-900">CAISHOP</div>
+              <div className="font-semibold text-sm tracking-tight text-slate-900">DE&apos;GENT</div>
               <div className="text-[10px] text-slate-400 uppercase tracking-widest font-mono">Bảng điều hành</div>
             </div>
           </div>
@@ -646,6 +931,55 @@ export default function ExecutiveDashboard() {
                 <FolderTree className="w-4 h-4 text-slate-500" style={getNavIconStyle('collections')} />
                 <span>Bộ sưu tập (Phân cấp)</span>
               </button>
+
+              <button
+                onClick={() => { setActiveTab('monitor'); }}
+                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-xs font-medium transition-all cursor-pointer ${activeTab === 'monitor'
+                    ? 'font-semibold'
+                    : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                style={getNavTabStyle('monitor')}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Activity className="w-4 h-4 text-slate-500" style={getNavIconStyle('monitor')} />
+                  <span>Giám sát & Đo lường</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full font-mono bg-sky-100 text-sky-700 font-bold">
+                    Live
+                  </span>
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${activeTab === 'monitor' ? 'rotate-180' : 'text-slate-400'}`} style={getNavIconStyle('monitor')} />
+                </div>
+              </button>
+
+              {/* SUB-SIDEBAR: Tỉ lệ hoàn hàng & Hành vi khách hàng */}
+              {activeTab === 'monitor' && (
+                <div className="mt-1.5 ml-2 pl-2.5 border-l-2 border-slate-200 dark:border-slate-800 space-y-1 py-1 transition-all">
+                  <button
+                    onClick={() => { setMonitorSubTab('returns'); setMobileSidebarOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${monitorSubTab === 'returns'
+                        ? 'text-white shadow-2xs font-medium'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                      }`}
+                    style={monitorSubTab === 'returns' ? { backgroundColor: themeMode === 'dark' ? '#38bdf8' : '#0f172a', color: themeMode === 'dark' ? '#0f172a' : '#ffffff' } : undefined}
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Tỉ lệ hoàn hàng</span>
+                  </button>
+
+                  <button
+                    onClick={() => { setMonitorSubTab('behavior'); setMobileSidebarOpen(false); }}
+                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all cursor-pointer ${monitorSubTab === 'behavior'
+                        ? 'text-white shadow-2xs font-medium'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200'
+                      }`}
+                    style={monitorSubTab === 'behavior' ? { backgroundColor: themeMode === 'dark' ? '#38bdf8' : '#0f172a', color: themeMode === 'dark' ? '#0f172a' : '#ffffff' } : undefined}
+                  >
+                    <Eye className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">Hành vi khách hàng</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -763,9 +1097,9 @@ export default function ExecutiveDashboard() {
               >
                 <div className="flex items-center gap-2.5">
                   <Database className="w-4 h-4 text-slate-500" style={getNavIconStyle('settings')} />
-                  <span>Cơ sở dữ liệu D1</span>
+                  <span>Cơ sở dữ liệu</span>
                 </div>
-                <span className="w-2 h-2 rounded-full bg-emerald-500" title="D1 Trực tuyến" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500" title="Hệ thống trực tuyến" />
               </button>
             </div>
           </div>
@@ -846,85 +1180,23 @@ export default function ExecutiveDashboard() {
 
           <div className="flex items-center gap-3">
             {/* System Light / Dark Theme Mode Switcher */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsThemeMenuOpen(!isThemeMenuOpen)}
-                className="inline-flex h-8 items-center gap-2 rounded-md border border-slate-300 bg-white px-2.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition-all cursor-pointer shadow-2xs"
-                title="Đổi chế độ Sáng / Tối hệ thống"
-              >
-                {themeMode === 'dark' ? (
-                  <>
-                    <Moon className="w-3.5 h-3.5 text-sky-400 shrink-0" />
-                    <span className="hidden sm:inline font-medium">Chế độ Tối</span>
-                  </>
-                ) : (
-                  <>
-                    <Sun className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                    <span className="hidden sm:inline font-medium">Chế độ Sáng</span>
-                  </>
-                )}
-                <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform duration-200 ${isThemeMenuOpen ? 'rotate-180' : ''}`} />
-              </button>
-
-              {/* Theme Dropdown Menu */}
-              {isThemeMenuOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsThemeMenuOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-64 rounded-lg border border-slate-200 bg-white p-2 shadow-pop z-50">
-                    <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1 flex items-center justify-between">
-                      <div className="text-xs font-semibold text-slate-900">Giao diện Hệ thống</div>
-                      <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">Sáng / Tối</span>
-                    </div>
-
-                    <div className="space-y-1">
-                      <button
-                        type="button"
-                        onClick={() => handleSelectThemeMode('light')}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-all cursor-pointer text-left ${themeMode === 'light'
-                            ? 'bg-slate-100 font-semibold text-slate-900'
-                            : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-6 h-6 rounded-md bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600">
-                            <Sun className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-xs">Chế độ Sáng (Light)</div>
-                            <div className="text-[10px] text-slate-400">Nền sáng tiêu chuẩn ban ngày</div>
-                          </div>
-                        </div>
-                        {themeMode === 'light' && <Check className="w-3.5 h-3.5 text-slate-900 shrink-0" />}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => handleSelectThemeMode('dark')}
-                        className={`w-full flex items-center justify-between px-2.5 py-2 rounded-md text-xs transition-all cursor-pointer text-left ${themeMode === 'dark'
-                            ? 'bg-slate-800 font-semibold text-white'
-                            : 'text-slate-700 hover:bg-slate-50'
-                          }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-6 h-6 rounded-md bg-slate-900 border border-slate-700 flex items-center justify-center text-sky-400">
-                            <Moon className="w-3.5 h-3.5" />
-                          </div>
-                          <div>
-                            <div className="font-medium text-xs">Chế độ Tối (Dark)</div>
-                            <div className="text-[10px] text-slate-400">Nền tối dịu mắt ban đêm</div>
-                          </div>
-                        </div>
-                        {themeMode === 'dark' && <Check className="w-3.5 h-3.5 text-sky-400 shrink-0" />}
-                      </button>
-                    </div>
-                  </div>
-                </>
+            <button
+              type="button"
+              onClick={() => handleSelectThemeMode(themeMode === 'dark' ? 'light' : 'dark')}
+              className={`w-8 h-8 flex items-center justify-center rounded-md border transition-all cursor-pointer shadow-2xs ${
+                themeMode === 'dark'
+                  ? 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+                  : 'bg-white border-slate-300 hover:bg-slate-50'
+              }`}
+              title={themeMode === 'dark' ? 'Chuyển sang Chế độ Sáng' : 'Chuyển sang Chế độ Tối'}
+              aria-label="Đổi chế độ Sáng / Tối hệ thống"
+            >
+              {themeMode === 'dark' ? (
+                <Moon className="w-4 h-4 text-white fill-white shrink-0" />
+              ) : (
+                <Sun className="w-4 h-4 text-slate-500 fill-slate-500 shrink-0" />
               )}
-            </div>
+            </button>
 
             <button
               onClick={fetchData}
@@ -938,7 +1210,7 @@ export default function ExecutiveDashboard() {
         </header>
 
         {/* Main Body Content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 space-y-6 w-full">
 
           {/* ================= TAB: TỔNG QUAN ĐIỀU HÀNH ================= */}
           {activeTab === 'overview' && (
@@ -1636,13 +1908,13 @@ export default function ExecutiveDashboard() {
                             </div>
                           )}
 
-                          {/* KHỐI 3: BỘ SƯU TẬP SẢN PHẨM TRANG CHỦ */}
+                          {/* KHỐI 3: BỘ SƯU TẬP SẢN PHẨM TRANG CHỦ & SẢN PHẨM HOT */}
                           {(homeActiveSection === 'all' || homeActiveSection === 'collection') && (
                             <div className="space-y-4 pt-5">
                               <div className="flex items-center justify-between pb-1">
                                 <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                                  <span className="w-5 h-5 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center text-[10px] font-mono">3</span>
-                                  <span>Khối Bộ sưu tập Sản phẩm Trang chủ (Editorial Grid)</span>
+                                  <span className="w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-mono">3</span>
+                                  <span>Khối Bộ sưu tập & Sản phẩm HOT (Editorial Grid)</span>
                                 </h4>
                                 <span className="text-[10px] font-mono text-slate-400">Anchor: #product</span>
                               </div>
@@ -1671,6 +1943,238 @@ export default function ExecutiveDashboard() {
                                   })}
                                   className="h-9 w-full rounded border border-slate-300 px-3 font-semibold text-sm focus:border-slate-900 focus:outline-none"
                                 />
+                              </div>
+
+                              {/* CHỌN SẢN PHẨM HOT */}
+                              <div className="pt-3 border-t border-slate-200/80 space-y-3">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <div>
+                                    <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                      <span className="text-sm">🔥</span>
+                                      <span>Cài đặt những sản phẩm đang HOT:</span>
+                                    </label>
+                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                      Các sản phẩm được chọn sẽ xuất hiện tại khối Lookbook trang chủ với huy hiệu <span className="text-rose-600 font-bold font-mono">🔥 HOT</span> (Đang chọn: <strong className="text-slate-900 font-mono">{(cmsContent?.home?.collection_hot_product_ids || []).length}</strong> sản phẩm).
+                                    </p>
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const top3 = availableProducts.slice(0, 3).map((p: any) => p.id);
+                                        setCmsContent({
+                                          ...cmsContent,
+                                          home: {
+                                            ...cmsContent.home,
+                                            collection_hot_products_mode: 'manual',
+                                            collection_hot_product_ids: top3
+                                          }
+                                        });
+                                      }}
+                                      className="px-2.5 py-1 text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
+                                    >
+                                      Chọn 3 mẫu đầu
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setCmsContent({
+                                          ...cmsContent,
+                                          home: {
+                                            ...cmsContent.home,
+                                            collection_hot_products_mode: 'manual',
+                                            collection_hot_product_ids: []
+                                          }
+                                        });
+                                      }}
+                                      className="px-2.5 py-1 text-[11px] font-medium text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                                    >
+                                      Bỏ chọn
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Chế độ lọc */}
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                  <label className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                                    (cmsContent?.home?.collection_hot_products_mode || 'manual') === 'manual'
+                                      ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900 ring-1 ring-slate-900/10'
+                                      : 'border-slate-200 text-slate-600 hover:bg-slate-50/50'
+                                  }`}>
+                                    <input
+                                      type="radio"
+                                      name="hot_products_mode"
+                                      value="manual"
+                                      checked={(cmsContent?.home?.collection_hot_products_mode || 'manual') === 'manual'}
+                                      onChange={() => setCmsContent({
+                                        ...cmsContent,
+                                        home: { ...cmsContent.home, collection_hot_products_mode: 'manual' }
+                                      })}
+                                      className="accent-slate-900"
+                                    />
+                                    <span>Ghim các sản phẩm HOT được chọn</span>
+                                  </label>
+
+                                  <label className={`flex items-center gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${
+                                    cmsContent?.home?.collection_hot_products_mode === 'all'
+                                      ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900 ring-1 ring-slate-900/10'
+                                      : 'border-slate-200 text-slate-600 hover:bg-slate-50/50'
+                                  }`}>
+                                    <input
+                                      type="radio"
+                                      name="hot_products_mode"
+                                      value="all"
+                                      checked={cmsContent?.home?.collection_hot_products_mode === 'all'}
+                                      onChange={() => setCmsContent({
+                                        ...cmsContent,
+                                        home: { ...cmsContent.home, collection_hot_products_mode: 'all' }
+                                      })}
+                                      className="accent-slate-900"
+                                    />
+                                    <span>Hiển thị tất cả sản phẩm</span>
+                                  </label>
+                                </div>
+
+                                {/* Danh sách sản phẩm cho phép toggle HOT */}
+                                {(cmsContent?.home?.collection_hot_products_mode || 'manual') === 'manual' && (
+                                  <div className="space-y-2 border border-slate-200 rounded-xl p-3 bg-slate-50/40 max-h-96 overflow-y-auto">
+                                    {availableProducts.length === 0 ? (
+                                      <div className="py-6 text-center text-xs text-slate-400">
+                                        Đang tải danh sách sản phẩm từ hệ thống...
+                                      </div>
+                                    ) : (
+                                      availableProducts.map((prod: any) => {
+                                        const hotIds: string[] = cmsContent?.home?.collection_hot_product_ids || [];
+                                        const isHot = hotIds.includes(prod.id);
+                                        const hotIndex = hotIds.indexOf(prod.id);
+                                        const minPrice = prod.variants?.length
+                                          ? Math.min(...prod.variants.map((v: any) => v.selling_price))
+                                          : 0;
+                                        const thumbImg = prod.image_url ? prod.image_url.split(',')[0] : '/images/placeholder.jpg';
+
+                                        const toggleHot = () => {
+                                          let updated = [...hotIds];
+                                          if (isHot) {
+                                            updated = updated.filter(id => id !== prod.id);
+                                          } else {
+                                            updated.push(prod.id);
+                                          }
+                                          setCmsContent({
+                                            ...cmsContent,
+                                            home: { ...cmsContent.home, collection_hot_product_ids: updated }
+                                          });
+                                        };
+
+                                        const moveUp = (e: React.MouseEvent) => {
+                                          e.stopPropagation();
+                                          if (hotIndex <= 0) return;
+                                          const updated = [...hotIds];
+                                          const temp = updated[hotIndex - 1];
+                                          updated[hotIndex - 1] = updated[hotIndex];
+                                          updated[hotIndex] = temp;
+                                          setCmsContent({
+                                            ...cmsContent,
+                                            home: { ...cmsContent.home, collection_hot_product_ids: updated }
+                                          });
+                                        };
+
+                                        const moveDown = (e: React.MouseEvent) => {
+                                          e.stopPropagation();
+                                          if (hotIndex < 0 || hotIndex >= hotIds.length - 1) return;
+                                          const updated = [...hotIds];
+                                          const temp = updated[hotIndex + 1];
+                                          updated[hotIndex + 1] = updated[hotIndex];
+                                          updated[hotIndex] = temp;
+                                          setCmsContent({
+                                            ...cmsContent,
+                                            home: { ...cmsContent.home, collection_hot_product_ids: updated }
+                                          });
+                                        };
+
+                                        return (
+                                          <div
+                                            key={prod.id}
+                                            onClick={toggleHot}
+                                            className={`p-2.5 rounded-lg border flex items-center justify-between gap-3 transition-all cursor-pointer ${
+                                              isHot
+                                                ? 'bg-rose-50/70 border-rose-300 ring-1 ring-rose-400/40 shadow-2xs'
+                                                : 'bg-white border-slate-200 hover:border-slate-300 opacity-80 hover:opacity-100'
+                                            }`}
+                                          >
+                                            <div className="flex items-center gap-3 min-w-0">
+                                              <div className="relative w-12 h-12 rounded-md bg-slate-100 overflow-hidden shrink-0 border border-slate-200">
+                                                <img
+                                                  src={thumbImg}
+                                                  alt={prod.name}
+                                                  className="w-full h-full object-cover"
+                                                />
+                                              </div>
+                                              <div className="min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                  <h5 className="text-xs font-bold text-slate-900 truncate">
+                                                    {prod.name}
+                                                  </h5>
+                                                  {isHot && (
+                                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-rose-600 text-white shrink-0 font-mono flex items-center gap-0.5">
+                                                      <span>🔥</span>
+                                                      <span>NO. 0{hotIndex + 1}</span>
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                <div className="text-[11px] text-slate-500 flex items-center gap-2 mt-0.5">
+                                                  <span className="font-medium text-slate-600">{prod.category}</span>
+                                                  <span>•</span>
+                                                  <span className="font-mono text-slate-700">{formatMoney(minPrice)}</span>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 shrink-0">
+                                              {isHot && (
+                                                <div className="flex items-center gap-0.5 mr-1" onClick={e => e.stopPropagation()}>
+                                                  <button
+                                                    type="button"
+                                                    onClick={moveUp}
+                                                    disabled={hotIndex === 0}
+                                                    title="Đưa lên vị trí trước"
+                                                    className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white border border-slate-200 text-xs disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                                  >
+                                                    ▲
+                                                  </button>
+                                                  <button
+                                                    type="button"
+                                                    onClick={moveDown}
+                                                    disabled={hotIndex === hotIds.length - 1}
+                                                    title="Đưa xuống vị trí sau"
+                                                    className="w-6 h-6 rounded flex items-center justify-center text-slate-500 hover:text-slate-900 hover:bg-white border border-slate-200 text-xs disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                                                  >
+                                                    ▼
+                                                  </button>
+                                                </div>
+                                              )}
+
+                                              <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  toggleHot();
+                                                }}
+                                                className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                                                  isHot
+                                                    ? 'bg-rose-600 text-white shadow-2xs hover:bg-rose-700'
+                                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                                }`}
+                                              >
+                                                {isHot ? '🔥 Đang HOT' : '+ Đặt HOT'}
+                                              </button>
+                                            </div>
+                                          </div>
+                                        );
+                                      })
+                                    )}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           )}
@@ -1718,7 +2222,7 @@ export default function ExecutiveDashboard() {
                                 <label className="font-medium text-slate-700">Đoạn văn mô tả Studio:</label>
                                 <textarea
                                   rows={3}
-                                  value={cmsContent?.home?.studio_narrative || cmsContent?.studio?.narrative || 'Every garment is linked to Cloudflare D1 distributed edge storage. Zero speculative inventory, instant double-entry accounting records, and automated dispatch upon bank confirmation.'}
+                                  value={cmsContent?.home?.studio_narrative || cmsContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, hệ thống tự động xác thực thanh toán sau 3 giây để đóng gói giao ngay.'}
                                   onChange={(e) => setCmsContent({
                                     ...cmsContent,
                                     home: { ...cmsContent.home, studio_narrative: e.target.value },
@@ -1733,7 +2237,7 @@ export default function ExecutiveDashboard() {
                                   <label className="font-medium text-slate-700">Thông số Web Canvas:</label>
                                   <input
                                     type="text"
-                                    value={cmsContent?.home?.studio_canvas || cmsContent?.studio?.spec_canvas || 'Full-bleed monochrome UI'}
+                                    value={cmsContent?.home?.studio_canvas || cmsContent?.studio?.spec_canvas || 'Form Á / Âu chuẩn size'}
                                     onChange={(e) => setCmsContent({
                                       ...cmsContent,
                                       home: { ...cmsContent.home, studio_canvas: e.target.value },
@@ -1746,7 +2250,7 @@ export default function ExecutiveDashboard() {
                                   <label className="font-medium text-slate-700">Thông số Inventory Engine:</label>
                                   <input
                                     type="text"
-                                    value={cmsContent?.home?.studio_ledger || cmsContent?.studio?.spec_ledger || 'Cloudflare D1 APAC (SIN)'}
+                                    value={cmsContent?.home?.studio_ledger || cmsContent?.studio?.spec_ledger || 'Hệ thống kho vận toàn quốc (Hà Nội & TP.HCM)'}
                                     onChange={(e) => setCmsContent({
                                       ...cmsContent,
                                       home: { ...cmsContent.home, studio_ledger: e.target.value },
@@ -1802,7 +2306,7 @@ export default function ExecutiveDashboard() {
                                 <label className="font-medium text-slate-700">Dòng chữ ký thương hiệu:</label>
                                 <input
                                   type="text"
-                                  value={cmsContent?.home?.manifesto_signature || cmsContent?.about?.signature || 'Atelier / Caishop Architecture 2026'}
+                                  value={cmsContent?.home?.manifesto_signature || cmsContent?.about?.signature || "DE'GENT Architecture 2026"}
                                   onChange={(e) => setCmsContent({
                                     ...cmsContent,
                                     home: { ...cmsContent.home, manifesto_signature: e.target.value },
@@ -1895,7 +2399,7 @@ export default function ExecutiveDashboard() {
                                 <label className="font-medium text-slate-700">Thông tin bản quyền (Copyright):</label>
                                 <input
                                   type="text"
-                                  value={cmsContent?.home?.footer_copyright || '© 2026 ATELIER CAISHOP. ALL RIGHTS RESERVED.'}
+                                  value={cmsContent?.home?.footer_copyright || "© 2026 DE'GENT. ALL RIGHTS RESERVED."}
                                   onChange={(e) => setCmsContent({
                                     ...cmsContent,
                                     home: { ...cmsContent.home, footer_copyright: e.target.value }
@@ -1936,7 +2440,7 @@ export default function ExecutiveDashboard() {
                               </div>
                               <div className="bg-white border border-slate-200 px-2.5 py-0.5 rounded text-[11px] font-mono text-slate-600 flex items-center gap-1.5 shadow-2xs">
                                 <span className="text-emerald-500 font-bold">https://</span>
-                                <span>caishop.vn/</span>
+                                <span>degent.vn/</span>
                               </div>
                             </div>
                             <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
@@ -2128,23 +2632,49 @@ export default function ExecutiveDashboard() {
                               </div>
                             </div>
 
-                            {/* 3 Sample Product Cards */}
+                            {/* Hot Product Cards Live Preview */}
                             <div className="grid grid-cols-3 gap-2.5 pt-1">
-                              <div className="border border-neutral-200 rounded p-2 bg-neutral-50/50 space-y-1">
-                                <div className="aspect-[3/4] bg-neutral-200/80 rounded flex items-center justify-center text-[9px] font-mono text-neutral-400">PLATE 01</div>
-                                <div className="text-[10px] font-semibold text-neutral-900 truncate">Atelier Coat</div>
-                                <div className="text-[9px] font-mono text-neutral-600">3,450,000₫</div>
-                              </div>
-                              <div className="border border-neutral-200 rounded p-2 bg-neutral-50/50 space-y-1">
-                                <div className="aspect-[3/4] bg-neutral-200/80 rounded flex items-center justify-center text-[9px] font-mono text-neutral-400">PLATE 02</div>
-                                <div className="text-[10px] font-semibold text-neutral-900 truncate">Pleated Pant</div>
-                                <div className="text-[9px] font-mono text-neutral-600">1,850,000₫</div>
-                              </div>
-                              <div className="border border-neutral-200 rounded p-2 bg-neutral-50/50 space-y-1">
-                                <div className="aspect-[3/4] bg-neutral-200/80 rounded flex items-center justify-center text-[9px] font-mono text-neutral-400">PLATE 03</div>
-                                <div className="text-[10px] font-semibold text-neutral-900 truncate">Raw Shirt</div>
-                                <div className="text-[9px] font-mono text-neutral-600">2,200,000₫</div>
-                              </div>
+                              {(() => {
+                                const hotIds: string[] = cmsContent?.home?.collection_hot_product_ids || [];
+                                const hotMode: string = cmsContent?.home?.collection_hot_products_mode || 'manual';
+
+                                let previewProds = availableProducts;
+                                if (hotMode === 'manual' && hotIds.length > 0) {
+                                  const pMap = new Map(availableProducts.map((p: any) => [p.id, p]));
+                                  const filtered = hotIds.map((id: string) => pMap.get(id)).filter(Boolean);
+                                  if (filtered.length > 0) previewProds = filtered;
+                                }
+
+                                const list = previewProds.slice(0, 3);
+                                if (list.length === 0) {
+                                  return (
+                                    <div className="col-span-3 py-6 text-center text-xs text-neutral-400 font-mono">
+                                      Chưa có sản phẩm nào được chọn.
+                                    </div>
+                                  );
+                                }
+
+                                return list.map((prod: any, idx: number) => {
+                                  const minPrice = prod.variants?.length
+                                    ? Math.min(...prod.variants.map((v: any) => v.selling_price))
+                                    : 0;
+                                  const imgUrl = prod.image_url ? prod.image_url.split(',')[0] : '/images/placeholder.jpg';
+
+                                  return (
+                                    <div key={prod.id || idx} className="border border-neutral-200 rounded p-2 bg-neutral-50/50 space-y-1.5 relative overflow-hidden group">
+                                      <div className="aspect-[3/4] bg-neutral-200/80 rounded relative overflow-hidden">
+                                        <img src={imgUrl} alt={prod.name} className="w-full h-full object-cover" />
+                                      </div>
+                                      <div className="text-[10px] font-semibold text-neutral-900 truncate" title={prod.name}>
+                                        {prod.name}
+                                      </div>
+                                      <div className="text-[9px] font-mono font-semibold text-slate-700">
+                                        {formatMoney(minPrice)}
+                                      </div>
+                                    </div>
+                                  );
+                                });
+                              })()}
                             </div>
                           </div>
 
@@ -2160,7 +2690,7 @@ export default function ExecutiveDashboard() {
                               {cmsContent?.home?.studio_title || cmsContent?.studio?.title || 'Crafted at the edge. Verified by code.'}
                             </h3>
                             <p className="text-xs text-neutral-400 leading-relaxed font-light">
-                              {cmsContent?.home?.studio_narrative || cmsContent?.studio?.narrative || 'Every garment is linked to Cloudflare D1 distributed edge storage. Zero speculative inventory, instant double-entry accounting records, and automated dispatch upon bank confirmation.'}
+                              {cmsContent?.home?.studio_narrative || cmsContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ.'}
                             </p>
 
                             {/* Specs Definition List */}
@@ -2168,13 +2698,13 @@ export default function ExecutiveDashboard() {
                               <div className="bg-neutral-900 border border-neutral-800 p-2 rounded">
                                 <div className="text-neutral-500 text-[8px] uppercase">WEB CANVAS</div>
                                 <div className="text-neutral-200 font-semibold truncate mt-0.5">
-                                  {cmsContent?.home?.studio_canvas || cmsContent?.studio?.spec_canvas || 'Full-bleed monochrome UI'}
+                                  {cmsContent?.home?.studio_canvas || cmsContent?.studio?.spec_canvas || 'Form Á / Âu chuẩn size'}
                                 </div>
                               </div>
                               <div className="bg-neutral-900 border border-neutral-800 p-2 rounded">
-                                <div className="text-neutral-500 text-[8px] uppercase">DATABASE</div>
+                                <div className="text-neutral-500 text-[8px] uppercase">KHO VẬN</div>
                                 <div className="text-emerald-400 font-semibold truncate mt-0.5">
-                                  {cmsContent?.home?.studio_ledger || cmsContent?.studio?.spec_ledger || 'Cloudflare D1 APAC (SIN)'}
+                                  {cmsContent?.home?.studio_ledger || cmsContent?.studio?.spec_ledger || 'Hệ thống kho toàn quốc'}
                                 </div>
                               </div>
                             </div>
@@ -2192,7 +2722,7 @@ export default function ExecutiveDashboard() {
                               "{cmsContent?.home?.manifesto_quote || cmsContent?.about?.body_text || 'True luxury is not ornament. It is the absolute precision of cut, material integrity, and silent execution.'}"
                             </blockquote>
                             <div className="text-[10px] font-mono uppercase text-stone-500 pt-1">
-                              {cmsContent?.home?.manifesto_signature || cmsContent?.about?.signature || 'Atelier / Caishop Architecture 2026'}
+                              {cmsContent?.home?.manifesto_signature || cmsContent?.about?.signature || "DE'GENT Architecture 2026"}
                             </div>
                           </div>
 
@@ -2226,12 +2756,12 @@ export default function ExecutiveDashboard() {
                               [KHỐI 7: CHÂN TRANG STOREFRONT]
                             </div>
                             <div className="flex items-center justify-between text-[10px] font-mono text-neutral-300 pt-1">
-                              <span className="font-bold text-white tracking-wider">ATELIER CAISHOP</span>
+                              <span className="font-bold text-white tracking-wider">DE&apos;GENT</span>
                               <span>{cmsContent?.home?.footer_address || 'Hanoi Flagship Studio • Edge Cloud Delivery'}</span>
                             </div>
                             <div className="text-[9px] font-mono text-neutral-500 pt-1 border-t border-neutral-800 flex justify-between">
-                              <span>{cmsContent?.home?.footer_copyright || '© 2026 ATELIER CAISHOP. ALL RIGHTS RESERVED.'}</span>
-                              <span>D1 PROTOCOL</span>
+                              <span>{cmsContent?.home?.footer_copyright || "© 2026 CÁI SHOP. ALL RIGHTS RESERVED."}</span>
+                              <span>LIVE INVENTORY</span>
                             </div>
                           </div>
                         </div>
@@ -2334,7 +2864,7 @@ export default function ExecutiveDashboard() {
                             </div>
                             <div className="bg-white border border-slate-200 px-2.5 py-0.5 rounded text-[11px] font-mono text-slate-600 flex items-center gap-1.5 shadow-2xs">
                               <span className="text-emerald-500 font-bold">https://</span>
-                              <span>caishop.vn/products</span>
+                              <span>degent.vn/products</span>
                             </div>
                           </div>
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
@@ -2401,7 +2931,7 @@ export default function ExecutiveDashboard() {
                               Nội dung Studio & Fitting Room (Route: <span className="font-mono text-slate-500">/#studio</span>)
                             </h3>
                             <p className="text-xs text-slate-500 mt-0.5">
-                              Chỉnh sửa phần studio nền đen đơn sắc và các thông số công nghệ D1
+                              Chỉnh sửa phần studio nền đen đơn sắc và các thông số vận hành
                             </p>
                           </div>
                           <button
@@ -2497,7 +3027,7 @@ export default function ExecutiveDashboard() {
                             </div>
                             <div className="bg-black border border-neutral-800 px-2.5 py-0.5 rounded text-[11px] font-mono text-neutral-300 flex items-center gap-1.5">
                               <span className="text-emerald-400 font-bold">https://</span>
-                              <span>caishop.vn/#studio</span>
+                              <span>degent.vn/#studio</span>
                             </div>
                           </div>
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-800 px-2 py-0.5 rounded">
@@ -2515,7 +3045,7 @@ export default function ExecutiveDashboard() {
                             {cmsContent?.studio?.title || 'PRECISION METRICS, REAL-TIME FIT.'}
                           </h2>
                           <p className="text-xs text-neutral-400 leading-relaxed font-light">
-                            {cmsContent?.studio?.narrative || 'Interactive 3D fitting canvas synchronizing geometric garment meshes with Cloudflare D1 inventory ledger.'}
+                            {cmsContent?.studio?.narrative || 'Trải nghiệm thử size thông minh, cập nhật số đo chuẩn xác và đồng bộ tồn kho thực tế.'}
                           </p>
 
                           {/* Tech Specs Badges */}
@@ -2523,13 +3053,13 @@ export default function ExecutiveDashboard() {
                             <div className="bg-neutral-900 border border-neutral-800 p-2 rounded">
                               <div className="text-neutral-500 text-[8px] uppercase">RENDER ENGINE</div>
                               <div className="text-neutral-200 font-semibold truncate mt-0.5">
-                                {cmsContent?.studio?.spec_canvas || '3D WEBGL ENGINE / 60 FPS'}
+                                {cmsContent?.studio?.spec_canvas || 'Form Á / Âu chuẩn size'}
                               </div>
                             </div>
                             <div className="bg-neutral-900 border border-neutral-800 p-2 rounded">
-                              <div className="text-neutral-500 text-[8px] uppercase">STATE DATABASE</div>
+                              <div className="text-neutral-500 text-[8px] uppercase">KHO HÀNG</div>
                               <div className="text-emerald-400 font-semibold truncate mt-0.5">
-                                {cmsContent?.studio?.spec_ledger || 'CLOUDFLARE D1 / <10MS SLA'}
+                                {cmsContent?.studio?.spec_ledger || 'Kho vận trung tâm (Hà Nội & TP.HCM)'}
                               </div>
                             </div>
                           </div>
@@ -2626,7 +3156,7 @@ export default function ExecutiveDashboard() {
                             </div>
                             <div className="bg-white border border-stone-200 px-2.5 py-0.5 rounded text-[11px] font-mono text-stone-600 flex items-center gap-1.5">
                               <span className="text-emerald-600 font-bold">https://</span>
-                              <span>caishop.vn/#about</span>
+                              <span>degent.vn/#about</span>
                             </div>
                           </div>
                           <span className="inline-flex items-center gap-1.5 text-[10px] font-mono uppercase font-semibold text-stone-800 bg-stone-200/80 border border-stone-300 px-2 py-0.5 rounded">
@@ -2644,10 +3174,10 @@ export default function ExecutiveDashboard() {
                             {cmsContent?.about?.headline || 'MINIMAL FORM, STRICT DISCIPLINE.'}
                           </h2>
                           <blockquote className="border-l-2 border-stone-400 pl-4 italic text-stone-700 text-xs leading-relaxed py-1">
-                            "{cmsContent?.about?.body_text || 'We reject ornamental excess in e-commerce interfaces. CAISHOP Atelier treats code, data integrity, and typography as singular architectural elements.'}"
+                            &quot;{cmsContent?.about?.body_text || "We reject ornamental excess in e-commerce interfaces. DE'GENT treats code, data integrity, and typography as singular architectural elements."}&quot;
                           </blockquote>
                           <div className="pt-2 flex items-center justify-between text-[10px] font-mono border-t border-stone-200 text-stone-600">
-                            <div>SIGNATURE: <span className="font-semibold text-stone-900">{cmsContent?.about?.signature || 'CAISHOP ATELIER / STUDIO LABS'}</span></div>
+                            <div>SIGNATURE: <span className="font-semibold text-stone-900">{cmsContent?.about?.signature || "DE'GENT ATELIER / STUDIO LABS"}</span></div>
                             <div className="text-[9px] bg-stone-200 px-1.5 py-0.5 rounded">SEAL • VERIFIED</div>
                           </div>
                         </div>
@@ -2669,6 +3199,14 @@ export default function ExecutiveDashboard() {
           {/* ================= TAB: COLLECTIONS & TAXONOMY ================= */}
           {activeTab === 'collections' && (
             <CollectionManagementSection />
+          )}
+
+          {/* ================= TAB: PRODUCT MONITORING & ANALYTICS ================= */}
+          {activeTab === 'monitor' && (
+            <ProductMonitoringSection
+              activeSectionTab={monitorSubTab}
+              onSectionTabChange={(tab) => setMonitorSubTab(tab)}
+            />
           )}
 
           {/* ================= TAB 1: CASH FLOW & P&L ================= */}
@@ -2896,86 +3434,397 @@ export default function ExecutiveDashboard() {
           )}
 
           {/* ================= TAB 5: ORDERS ================= */}
-          {activeTab === 'orders' && (
-            <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
-              <header className="border-b border-slate-200 px-4 py-3 flex items-center justify-between">
-                <div>
-                  <h2 className="text-sm font-semibold text-slate-900">Danh sách đơn hàng vận hành</h2>
-                  <p className="text-xs text-slate-500 mt-0.5">Tiến trình thanh toán VietQR và xử lý đóng gói xuất kho</p>
+          {activeTab === 'orders' && (() => {
+            const totalOrdersCount = orders.length;
+            const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+            const packingOrders = orders.filter(o => o.fulfillment_status === 'PACKING' || o.fulfillment_status === 'DISPATCHED');
+            const packingRevenue = packingOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+            const deliveredOrders = orders.filter(o => o.fulfillment_status === 'DELIVERED');
+            const deliveredRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+            const returnedOrders = orders.filter(o => o.fulfillment_status === 'RETURNED');
+            const exchangeOrdersCount = returnedOrders.filter(o => {
+              const notes = (o.return_notes || '').toLowerCase();
+              return o.return_notes?.includes('ĐỔI HÀNG') || notes.includes('đổi size') || notes.includes('đổi mẫu') || notes.includes('đổi hàng');
+            }).length;
+            const refundOrdersCount = returnedOrders.length - exchangeOrdersCount;
+
+            const unfulfilledOrders = orders.filter(o => o.fulfillment_status === 'UNFULFILLED' || !o.fulfillment_status);
+            const unfulfilledRevenue = unfulfilledOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+
+            const orderMetricCards = [
+              {
+                id: 'ALL' as const,
+                label: 'Tổng đơn hàng',
+                count: totalOrdersCount,
+                subtext: formatMoney(totalRevenue),
+                badge: 'Tất cả',
+                badgeColor: 'bg-slate-100 text-slate-700',
+                icon: ShoppingCart,
+                iconBg: 'bg-slate-100 text-slate-700',
+                activeClass: 'ring-2 ring-slate-900 border-slate-900 bg-slate-50/60 shadow-xs',
+              },
+              {
+                id: 'PACKING' as const,
+                label: 'Đang xử lý',
+                count: packingOrders.length,
+                subtext: formatMoney(packingRevenue),
+                badge: 'Đang giao & gói',
+                badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200/60',
+                icon: Truck,
+                iconBg: 'bg-blue-50 text-blue-700 border border-blue-200/60',
+                activeClass: 'ring-2 ring-blue-600 border-blue-600 bg-blue-50/40 shadow-xs',
+              },
+              {
+                id: 'DELIVERED' as const,
+                label: 'Đã nhận hàng',
+                count: deliveredOrders.length,
+                subtext: formatMoney(deliveredRevenue),
+                badge: 'Giao thành công',
+                badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
+                icon: CheckCircle2,
+                iconBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
+                activeClass: 'ring-2 ring-emerald-600 border-emerald-600 bg-emerald-50/40 shadow-xs',
+              },
+              {
+                id: 'RETURNED' as const,
+                label: 'Yêu cầu đổi / hoàn',
+                count: returnedOrders.length,
+                subtext: `Đổi: ${exchangeOrdersCount} • Trả: ${refundOrdersCount}`,
+                badge: returnedOrders.length > 0 ? `${returnedOrders.length} yêu cầu` : '0 đơn',
+                badgeColor: returnedOrders.length > 0 ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-500',
+                icon: RotateCcw,
+                iconBg: 'bg-amber-50 text-amber-700 border border-amber-200/60',
+                activeClass: 'ring-2 ring-amber-600 border-amber-600 bg-amber-50/40 shadow-xs',
+              },
+              {
+                id: 'UNFULFILLED' as const,
+                label: 'Chưa xử lý',
+                count: unfulfilledOrders.length,
+                subtext: formatMoney(unfulfilledRevenue),
+                badge: 'Chờ tiếp nhận',
+                badgeColor: 'bg-slate-100 text-slate-600',
+                icon: Clock,
+                iconBg: 'bg-slate-100 text-slate-600 border border-slate-200/60',
+                activeClass: 'ring-2 ring-slate-800 border-slate-800 bg-slate-50/50 shadow-xs',
+              },
+            ];
+
+            return (
+              <div className="space-y-4">
+                {/* Indicator Metric Cards Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                  {orderMetricCards.map((card) => {
+                    const isActive = orderStatusFilter === card.id;
+                    const IconComp = card.icon;
+                    return (
+                      <button
+                        key={card.id}
+                        type="button"
+                        onClick={() => setOrderStatusFilter(card.id)}
+                        className={`group text-left p-4 sm:p-4.5 rounded-xl border transition-all cursor-pointer bg-white relative flex flex-col justify-between hover:shadow-xs ${
+                          isActive
+                            ? card.activeClass
+                            : 'border-slate-200 hover:border-slate-300'
+                        }`}
+                        title={`Lọc theo: ${card.label}`}
+                      >
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+                            {card.label}
+                          </span>
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${card.iconBg}`}>
+                            <IconComp className="w-4 h-4" />
+                          </div>
+                        </div>
+
+                        <div>
+                          <div className="flex items-baseline gap-1.5 my-1">
+                            <span className="text-3xl sm:text-4xl font-black font-mono text-slate-900 tracking-tight leading-none">
+                              {card.count}
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-slate-500">đơn</span>
+                          </div>
+
+                          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 text-xs text-slate-600 font-medium">
+                            <span className="truncate font-mono font-bold text-slate-800" title={card.subtext}>
+                              {card.subtext}
+                            </span>
+                            {card.badge && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${card.badgeColor}`}>
+                                {card.badge}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {isActive && (
+                          <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-slate-900" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div className="text-xs text-slate-500 font-mono">
-                  Tổng {orders.length} đơn hàng
+
+                <section className="rounded-lg border border-slate-200 bg-white overflow-hidden">
+                  <header className="border-b border-slate-200 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="text-sm font-semibold text-slate-900">Danh sách đơn hàng vận hành</h2>
+                    {isMockPaymentEnabled && (
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-200 font-bold uppercase tracking-wider">
+                        🧪 Test Ảo Bật
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">Tiến trình thanh toán VietQR và xử lý đóng gói xuất kho & đổi/trả hàng</p>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  {isMockPaymentEnabled && (
+                    <button
+                      type="button"
+                      onClick={handleCreateMockOrder}
+                      disabled={mockLoadingId === 'CREATE_NEW'}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-all cursor-pointer shadow-xs active:scale-[0.98]"
+                      title="Tạo nhanh 1 đơn hàng test VietQR để thử nghiệm thanh toán ảo"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>{mockLoadingId === 'CREATE_NEW' ? 'Đang tạo...' : '+ Tạo đơn test'}</span>
+                    </button>
+                  )}
+                  <div className="text-xs text-slate-500 font-mono">
+                    Tổng {orders.length} đơn hàng
+                  </div>
                 </div>
               </header>
+
+
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-sm">
                   <thead className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-600">
                     <tr>
                       <th className="py-2.5 px-4">Mã đơn</th>
-                      <th className="py-2.5 px-4">Khách hàng</th>
+                      <th className="py-2.5 px-4">Khách hàng & Liên hệ</th>
                       <th className="py-2.5 px-4">Địa chỉ giao hàng</th>
                       <th className="py-2.5 px-4 text-center">Thanh toán</th>
                       <th className="py-2.5 px-4 text-center">Trạng thái</th>
                       <th className="py-2.5 px-4 text-right">Tổng thanh toán</th>
+                      <th className="py-2.5 px-4 text-center">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
-                    {orders.length === 0 ? (
-                      <tr>
-                        <td colSpan={6} className="py-8 text-center text-slate-500">
-                          Chưa có đơn hàng nào được ghi nhận.
-                        </td>
-                      </tr>
-                    ) : (
-                      orders.map(ord => (
-                        <tr key={ord.id} className="hover:bg-slate-50/60">
-                          <td className="py-2.5 px-4 font-mono font-medium text-slate-900">{ord.order_code}</td>
-                          <td className="py-2.5 px-4">
-                            <div className="font-medium text-slate-900">{ord.customer_name}</div>
-                            <div className="text-[11px] text-slate-500">{ord.customer_phone}</div>
-                          </td>
-                          <td className="py-2.5 px-4 text-slate-600 max-w-xs truncate">{ord.shipping_address}</td>
-                          <td className="py-2.5 px-4 text-center">
-                            <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium ${ord.payment_status === 'PAID'
-                              ? 'bg-emerald-50 text-emerald-700'
-                              : 'bg-amber-50 text-amber-800'
-                              }`}>
-                              {ord.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
-                            </span>
-                          </td>
-                          <td className="py-2.5 px-4 text-center">
-                            {(() => {
-                              const isDelivered = ord.fulfillment_status === 'DELIVERED';
-                              const isProcessing = ord.fulfillment_status === 'PACKING' || ord.fulfillment_status === 'DISPATCHED';
-                              const currentVal = isDelivered ? 'DELIVERED' : isProcessing ? 'PACKING' : 'UNFULFILLED';
+                    {(() => {
+                      const displayedOrders = orders.filter(ord => {
+                        if (orderStatusFilter === 'RETURNED') return ord.fulfillment_status === 'RETURNED';
+                        if (orderStatusFilter === 'PACKING') return ord.fulfillment_status === 'PACKING' || ord.fulfillment_status === 'DISPATCHED';
+                        if (orderStatusFilter === 'DELIVERED') return ord.fulfillment_status === 'DELIVERED';
+                        if (orderStatusFilter === 'UNFULFILLED') return ord.fulfillment_status === 'UNFULFILLED' || !ord.fulfillment_status;
+                        return true;
+                      });
 
-                              return (
-                                <CustomSelect
-                                  value={currentVal}
-                                  onChange={val => handleUpdateOrderStatus(ord.id, val)}
-                                  options={[
-                                    { value: 'UNFULFILLED', label: 'Chưa xử lý', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' },
-                                    { value: 'PACKING', label: 'Đang xử lý', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100' },
-                                    { value: 'DELIVERED', label: 'Hoàn thành', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' }
-                                  ]}
-                                  variant="status-badge"
-                                  size="sm"
-                                />
-                              );
-                            })()}
-                          </td>
-                          <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900">
-                            {formatMoney(ord.total_amount)}
-                          </td>
-                        </tr>
-                      ))
-                    )}
+                      if (displayedOrders.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={7} className="py-8 text-center text-slate-500">
+                              Không có đơn hàng nào phù hợp với bộ lọc hiện tại.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return displayedOrders.map(ord => {
+                        const isReturned = ord.fulfillment_status === 'RETURNED';
+                        const returnNotesLower = (ord.return_notes || '').toLowerCase();
+                        const isExchange = isReturned && (
+                          ord.return_notes?.includes('ĐỔI HÀNG') || 
+                          returnNotesLower.includes('đổi size') || 
+                          returnNotesLower.includes('đổi mẫu') ||
+                          returnNotesLower.includes('đổi hàng')
+                        );
+                        const isRefund = isReturned && !isExchange;
+                        const cleanPhone = (ord.customer_phone || '').replace(/\D/g, '');
+
+                        return (
+                          <tr
+                            key={ord.id}
+                            className={
+                              isExchange
+                                ? 'bg-blue-50/40 hover:bg-blue-50/70 border-l-4 border-l-blue-600 transition-colors'
+                                : isRefund
+                                ? 'bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-l-amber-500 transition-colors'
+                                : 'hover:bg-slate-50/60 transition-colors'
+                            }
+                          >
+                            <td className="py-2.5 px-4 font-mono font-medium">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedOrderForDetail(ord)}
+                                  className={`font-bold hover:underline cursor-pointer text-left transition-colors ${
+                                    isExchange
+                                      ? 'text-blue-600 hover:text-blue-800'
+                                      : isRefund
+                                      ? 'text-amber-600 hover:text-amber-800'
+                                      : 'text-slate-900 hover:text-black'
+                                  }`}
+                                  title="Nhấn để xem chi tiết đơn hàng"
+                                >
+                                  {ord.order_code}
+                                </button>
+                                {isExchange ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedOrderForDetail(ord)}
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white shrink-0 shadow-2xs hover:bg-blue-700 cursor-pointer transition-colors"
+                                    title="Xem chi tiết đổi hàng"
+                                  >
+                                    Đổi hàng
+                                  </button>
+                                ) : isRefund ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedOrderForDetail(ord)}
+                                    className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-600 text-white shrink-0 shadow-2xs hover:bg-amber-700 cursor-pointer transition-colors"
+                                    title="Xem chi tiết trả hàng"
+                                  >
+                                    Trả hàng
+                                  </button>
+                                ) : null}
+                              </div>
+                            </td>
+
+                            <td className="py-2.5 px-4 max-w-xs">
+                              <div className="font-semibold text-slate-900">{ord.customer_name}</div>
+                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                                <span className="font-mono text-xs font-semibold text-slate-800">
+                                  {ord.customer_phone}
+                                </span>
+                                {cleanPhone && (
+                                  <a
+                                    href={`https://zalo.me/${cleanPhone}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    title="Nhắn tin qua Zalo cho khách"
+                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-semibold shadow-2xs transition-colors"
+                                  >
+                                    <MessageCircle className="w-2.5 h-2.5" />
+                                    <span>Zalo</span>
+                                  </a>
+                                )}
+                              </div>
+                            </td>
+
+                            <td className="py-2.5 px-4 text-slate-600 max-w-xs truncate">{ord.shipping_address}</td>
+                            <td className="py-2.5 px-4 text-center">
+                              <div className="flex flex-col items-center gap-1">
+                                <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium ${ord.payment_status === 'PAID'
+                                  ? 'bg-emerald-50 text-emerald-700'
+                                  : 'bg-amber-50 text-amber-800'
+                                  }`}>
+                                  {ord.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                                </span>
+
+                                {isMockPaymentEnabled && ord.payment_status !== 'PAID' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMockPayOrder(ord.id)}
+                                    disabled={mockLoadingId === ord.id}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 transition-all cursor-pointer shadow-2xs active:scale-[0.97]"
+                                    title="Giả lập ngân hàng báo tiền về thành công (Chỉ bật khi có biến NEXT_PUBLIC_ENABLE_MOCK_PAYMENT)"
+                                  >
+                                    <Zap className="w-3 h-3 text-indigo-500" />
+                                    <span>{mockLoadingId === ord.id ? 'Đang nạp...' : 'Thanh toán test'}</span>
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-4 text-center">
+                              {(() => {
+                                const isDelivered = ord.fulfillment_status === 'DELIVERED';
+                                const isDispatched = ord.fulfillment_status === 'DISPATCHED';
+                                const isPacking = ord.fulfillment_status === 'PACKING';
+                                const currentVal = isReturned ? 'RETURNED' : isDelivered ? 'DELIVERED' : isDispatched ? 'DISPATCHED' : isPacking ? 'PACKING' : 'UNFULFILLED';
+                                const returnLabel = isExchange ? 'Đang đổi hàng' : isRefund ? 'Đang trả hàng' : 'Yêu cầu đổi/trả';
+                                const returnBadgeClass = isExchange
+                                  ? 'bg-blue-100 text-blue-900 border-blue-300 hover:bg-blue-200 font-bold'
+                                  : 'bg-amber-100 text-amber-900 border-amber-300 hover:bg-amber-200 font-bold';
+
+                                return (
+                                  <CustomSelect
+                                    value={currentVal}
+                                    onChange={val => handleUpdateOrderStatus(ord.id, val)}
+                                    options={[
+                                      ...(isReturned ? [{ value: 'RETURNED', label: returnLabel, badgeClass: returnBadgeClass }] : []),
+                                      { value: 'DELIVERED', label: 'Đã nhận', badgeClass: 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' },
+                                      { value: 'PACKING', label: 'Đang xử lý', badgeClass: 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100' },
+                                      { value: 'DISPATCHED', label: 'Đã bàn giao ĐVVC', badgeClass: 'bg-sky-50 text-sky-700 border-sky-200 hover:bg-sky-100' },
+                                      { value: 'UNFULFILLED', label: 'Chưa xử lý', badgeClass: 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' }
+                                    ]}
+                                    variant="status-badge"
+                                    size="sm"
+                                  />
+                                );
+                              })()}
+                            </td>
+                            <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
+                              {formatMoney(ord.total_amount)}
+                            </td>
+                            <td className="py-2.5 px-4 text-center">
+                              {(() => {
+                                const isDispatched = ord.fulfillment_status === 'DISPATCHED';
+
+                                if (isDispatched) {
+                                  return (
+                                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenDispatchModal(ord)}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+                                        title="Bấm để xem hoặc chỉnh sửa mã vận đơn"
+                                      >
+                                        <Truck className="w-3 h-3 text-sky-600 shrink-0" />
+                                        <span className="font-mono font-bold">{ord.tracking_code || 'Sửa mã'}</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateOrderStatus(ord.id, 'DELIVERED')}
+                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
+                                        title="Xác nhận khách đã nhận hàng thành công"
+                                      >
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 hover:text-white shrink-0" />
+                                        <span>Đã nhận</span>
+                                      </button>
+                                    </div>
+                                  );
+                                }
+
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenDispatchModal(ord)}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                    title="Lên đơn và gửi mã vận chuyển của ĐVVC vào đơn hàng cho khách"
+                                  >
+                                    <Truck className="w-3.5 h-3.5 shrink-0" />
+                                    <span>Lên đơn & Gửi mã ĐVVC</span>
+                                  </button>
+                                );
+                              })()}
+                            </td>
+                          </tr>
+                        );
+                      });
+                    })()}
                   </tbody>
                 </table>
               </div>
             </section>
-          )}
+          </div>
+        );
+      })()}
 
           {/* ================= TAB 6: CUSTOMERS & USERS ================= */}
           {activeTab === 'customers' && (
@@ -3285,7 +4134,7 @@ export default function ExecutiveDashboard() {
                 <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3">
                   <Database className="w-5 h-5 text-slate-700" />
                   <div>
-                    <h2 className="text-sm font-semibold text-slate-900">Trạng thái Cơ sở dữ liệu Cloudflare D1</h2>
+                    <h2 className="text-sm font-semibold text-slate-900">Trạng thái Cơ sở dữ liệu hệ thống</h2>
                     <p className="text-xs text-slate-500">Cấu hình kết nối và phân bổ phân vùng địa lý</p>
                   </div>
                 </div>
@@ -3423,7 +4272,7 @@ export default function ExecutiveDashboard() {
                   type="email"
                   value={tempProfile.email}
                   onChange={(e) => setTempProfile({ ...tempProfile, email: e.target.value })}
-                  placeholder="admin@caishop.vn"
+                  placeholder="admin@degent.vn"
                   className="h-9 w-full rounded border border-slate-300 px-3 text-xs font-mono focus:border-slate-900 focus:outline-none"
                 />
               </div>
@@ -3513,6 +4362,538 @@ export default function ExecutiveDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= ORDER DETAIL MODAL POPUP ================= */}
+      {selectedOrderForDetail && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="relative w-full max-w-2xl bg-white rounded-2xl shadow-2xl border-0 overflow-hidden my-8 text-left space-y-0">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-mono font-bold tracking-wider text-amber-400">
+                    #{selectedOrderForDetail.order_code}
+                  </span>
+                  {(() => {
+                    const isRet = selectedOrderForDetail.fulfillment_status === 'RETURNED';
+                    const retNotesLower = (selectedOrderForDetail.return_notes || '').toLowerCase();
+                    const isEx = isRet && (
+                      selectedOrderForDetail.return_notes?.includes('ĐỔI HÀNG') || 
+                      retNotesLower.includes('đổi size') || 
+                      retNotesLower.includes('đổi mẫu') ||
+                      retNotesLower.includes('đổi hàng')
+                    );
+                    const isRef = isRet && !isEx;
+
+                    if (isEx) {
+                      return (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-600 text-white shadow-xs">
+                          ĐỔI HÀNG
+                        </span>
+                      );
+                    }
+                    if (isRef) {
+                      return (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-white shadow-xs">
+                          TRẢ HÀNG
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
+                </div>
+                <div className="text-[11px] text-slate-300">
+                  Đặt lúc: {new Date(selectedOrderForDetail.created_at).toLocaleString('vi-VN')}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSelectedOrderForDetail(null)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 max-h-[75vh] overflow-y-auto space-y-5">
+              {/* Box YÊU CẦU ĐỔI / TRẢ (Nếu có) */}
+              {(() => {
+                const isRet = selectedOrderForDetail.fulfillment_status === 'RETURNED';
+                const retNotesLower = (selectedOrderForDetail.return_notes || '').toLowerCase();
+                const isEx = isRet && (
+                  selectedOrderForDetail.return_notes?.includes('ĐỔI HÀNG') || 
+                  retNotesLower.includes('đổi size') || 
+                  retNotesLower.includes('đổi mẫu') ||
+                  retNotesLower.includes('đổi hàng')
+                );
+                const isRef = isRet && !isEx;
+
+                if (!isRet) return null;
+
+                return (
+                  <div className={`p-4 rounded-xl border text-xs space-y-2.5 shadow-sm ${
+                    isEx
+                      ? 'bg-blue-50/90 border-blue-300 text-blue-950'
+                      : 'bg-amber-50/90 border-amber-300 text-amber-950'
+                  }`}>
+                    <div className="flex items-center justify-between border-b pb-2">
+                      <div className={`font-bold flex items-center gap-1.5 text-sm ${
+                        isEx ? 'text-blue-900 border-blue-200' : 'text-amber-900 border-amber-200'
+                      }`}>
+                        <RotateCcw className={`w-4 h-4 ${isEx ? 'text-blue-700' : 'text-amber-700'}`} />
+                        <span>
+                          {isEx ? 'CHI TIẾT YÊU CẦU: ĐỔI HÀNG (ĐỔI SIZE / MẪU)' : 'CHI TIẾT YÊU CẦU: TRẢ HÀNG (HOÀN TIỀN)'}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                        isEx ? 'bg-blue-600 text-white' : 'bg-amber-600 text-white'
+                      }`}>
+                        {isEx ? 'Đổi hàng' : 'Trả hàng'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 leading-relaxed">
+                      <div>
+                        <span className="font-semibold text-slate-700">Lý do & Ghi chú từ khách:</span>
+                        <div className={`mt-1 p-3 rounded-lg border bg-white font-medium text-xs leading-relaxed ${
+                          isEx ? 'border-blue-200 text-blue-950' : 'border-amber-200 text-amber-950'
+                        }`}>
+                          {selectedOrderForDetail.return_notes || (isEx ? 'Khách yêu cầu đổi sản phẩm / đổi size vừa vặn.' : 'Khách yêu cầu trả sản phẩm / nhận lại tiền.')}
+                        </div>
+                      </div>
+
+                      {selectedOrderForDetail.return_created_at && (
+                        <div className="text-[11px] text-slate-500 pt-0.5">
+                          Thời gian gửi yêu cầu: {new Date(selectedOrderForDetail.return_created_at).toLocaleString('vi-VN')}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Thông tin Khách hàng & Giao hàng */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5 uppercase text-[11px] tracking-wide">
+                    <User className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Người nhận & Liên hệ</span>
+                  </div>
+                  <div className="text-slate-900 font-semibold text-sm">
+                    {selectedOrderForDetail.customer_name}
+                  </div>
+                  <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                    <span className="font-mono font-medium text-slate-700">
+                      {selectedOrderForDetail.customer_phone}
+                    </span>
+                    {selectedOrderForDetail.customer_phone && (
+                      <a
+                        href={`https://zalo.me/${selectedOrderForDetail.customer_phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-semibold inline-flex items-center gap-1 shadow-2xs"
+                      >
+                        <MessageCircle className="w-2.5 h-2.5" />
+                        <span>Zalo</span>
+                      </a>
+                    )}
+                  </div>
+                  {selectedOrderForDetail.customer_email && (
+                    <div className="text-slate-500 text-[11px] truncate">
+                      {selectedOrderForDetail.customer_email}
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5">
+                  <div className="font-bold text-slate-900 flex items-center gap-1.5 uppercase text-[11px] tracking-wide">
+                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                    <span>Địa chỉ nhận hàng & Thanh toán</span>
+                  </div>
+                  <div className="text-slate-700 leading-relaxed font-medium">
+                    {selectedOrderForDetail.shipping_address}
+                  </div>
+                  <div className="pt-1 flex items-center gap-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-800 uppercase">
+                      {selectedOrderForDetail.payment_method === 'cod' ? 'COD (Tiền mặt)' : 'VietQR Chuyển khoản'}
+                    </span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      selectedOrderForDetail.payment_status === 'PAID'
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}>
+                      {selectedOrderForDetail.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                    </span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 font-mono flex items-center gap-1.5">
+                      <img
+                        src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                        alt="ĐVVC"
+                        className="w-3.5 h-3.5 rounded object-cover inline-block"
+                      />
+                      <span>{selectedOrderForDetail.carrier || 'Viettel Post'}: {selectedOrderForDetail.tracking_code || `VTP${(selectedOrderForDetail.order_code || '').replace(/\D/g, '') || '881865'}VN`}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenDispatchModal(selectedOrderForDetail)}
+                      className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                    >
+                      <Truck className="w-3 h-3 text-slate-500" />
+                      <span>{selectedOrderForDetail.tracking_code ? 'Sửa mã ĐVVC' : 'Lên đơn & Gửi mã'}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Chi tiết Sản phẩm đã đặt */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-slate-600" />
+                    <span>Sản phẩm trong đơn ({Array.isArray(selectedOrderForDetail.items) ? selectedOrderForDetail.items.length : selectedOrderForDetail.items_count || 0})</span>
+                  </h4>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden bg-white">
+                  {loadingOrderDetail ? (
+                    <div className="p-6 text-center text-xs text-slate-500">Đang tải chi tiết sản phẩm...</div>
+                  ) : Array.isArray(selectedOrderForDetail.items) && selectedOrderForDetail.items.length > 0 ? (
+                    selectedOrderForDetail.items.map((it: any, idx: number) => {
+                      const imgUrl = getPrimaryImageUrl(it.product_images);
+                      return (
+                        <div key={it.id || idx} className="p-3.5 flex items-center gap-3 hover:bg-slate-50/50 transition-colors">
+                          <button
+                            type="button"
+                            onClick={() => setZoomedImage({
+                              url: imgUrl,
+                              title: it.product_name,
+                              subtitle: `Màu: ${it.color} • Size: ${it.size}${it.variant_sku ? ` • SKU: ${it.variant_sku}` : ''}`
+                            })}
+                            className="relative group/img shrink-0 cursor-zoom-in rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-500 transition-all focus:outline-none shadow-2xs"
+                            title="Nhấp để phóng to & sao chép ảnh"
+                          >
+                            <img
+                              src={imgUrl}
+                              alt={it.product_name}
+                              className="w-12 h-14 object-cover group-hover/img:scale-110 transition-transform duration-200"
+                            />
+                            <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover/img:opacity-100 flex items-center justify-center transition-opacity text-white">
+                              <ZoomIn className="w-4 h-4 drop-shadow-sm" />
+                            </div>
+                          </button>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-slate-900 text-xs truncate">
+                            {it.product_name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                            <span>Màu: <strong className="text-slate-700">{it.color}</strong></span>
+                            <span>•</span>
+                            <span>Size: <strong className="text-slate-700">{it.size}</strong></span>
+                            {it.variant_sku && (
+                              <>
+                                <span>•</span>
+                                <span className="font-mono text-[10px] text-slate-400">SKU: {it.variant_sku}</span>
+                              </>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-slate-600 mt-0.5">
+                            {formatMoney(it.unit_price)} × {it.quantity}
+                          </div>
+                        </div>
+                        <div className="text-right font-mono font-bold text-xs text-slate-900 tabular-nums">
+                          {formatMoney(it.total_price || (it.unit_price * it.quantity))}
+                        </div>
+                      </div>
+                    );
+                  })
+                  ) : (
+                    <div className="p-4 text-center text-xs text-slate-500">
+                      Không có thông tin chi tiết sản phẩm.
+                    </div>
+                  )}
+                </div>
+
+                {/* Tổng thanh toán */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-between text-xs">
+                  <span className="font-bold text-slate-700">Tổng thanh toán:</span>
+                  <span className="font-mono font-black text-slate-950 text-base tabular-nums">
+                    {formatMoney(selectedOrderForDetail.total_amount)}
+                  </span>
+                </div>
+              </div>
+
+
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 bg-slate-100/80 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedOrderForDetail(null)}
+                className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ================= LIGHTBOX ZOOM & COPY IMAGE MODAL ================= */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-[70] flex items-center justify-center bg-black/85 backdrop-blur-md p-4 animate-in fade-in duration-200"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div
+            className="relative max-w-3xl w-full flex flex-col items-center space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Bar with title & close button */}
+            <div className="w-full flex items-center justify-between text-white/90 px-1">
+              <div className="min-w-0 pr-4">
+                <div className="font-semibold text-sm truncate">{zoomedImage.title || 'Hình ảnh sản phẩm'}</div>
+                {zoomedImage.subtitle && (
+                  <div className="text-xs text-white/60 font-mono mt-0.5 truncate">{zoomedImage.subtitle}</div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => setZoomedImage(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Đóng cửa sổ xem ảnh (Esc)"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Main Enlarged Image */}
+            <div className="relative max-h-[75vh] w-full flex items-center justify-center overflow-hidden rounded-xl bg-black/40 border border-white/10 shadow-2xl p-2">
+              <img
+                src={zoomedImage.url}
+                alt={zoomedImage.title || 'Phóng to ảnh sản phẩm'}
+                className="max-h-[70vh] max-w-full object-contain rounded-lg select-auto cursor-default"
+                title="Chuột phải để chọn 'Sao chép hình ảnh' hoặc bấm nút bên dưới"
+              />
+            </div>
+
+            {/* Action Buttons Bar */}
+            <div className="flex items-center gap-2 flex-wrap justify-center bg-slate-900/90 border border-white/10 backdrop-blur-md px-3.5 py-2 rounded-xl shadow-xl">
+              <button
+                type="button"
+                onClick={() => handleCopyImageToClipboard(zoomedImage.url)}
+                disabled={isCopyingImage}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all active:scale-95 cursor-pointer disabled:opacity-50"
+                title="Sao chép trực tiếp hình ảnh vào Clipboard để dán (Ctrl+V) vào Zalo, Facebook, chat"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>{isCopyingImage ? 'Đang sao chép...' : 'Sao chép ảnh'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleCopyImageUrl(zoomedImage.url)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+                title="Sao chép đường dẫn link ảnh"
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Sao chép link</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleDownloadImage(zoomedImage.url, zoomedImage.title)}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+                title="Tải ảnh về máy tính"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Tải ảnh</span>
+              </button>
+
+              <a
+                href={zoomedImage.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-all active:scale-95 cursor-pointer"
+                title="Mở ảnh gốc trong tab mới"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                <span>Tab mới</span>
+              </a>
+            </div>
+
+            {/* Notification Toast */}
+            {copyImageToast && (
+              <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] bg-slate-900 text-white px-4 py-2.5 rounded-lg shadow-2xl border border-slate-700 text-xs font-medium flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
+                <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>{copyImageToast}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Dispatch Order / Tracking Modal */}
+      {dispatchOrderModal && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Lên đơn & Gửi mã vận chuyển
+                  </h3>
+                  <p className="text-xs text-slate-500 font-mono">
+                    Đơn hàng #{dispatchOrderModal.order.order_code} • {dispatchOrderModal.order.customer_name}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDispatchOrderModal(null)}
+                className="w-8 h-8 rounded-lg hover:bg-slate-200/60 flex items-center justify-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Form */}
+            <form onSubmit={handleSubmitDispatch} className="p-6 space-y-4">
+              {/* Order quick summary */}
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl space-y-1.5 text-xs text-slate-600">
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Khách nhận:</span>
+                  <span className="font-semibold text-slate-900">{dispatchOrderModal.order.customer_name} ({dispatchOrderModal.order.customer_phone})</span>
+                </div>
+                <div className="flex justify-between items-start">
+                  <span className="text-slate-500 shrink-0 mr-2">Địa chỉ:</span>
+                  <span className="font-medium text-slate-900 text-right leading-relaxed">{dispatchOrderModal.order.shipping_address}</span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-slate-200/60">
+                  <span className="text-slate-500">Thu hộ / Tổng tiền:</span>
+                  <span className="font-bold text-slate-900 font-mono">
+                    {dispatchOrderModal.order.payment_method === 'cod' ? `COD ${formatMoney(dispatchOrderModal.order.total_amount)}` : 'Đã thanh toán (0đ)'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Carrier Selection */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider block">
+                  1. Chọn Đơn vị vận chuyển
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'VIETTEL_POST', label: 'Viettel Post', hasLogo: true },
+                    { id: 'GHTK', label: 'Giao Hàng Tiết Kiệm (GHTK)', hasLogo: false },
+                    { id: 'GHN', label: 'Giao Hàng Nhanh (GHN)', hasLogo: false },
+                    { id: 'SHIPPER', label: 'Shipper riêng DE\'GENT', hasLogo: false },
+                  ].map(c => {
+                    const isSelected = dispatchOrderModal.carrier === c.id;
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        onClick={() => handleCarrierChange(c.id)}
+                        className={`p-2.5 rounded-xl border text-left text-xs font-semibold transition-all flex items-center gap-2 cursor-pointer ${
+                          isSelected
+                            ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-700'
+                        }`}
+                      >
+                        {c.hasLogo ? (
+                          <img
+                            src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                            alt="Viettel Post"
+                            className="w-4 h-4 rounded object-cover shrink-0"
+                          />
+                        ) : (
+                          <Truck className={`w-4 h-4 shrink-0 ${isSelected ? 'text-white' : 'text-slate-400'}`} />
+                        )}
+                        <span className="truncate">{c.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Tracking Code Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                    2. Mã vận đơn của ĐVVC
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const rawCode = (dispatchOrderModal.order.order_code || '').replace(/\D/g, '') || '881865';
+                      const prefix = dispatchOrderModal.carrier === 'VIETTEL_POST' ? 'VTP' : dispatchOrderModal.carrier === 'GHTK' ? 'S' : dispatchOrderModal.carrier === 'GHN' ? 'GHN' : 'DGT-';
+                      const suffix = dispatchOrderModal.carrier === 'VIETTEL_POST' ? 'VN' : dispatchOrderModal.carrier === 'GHTK' ? '.GHTK' : '';
+                      setDispatchOrderModal({
+                        ...dispatchOrderModal,
+                        trackingCode: `${prefix}${rawCode}${suffix}`,
+                      });
+                    }}
+                    className="text-[11px] text-blue-600 hover:underline cursor-pointer font-medium"
+                  >
+                    Tạo mã gợi ý
+                  </button>
+                </div>
+                <div className="relative">
+                  <input
+                    type="text"
+                    required
+                    value={dispatchOrderModal.trackingCode}
+                    onChange={e => setDispatchOrderModal({ ...dispatchOrderModal, trackingCode: e.target.value.toUpperCase() })}
+                    placeholder="Ví dụ: VTP881865VN hoặc S12345.GHTK"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-300 font-mono font-bold text-sm tracking-wider uppercase text-slate-900 bg-slate-50 focus:bg-white focus:border-slate-900 focus:outline-none transition-all"
+                  />
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed">
+                  ✓ Mã này sẽ được lưu vào đơn hàng. Khách hàng khi kiểm tra đơn hàng sẽ thấy mã vận đơn và link tra cứu trực tiếp.
+                </p>
+              </div>
+
+              {/* Action buttons */}
+              <div className="pt-2 flex items-center justify-end gap-2.5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setDispatchOrderModal(null)}
+                  className="px-4 py-2 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingDispatch}
+                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 disabled:opacity-50 text-white text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer flex items-center gap-2"
+                >
+                  {isSubmittingDispatch ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Đang lưu & gửi mã...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Truck className="w-4 h-4" />
+                      <span>Xác nhận lên đơn & Gửi mã</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

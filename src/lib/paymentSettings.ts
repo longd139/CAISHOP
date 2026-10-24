@@ -3,7 +3,7 @@ export interface PaymentSettings {
   bank_id: string; // e.g. 'MB', 'VCB', 'TCB'
   bank_name: string; // e.g. 'MB Bank (Quân Đội)'
   account_number: string; // e.g. '0903112233'
-  account_holder: string; // e.g. 'CAISHOP ATELIER'
+  account_holder: string; // e.g. 'DEGENT ATELIER'
   qr_template: 'compact2' | 'compact' | 'qr_only' | 'print';
   transfer_syntax: string; // e.g. '{ORDER_CODE}'
   payment_instructions: string;
@@ -55,7 +55,7 @@ export const defaultPaymentSettings: PaymentSettings = {
   bank_id: 'MB',
   bank_name: 'MB Bank (Quân Đội)',
   account_number: '0903112233',
-  account_holder: 'CAISHOP ATELIER',
+  account_holder: 'DEGENT ATELIER',
   qr_template: 'compact2',
   transfer_syntax: '{ORDER_CODE}',
   payment_instructions: 'Mở ứng dụng ngân hàng bất kỳ để quét mã QR bên dưới, hệ thống đã điền sẵn số tiền và mã đơn hàng của bạn.',

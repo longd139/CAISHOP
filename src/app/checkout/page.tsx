@@ -25,9 +25,13 @@ import {
   Loader2,
   PackageCheck,
   QrCode,
-  ExternalLink
+  ExternalLink,
+  ThumbsUp,
+  Share2,
+  RotateCcw
 } from 'lucide-react';
 import { VietnamAddressSelector, AddressMeta } from '@/components/VietnamAddressSelector';
+import { FacebookFreeshipConfig, DEFAULT_FACEBOOK_FREESHIP_CONFIG } from '@/app/api/deals/facebook-freeship/route';
 
 interface DeliveryTimeSlot {
   id: string;
@@ -96,6 +100,102 @@ export default function CheckoutPage() {
   const [expressTimeSlot, setExpressTimeSlot] = useState<string>('09:00 - 12:00');
   const [customTimeSlot, setCustomTimeSlot] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
+
+  // Facebook Freeship Hunt Deal states
+  const [fbConfig, setFbConfig] = useState<FacebookFreeshipConfig>(DEFAULT_FACEBOOK_FREESHIP_CONFIG);
+  const [isFbModalOpen, setIsFbModalOpen] = useState(false);
+  const [fbProfileUrl, setFbProfileUrl] = useState('');
+  const [isVerifyingFb, setIsVerifyingFb] = useState(false);
+  const [fbVerifyError, setFbVerifyError] = useState('');
+  const [fbVerifySuccessMsg, setFbVerifySuccessMsg] = useState('');
+  const [isFbFreeshipActive, setIsFbFreeshipActive] = useState(false);
+  const [fbVerifiedProfileName, setFbVerifiedProfileName] = useState('');
+  const [fbPostCopied, setFbPostCopied] = useState(false);
+
+  // Fetch Facebook Freeship config & check saved verified state
+  useEffect(() => {
+    fetch('/api/deals/facebook-freeship')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.config) {
+          setFbConfig(data.config);
+        }
+      })
+      .catch((err) => console.error('Error fetching facebook freeship config:', err));
+
+    try {
+      const saved = localStorage.getItem('caishop_fb_freeship_verified');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed?.verified) {
+          setIsFbFreeshipActive(true);
+          setFbVerifiedProfileName(parsed.profile_name || 'Facebook User');
+        }
+      }
+    } catch (e) {}
+  }, []);
+
+  const handleVerifyFbLike = async () => {
+    if (!fbProfileUrl.trim()) {
+      setFbVerifyError('Vui lòng nhập link tài khoản Facebook cá nhân của bạn.');
+      return;
+    }
+
+    try {
+      setIsVerifyingFb(true);
+      setFbVerifyError('');
+      setFbVerifySuccessMsg('');
+
+      const res = await fetch('/api/deals/facebook-freeship', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'verify_like',
+          profile_url: fbProfileUrl.trim(),
+          post_url: fbConfig?.facebook_post_url
+        })
+      });
+
+      const data = await res.json();
+      if (data.success && data.verified) {
+        setIsFbFreeshipActive(true);
+        setFbVerifiedProfileName(data.profile_name || 'Facebook User');
+        setFbVerifySuccessMsg(data.message || 'Xác thực thành công! Deal Freeship 0₫ đã được kích hoạt.');
+
+        try {
+          localStorage.setItem('caishop_fb_freeship_verified', JSON.stringify({
+            verified: true,
+            profile_url: fbProfileUrl.trim(),
+            profile_name: data.profile_name || 'Facebook User',
+            verified_at: new Date().toISOString()
+          }));
+        } catch (e) {}
+      } else {
+        setFbVerifyError(data.message || 'Chưa thể xác thực lượt Like từ tài khoản này. Vui lòng kiểm tra lại link hoặc chắc chắn đã bấm Like.');
+      }
+    } catch (err: any) {
+      console.error('Verify error:', err);
+      setFbVerifyError('Lỗi kết nối khi đối soát với Facebook. Vui lòng thử lại.');
+    } finally {
+      setIsVerifyingFb(false);
+    }
+  };
+
+  const handleRemoveFbFreeship = () => {
+    setIsFbFreeshipActive(false);
+    setFbVerifiedProfileName('');
+    setFbVerifySuccessMsg('');
+    try {
+      localStorage.removeItem('caishop_fb_freeship_verified');
+    } catch (e) {}
+  };
+
+  const handleCopyFbPost = () => {
+    if (!fbConfig?.facebook_post_url) return;
+    navigator.clipboard.writeText(fbConfig.facebook_post_url);
+    setFbPostCopied(true);
+    setTimeout(() => setFbPostCopied(false), 3000);
+  };
 
   // Sync client time on mount
   useEffect(() => {
@@ -197,6 +297,7 @@ export default function CheckoutPage() {
   const [orderNotFound, setOrderNotFound] = useState(false);
   const [secondsRemaining, setSecondsRemaining] = useState<number | null>(null);
   const [isOrderExpired, setIsOrderExpired] = useState(false);
+  const [copiedTracking, setCopiedTracking] = useState(false);
 
   // Check URL params if returning from PayOS
   useEffect(() => {
@@ -220,6 +321,9 @@ export default function CheckoutPage() {
               setSearchPaid(true);
               setOrderSuccess(order);
               clearCart();
+              if (params.get('open_return') === '1' && order.fulfillment_status === 'DELIVERED') {
+                setShowReturnModal(true);
+              }
               return;
             }
 
@@ -248,6 +352,9 @@ export default function CheckoutPage() {
 
             setOrderSuccess(order);
             clearCart();
+            if (params.get('open_return') === '1' && order.fulfillment_status === 'DELIVERED') {
+              setShowReturnModal(true);
+            }
           } else {
             // Đơn hàng không tìm thấy hoặc đã quá 1 tiếng nên bị tự động xóa
             setOrderNotFound(true);
@@ -440,7 +547,7 @@ export default function CheckoutPage() {
   if (isDealEligible && appliedDeal?.discount_amount) {
     voucherDiscountAmount = appliedDeal.discount_amount;
   }
-  const isFreeshipDeal = isDealEligible && appliedDeal?.is_freeship;
+  const isFreeshipDeal = (isDealEligible && appliedDeal?.is_freeship) || isFbFreeshipActive;
 
   const totalDiscount = tierDiscountAmount + voucherDiscountAmount;
   const cartAfterDiscount = Math.max(0, cartSubtotal - totalDiscount);
@@ -516,11 +623,12 @@ export default function CheckoutPage() {
     try {
       const selectedTime = customTimeSlot.trim() || expressTimeSlot;
       const dayLabel = deliveryDay === 'today' ? 'Hôm nay' : 'Ngày mai';
+      const fbTag = isFbFreeshipActive ? ` [DEAL: Freeship FB - Người Like: @${fbVerifiedProfileName || 'đã xác nhận'}]` : '';
       const carrierTag = isHcmInnerCity 
         ? hcmShippingType === 'express'
-          ? `[VẬN CHUYỂN: Shipper riêng CAISHOP - Ship nhanh (${dayLabel} lúc ${selectedTime}) - Phí: 100k]`
-          : `[VẬN CHUYỂN: Shipper riêng CAISHOP - Ship thường trong ngày (40k)]`
-        : '[VẬN CHUYỂN: Giao hàng tiêu chuẩn]';
+          ? `[VẬN CHUYỂN: Shipper riêng DE'GENT - Ship nhanh (${dayLabel} lúc ${selectedTime}) - Phí: ${shippingFee === 0 ? '0đ' : formatMoney(shippingFee)}]${fbTag}`
+          : `[VẬN CHUYỂN: Shipper riêng DE'GENT - Ship thường trong ngày (${shippingFee === 0 ? '0đ' : '40k'})]${fbTag}`
+        : `[VẬN CHUYỂN: Giao hàng tiêu chuẩn (${shippingFee === 0 ? '0đ' : formatMoney(shippingFee)})]${fbTag}`;
 
       const fullAddress = [
         shippingAddress.trim(),
@@ -678,6 +786,115 @@ export default function CheckoutPage() {
     }
   };
 
+  // State & Handler: Confirm Customer Delivery ("Đã nhận được hàng")
+  const [isConfirmingDelivery, setIsConfirmingDelivery] = useState(false);
+  const [deliveryConfirmError, setDeliveryConfirmError] = useState('');
+
+  const handleConfirmReceived = async () => {
+    if (!orderSuccess?.id) return;
+    setIsConfirmingDelivery(true);
+    setDeliveryConfirmError('');
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderSuccess.id,
+          action: 'CONFIRM_DELIVERY',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setOrderSuccess((prev: any) => ({
+          ...prev,
+          fulfillment_status: 'DELIVERED',
+          payment_status: 'PAID',
+        }));
+      } else {
+        setDeliveryConfirmError(data.message || 'Không thể xác nhận nhận hàng. Vui lòng thử lại.');
+      }
+    } catch (err: any) {
+      setDeliveryConfirmError(err.message || 'Lỗi kết nối khi xác nhận. Vui lòng thử lại.');
+    } finally {
+      setIsConfirmingDelivery(false);
+    }
+  };
+
+  // State & Handler: Return Request ("Yêu cầu hoàn hàng / đổi trả")
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const [returnReason, setReturnReason] = useState('TIGHT');
+  const [refundMethod, setRefundMethod] = useState<'EXCHANGE' | 'REFUND'>('EXCHANGE');
+  const [returnNotes, setReturnNotes] = useState('');
+  const [bankAccount, setBankAccount] = useState('');
+  const [bankName, setBankName] = useState('');
+  const [accountHolder, setAccountHolder] = useState('');
+  const [isSubmittingReturn, setIsSubmittingReturn] = useState(false);
+  const [returnError, setReturnError] = useState('');
+  const [returnSuccessMessage, setReturnSuccessMessage] = useState('');
+  const [contactPhone, setContactPhone] = useState('');
+  const [confirmReturnStep, setConfirmReturnStep] = useState(false);
+
+  // Auto fill contact phone from customer_phone or user.phone
+  useEffect(() => {
+    const defaultPhone = orderSuccess?.customer_phone || user?.phone || '';
+    if (defaultPhone && !contactPhone) {
+      setContactPhone(defaultPhone);
+    }
+  }, [orderSuccess?.customer_phone, user?.phone]);
+
+  const handlePreSendReturnRequest = (e: React.FormEvent) => {
+    e.preventDefault();
+    const phone = (contactPhone || orderSuccess?.customer_phone || user?.phone || '').trim();
+    if (!phone) {
+      setReturnError('Vui lòng nhập số điện thoại (có Zalo) để shop liên hệ hỗ trợ đổi trả.');
+      return;
+    }
+    setReturnError('');
+    setConfirmReturnStep(true);
+  };
+
+  const proceedSendReturnRequest = async () => {
+    if (!orderSuccess?.id) return;
+    setIsSubmittingReturn(true);
+    setReturnError('');
+    const finalPhone = (contactPhone || orderSuccess?.customer_phone || user?.phone || '').trim();
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderSuccess.id,
+          action: 'REQUEST_RETURN',
+          return_reason: returnReason,
+          refund_method: refundMethod,
+          bank_account: bankAccount,
+          bank_name: bankName,
+          account_holder: accountHolder,
+          notes: returnNotes,
+          contact_phone: finalPhone
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setReturnSuccessMessage(data.message || `Chúng tôi sẽ liên hệ ${refundMethod === 'EXCHANGE' ? 'đổi hàng' : 'hoàn hàng'} qua ${finalPhone} này nhé, bạn nhớ để ý điện thoại nhé`);
+        setOrderSuccess((prev: any) => ({
+          ...prev,
+          fulfillment_status: 'RETURNED'
+        }));
+        setTimeout(() => {
+          setShowReturnModal(false);
+          setConfirmReturnStep(false);
+        }, 3500);
+      } else {
+        setReturnError(data.message || 'Không thể gửi yêu cầu hoàn hàng. Vui lòng thử lại.');
+      }
+    } catch (err: any) {
+      setReturnError(err.message || 'Lỗi kết nối khi gửi yêu cầu. Vui lòng thử lại.');
+    } finally {
+      setIsSubmittingReturn(false);
+    }
+  };
+
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 text-sm text-slate-500">
@@ -722,7 +939,7 @@ export default function CheckoutPage() {
           <div className="space-y-1">
             <h1 className="text-lg font-bold text-slate-900">Đơn hàng không tồn tại hoặc đã hết hạn</h1>
             <p className="text-xs text-slate-500 leading-relaxed">
-              Các đơn hàng chưa thanh toán chỉ được lưu giữ trong vòng 1 tiếng. Nếu quá thời gian này, hệ thống sẽ tự động hủy đơn và hoàn trả lại số lượng sản phẩm vào kho hàng.
+              Các đơn hàng chưa thanh toán chỉ được lưu giữ trong vòng 1 tiếng. Nếu quá thời gian này, hệ thống sẽ tự động hủy đơn.
             </p>
           </div>
           <div className="pt-2">
@@ -742,15 +959,34 @@ export default function CheckoutPage() {
   // View: Order Success Screen
   if (orderSuccess) {
     const isVietQr = (orderSuccess.payment_method || paymentMethod) === 'vietqr';
-    const isPaid = orderSuccess.payment_status === 'PAID';
-    const isPacking = orderSuccess.fulfillment_status === 'PACKING' || isPaid;
+    const isDelivered = orderSuccess.fulfillment_status === 'DELIVERED';
+    const isReturned = orderSuccess.fulfillment_status === 'RETURNED';
+    const returnNotesLower = (orderSuccess.return_notes || '').toLowerCase();
+    const isExchange = isReturned && (
+      orderSuccess.return_notes?.includes('ĐỔI HÀNG') || 
+      returnNotesLower.includes('đổi size') || 
+      returnNotesLower.includes('đổi mẫu') || 
+      returnNotesLower.includes('đổi hàng') ||
+      refundMethod === 'EXCHANGE'
+    );
+    const isRefund = isReturned && !isExchange;
+    const isPaid = orderSuccess.payment_status === 'PAID' || isDelivered || isReturned;
+    const isPacking = (orderSuccess.fulfillment_status === 'PACKING' || isPaid) && !isDelivered && !isReturned;
 
     return (
       <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
         <div className="max-w-xl mx-auto bg-white rounded-2xl border border-slate-200/90 shadow-sm p-6 sm:p-10 space-y-7">
           {/* Header & Status Indicator */}
           <div className="text-center space-y-3">
-            {isPaid ? (
+            {isReturned ? (
+              <div className={`w-14 h-14 ${isExchange ? 'bg-blue-600' : 'bg-amber-500'} text-white rounded-full flex items-center justify-center mx-auto shadow-sm`}>
+                <RotateCcw className="w-7 h-7 stroke-[2.5]" />
+              </div>
+            ) : isDelivered ? (
+              <div className="w-14 h-14 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+                <CheckCircle2 className="w-7 h-7" />
+              </div>
+            ) : isPaid ? (
               <div className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
                 <CheckCircle2 className="w-7 h-7" />
               </div>
@@ -770,7 +1006,13 @@ export default function CheckoutPage() {
 
             <div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
-                {isPaid
+                {isExchange
+                  ? 'Đã Tiếp Nhận Yêu Cầu Đổi Hàng'
+                  : isRefund
+                  ? 'Đã Tiếp Nhận Yêu Cầu Trả Hàng (Hoàn Tiền)'
+                  : isDelivered
+                  ? 'Đã Nhận Hàng Thành Công!'
+                  : isPaid
                   ? 'Thanh Toán Thành Công!'
                   : isOrderExpired
                   ? 'Đơn Hàng Đã Hết Hạn'
@@ -785,7 +1027,31 @@ export default function CheckoutPage() {
 
             {/* Current State Badges */}
             <div className="flex items-center justify-center gap-2 pt-1 flex-wrap">
-              {isPaid ? (
+              {isReturned ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Đã thanh toán</span>
+                  </span>
+                  <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-white text-xs font-semibold shadow-xs ${
+                    isExchange ? 'bg-blue-600' : 'bg-amber-600'
+                  }`}>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>{isExchange ? 'Trạng thái: Đang đổi hàng' : 'Trạng thái: Đang trả hàng'}</span>
+                  </span>
+                </>
+              ) : isDelivered ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Đã thanh toán</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-emerald-600 text-white text-xs font-semibold shadow-xs">
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Trạng thái: Đã nhận</span>
+                  </span>
+                </>
+              ) : isPaid ? (
                 <>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
@@ -819,18 +1085,7 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* PayOS Return Banners */}
-          {searchPaid && (
-            <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl text-xs space-y-1">
-              <div className="font-bold flex items-center gap-1.5 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-                <span>Thanh toán thành công qua cổng PayOS (pay.payos.vn)!</span>
-              </div>
-              <p className="text-[11px] text-emerald-700 leading-relaxed">
-                Hệ thống đã nhận diện giao dịch chuyển khoản tự động. Đơn hàng #{orderSuccess.order_code} đã được chuyển sang trạng thái <strong>Đang chuẩn bị đóng gói & vận chuyển</strong>.
-              </p>
-            </div>
-          )}
+
 
           {searchCancelled && !isPaid && !isOrderExpired && (
             <div className="p-4 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs space-y-2">
@@ -850,7 +1105,7 @@ export default function CheckoutPage() {
               <div className="space-y-1">
                 <h3 className="text-sm font-bold text-rose-900">Đơn hàng đã hết hạn thanh toán (quá 1 tiếng)</h3>
                 <p className="text-xs text-rose-700 leading-relaxed">
-                  Đơn hàng #{orderSuccess.order_code} đã tự động bị xóa khỏi hệ thống. Toàn bộ số lượng sản phẩm đã được hoàn trả lại kho hàng. Quý khách vui lòng chọn mua lại nếu có nhu cầu.
+                  Đơn hàng #{orderSuccess.order_code} đã tự động bị hủy do quá thời gian thanh toán. Quý khách vui lòng chọn mua lại nếu có nhu cầu.
                 </p>
               </div>
               <Link
@@ -866,7 +1121,7 @@ export default function CheckoutPage() {
           {/* Stepper Progress */}
           {!isOrderExpired && (
             <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4">
-              <div className="grid grid-cols-3 gap-2 text-center relative">
+              <div className="grid grid-cols-4 gap-2 text-center relative">
                 {/* Step 1 */}
                 <div className="space-y-1">
                   <div className="w-6 h-6 mx-auto rounded-full bg-slate-900 text-white text-[11px] flex items-center justify-center font-bold">
@@ -890,10 +1145,10 @@ export default function CheckoutPage() {
                     {isPaid ? '✓' : isVietQr ? '2' : 'COD'}
                   </div>
                   <div className="text-[11px] font-bold text-slate-900">
-                    {isVietQr ? (isPaid ? '2. Đã thanh toán' : '2. Chờ chuyển khoản') : '2. Thu tiền mặt'}
+                    {isVietQr ? (isPaid ? '2. Thanh toán' : '2. Chờ CK') : '2. Thu COD'}
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    {isVietQr ? (isPaid ? 'Giao dịch thành công' : 'Quét mã PayOS') : 'Khi nhận hàng'}
+                    {isVietQr ? (isPaid ? 'Thành công' : 'Quét PayOS') : 'Khi nhận'}
                   </div>
                 </div>
 
@@ -901,21 +1156,147 @@ export default function CheckoutPage() {
                 <div className="space-y-1">
                   <div
                     className={`w-6 h-6 mx-auto rounded-full text-[11px] flex items-center justify-center font-bold transition-all ${
-                      isPacking
+                      isDelivered || isReturned
+                        ? 'bg-slate-900 text-white'
+                        : isPacking
                         ? 'bg-slate-900 text-white ring-2 ring-slate-300'
                         : 'bg-slate-100 text-slate-400 border border-slate-200'
                     }`}
                   >
-                    {isPacking ? '3' : '○'}
+                    {isDelivered || isReturned ? '✓' : isPacking ? '3' : '○'}
                   </div>
-                  <div className={`text-[11px] font-bold ${isPacking ? 'text-slate-900' : 'text-slate-400'}`}>
-                    3. Chờ vận chuyển
+                  <div className={`text-[11px] font-bold ${isPacking || isDelivered || isReturned ? 'text-slate-900' : 'text-slate-400'}`}>
+                    3. Vận chuyển
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    {isPacking ? 'Chuẩn bị đóng gói' : 'Chờ hoàn tất thanh toán'}
+                    {isDelivered || isReturned ? 'Đã giao tới bạn' : isPacking ? 'Chuẩn bị gói' : 'Chờ hoàn tất'}
+                  </div>
+                </div>
+
+                {/* Step 4 */}
+                <div className="space-y-1">
+                  <div
+                    className={`w-6 h-6 mx-auto rounded-full text-[11px] flex items-center justify-center font-bold transition-all ${
+                      isReturned
+                        ? 'bg-amber-500 text-white ring-2 ring-amber-200'
+                        : isDelivered
+                        ? 'bg-emerald-600 text-white ring-2 ring-emerald-200'
+                        : isPacking
+                        ? 'bg-slate-100 text-slate-700 border border-slate-300 ring-2 ring-emerald-400/40'
+                        : 'bg-slate-100 text-slate-400 border border-slate-200'
+                    }`}
+                  >
+                    {isReturned ? '↩' : isDelivered ? '✓' : '4'}
+                  </div>
+                  <div className={`text-[11px] font-bold ${isReturned ? 'text-amber-700' : isDelivered ? 'text-emerald-700' : isPacking ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {isReturned ? '4. Hoàn hàng' : '4. Đã nhận'}
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {isReturned ? 'Đang xử lý' : isDelivered ? 'Hoàn thành' : 'Khách xác nhận'}
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Customer Action Card: Confirm Received */}
+          {!isOrderExpired && (isPaid || !isVietQr) && (
+            <div>
+              {isReturned ? (
+                <div className="p-4 sm:p-5 bg-amber-50/90 border border-amber-200 rounded-2xl flex items-start gap-3.5 text-left shadow-2xs">
+                  <div className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+                    <RotateCcw className="w-5 h-5 stroke-[2.5]" />
+                  </div>
+                  <div className="space-y-1 flex-1">
+                    <h4 className="text-xs font-bold text-amber-950">
+                      Yêu cầu đổi / hoàn hàng đang được xử lý!
+                    </h4>
+                    <p className="text-[11px] text-amber-800 leading-relaxed">
+                      Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được ghi nhận vào hệ thống. Đội ngũ CSKH DE&apos;GENT sẽ liên hệ với bạn trong vòng 24 giờ làm việc để hỗ trợ thu hồi kiện hàng và thực hiện đổi hàng/hoàn tiền.
+                    </p>
+                  </div>
+                </div>
+              ) : isDelivered ? (
+                <div className="space-y-3">
+                  <div className="p-4 sm:p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3.5 text-left shadow-2xs">
+                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+                      <Check className="w-5 h-5 stroke-[3]" />
+                    </div>
+                    <div className="space-y-0.5">
+                      <h4 className="text-xs font-bold text-emerald-950">
+                        Bạn đã xác nhận nhận hàng thành công!
+                      </h4>
+                      <p className="text-[11px] text-emerald-800 leading-relaxed">
+                        Đơn hàng #{orderSuccess.order_code} đã hoàn tất. Cảm ơn bạn đã tin tưởng và ủng hộ DE&apos;GENT!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Nút Yêu cầu */}
+                  <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3 text-left">
+                    <div className="space-y-0.5">
+                      <div className="text-xs font-semibold text-slate-900 flex items-center gap-1.5">
+                        <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                        <span>Sản phẩm chưa vừa ý hoặc cần đổi size?</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500">
+                        DE&apos;GENT hỗ trợ đổi hàng hoặc hoàn hàng trong vòng 7 ngày kể từ khi nhận.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowReturnModal(true)}
+                      className="px-4 py-2 bg-white hover:bg-amber-50 text-amber-900 border border-amber-300 hover:border-amber-400 rounded-lg text-xs font-bold transition-all shadow-2xs shrink-0 cursor-pointer inline-flex items-center gap-1.5 active:scale-95"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-amber-600" />
+                      <span>Yêu cầu</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-4 sm:p-5 bg-gradient-to-br from-emerald-50/90 to-teal-50/50 border border-emerald-200 rounded-2xl space-y-3.5 text-left shadow-2xs">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
+                      <PackageCheck className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1 space-y-0.5">
+                      <h4 className="text-xs font-bold text-slate-950">
+                        Xác nhận nhận hàng
+                      </h4>
+                      <p className="text-[11px] text-slate-600 leading-relaxed">
+                        Khi shipper giao kiện hàng tới và bạn đã kiểm tra sản phẩm ưng ý, hãy nhấn nút bên dưới để xác nhận hoàn tất đơn hàng.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 space-y-2">
+                    <button
+                      type="button"
+                      onClick={handleConfirmReceived}
+                      disabled={isConfirmingDelivery}
+                      className="w-full py-3 px-5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all shadow-sm active:scale-[0.99] disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      {isConfirmingDelivery ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Đang lưu trạng thái...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 stroke-[3]" />
+                          <span>Đã nhận được hàng</span>
+                        </>
+                      )}
+                    </button>
+
+                    {deliveryConfirmError && (
+                      <p className="text-[11px] text-rose-600 text-center font-medium">
+                        {deliveryConfirmError}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -932,10 +1313,10 @@ export default function CheckoutPage() {
                       </div>
                       <div>
                         <div className="text-xs font-bold text-amber-900 uppercase tracking-wide">
-                          Thời gian lưu giữ đơn & giữ hàng trong kho
+                          Thời gian lưu giữ đơn hàng
                         </div>
                         <div className="text-[11px] text-amber-700">
-                          Tự động xóa đơn & hoàn kho nếu không thanh toán sau 1 giờ
+                          Tự động hủy đơn nếu không hoàn tất thanh toán sau 1 giờ
                         </div>
                       </div>
                     </div>
@@ -1235,10 +1616,20 @@ export default function CheckoutPage() {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Đã thanh toán thành công {formatMoney(orderSuccess.total_amount)}</span>
+                  <span>
+                    {isDelivered ? 'Đã hoàn tất đơn hàng' : `Đã thanh toán thành công ${formatMoney(orderSuccess.total_amount)}`}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được chuyển sang trạng thái <strong>Chờ vận chuyển</strong>. Đội ngũ kho CAISHOP đang tiến hành đóng gói và xuất kho.
+                  {isReturned ? (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đang trong tiến trình yêu cầu hoàn hàng / đổi size.</>
+                  ) : isDelivered ? (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được bạn xác nhận nhận hàng thành công.</>
+                  ) : orderSuccess.tracking_code ? (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được bàn giao cho <strong>{orderSuccess.carrier === 'GHTK' ? 'GHTK' : orderSuccess.carrier === 'GHN' ? 'GHN' : 'Viettel Post'}</strong> (Mã: <strong>{orderSuccess.tracking_code}</strong>). Bưu tá đang vận chuyển giao đến bạn.</>
+                  ) : (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được chuyển sang trạng thái <strong>Chờ vận chuyển</strong>. DE&apos;GENT đang chuẩn bị gói hàng và chờ bàn giao với ĐVVC.</>
+                  )}
                 </p>
               </div>
 
@@ -1252,16 +1643,70 @@ export default function CheckoutPage() {
                   <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
                   <span className="font-medium text-slate-900 text-right leading-relaxed">{orderSuccess.shipping_address}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
                   <span className="text-slate-500">Hình thức thanh toán:</span>
                   <span className="font-semibold text-slate-900">VietQR (Đã hoàn tất)</span>
+                </div>
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Đơn vị vận chuyển:</span>
+                  <span className="font-bold text-red-600 flex items-center gap-1.5">
+                    <img
+                      src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                      alt="Viettel Post"
+                      className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
+                    />
+                    {orderSuccess.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : orderSuccess.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : orderSuccess.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Mã vận chuyển:</span>
+                  {orderSuccess.tracking_code ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-slate-900 tracking-wider bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
+                        {orderSuccess.tracking_code}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(orderSuccess.tracking_code);
+                          setCopiedTracking(true);
+                          setTimeout(() => setCopiedTracking(false), 2500);
+                        }}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors"
+                        title="Sao chép mã vận đơn"
+                      >
+                        {copiedTracking ? '✓ Đã chép' : 'Sao chép'}
+                      </button>
+                      <a
+                        href={
+                          orderSuccess.carrier === 'GHTK'
+                            ? `https://i.ghtk.vn/${orderSuccess.tracking_code}`
+                            : orderSuccess.carrier === 'GHN'
+                            ? `https://tracking.ghn.vn/?order_code=${orderSuccess.tracking_code}`
+                            : `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${orderSuccess.tracking_code}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-slate-500 hover:text-slate-800 underline ml-0.5"
+                        title="Tra cứu bưu gửi trực tiếp trên ĐVVC"
+                      >
+                        Tra cứu
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span>Đang chờ bàn giao với ĐVVC</span>
+                    </span>
+                  )}
                 </div>
               </div>
 
               {isHcmInnerCity && (
                 <div className="text-[11px] text-slate-700 bg-white border border-slate-200 p-3 rounded-lg flex items-center gap-2">
                   <Truck className="w-4 h-4 text-slate-600 shrink-0" />
-                  <span>Đơn nội thành TP.HCM: <strong>Shipper riêng của CAISHOP</strong> sẽ liên hệ và giao hàng tận nơi.</span>
+                  <span>Đơn nội thành TP.HCM: <strong>Shipper riêng của DE&apos;GENT</strong> sẽ liên hệ và giao hàng tận nơi.</span>
                 </div>
               )}
             </div>
@@ -1272,11 +1717,23 @@ export default function CheckoutPage() {
             <div className="border border-slate-200 rounded-xl p-5 sm:p-6 bg-slate-50/70 text-left space-y-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
-                  <Truck className="w-4 h-4 text-slate-800" />
-                  <span>Giao hàng nội thành TP.HCM (Thu tiền mặt COD)</span>
+                  {isDelivered ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  ) : (
+                    <Truck className="w-4 h-4 text-slate-800" />
+                  )}
+                  <span>
+                    {isDelivered ? 'Đã nhận hàng & Đã thanh toán (COD)' : 'Giao hàng nội thành TP.HCM (Thu tiền mặt COD)'}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
-                  Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được tiếp nhận và chuyển sang trạng thái <strong>Chờ vận chuyển</strong>. Shipper riêng của CAISHOP sẽ liên hệ trước khi giao.
+                  {isReturned ? (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đang trong tiến trình yêu cầu hoàn hàng / đổi size.</>
+                  ) : isDelivered ? (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã hoàn thành. Quý khách đã nhận hàng và thanh toán tiền mặt thành công.</>
+                  ) : (
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được tiếp nhận và chuyển sang trạng thái <strong>Chờ vận chuyển</strong>. Shipper riêng của DE&apos;GENT sẽ liên hệ trước khi giao.</>
+                  )}
                 </p>
               </div>
 
@@ -1289,9 +1746,63 @@ export default function CheckoutPage() {
                   <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
                   <span className="font-medium text-slate-900 text-right leading-relaxed">{orderSuccess.shipping_address}</span>
                 </div>
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
                   <span className="text-slate-500">Người nhận:</span>
                   <span className="font-semibold text-slate-900">{orderSuccess.customer_name} ({orderSuccess.customer_phone})</span>
+                </div>
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Đơn vị vận chuyển:</span>
+                  <span className="font-bold text-red-600 flex items-center gap-1.5">
+                    <img
+                      src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = '/viettelpost-logo.jpg'; }}
+                      alt="Viettel Post"
+                      className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
+                    />
+                    {orderSuccess.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : orderSuccess.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : orderSuccess.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">Mã vận chuyển:</span>
+                  {orderSuccess.tracking_code ? (
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-slate-900 tracking-wider bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
+                        {orderSuccess.tracking_code}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(orderSuccess.tracking_code);
+                          setCopiedTracking(true);
+                          setTimeout(() => setCopiedTracking(false), 2500);
+                        }}
+                        className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 cursor-pointer px-1.5 py-0.5 rounded hover:bg-blue-50 transition-colors"
+                        title="Sao chép mã vận đơn"
+                      >
+                        {copiedTracking ? '✓ Đã chép' : 'Sao chép'}
+                      </button>
+                      <a
+                        href={
+                          orderSuccess.carrier === 'GHTK'
+                            ? `https://i.ghtk.vn/${orderSuccess.tracking_code}`
+                            : orderSuccess.carrier === 'GHN'
+                            ? `https://tracking.ghn.vn/?order_code=${orderSuccess.tracking_code}`
+                            : `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${orderSuccess.tracking_code}`
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] text-slate-500 hover:text-slate-800 underline ml-0.5"
+                        title="Tra cứu bưu gửi trực tiếp trên ĐVVC"
+                      >
+                        Tra cứu
+                      </a>
+                    </div>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      <span>Đang chờ bàn giao với ĐVVC</span>
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -1305,6 +1816,16 @@ export default function CheckoutPage() {
             >
               Tiếp tục mua sắm
             </Link>
+            {isDelivered && !isReturned && (
+              <button
+                type="button"
+                onClick={() => setShowReturnModal(true)}
+                className="py-3 px-5 rounded-lg border border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 text-xs font-bold text-center transition-colors inline-flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                <span>Yêu cầu</span>
+              </button>
+            )}
             <Link
               href="/products"
               className="py-3 px-4 rounded-lg border border-slate-200 text-slate-700 text-xs font-medium text-center hover:bg-slate-50 transition-colors"
@@ -1312,6 +1833,281 @@ export default function CheckoutPage() {
               Xem bộ sưu tập
             </Link>
           </div>
+
+          {/* Modal: Yêu cầu Đổi hàng & Hoàn hàng */}
+          {showReturnModal && (
+            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
+              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 text-left space-y-5 my-8">
+                <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">
+                      Yêu Cầu Đổi / Hoàn Hàng
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Đơn hàng #{orderSuccess.order_code} • Khách hàng {orderSuccess.customer_name}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowReturnModal(false);
+                      setConfirmReturnStep(false);
+                    }}
+                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {returnSuccessMessage ? (
+                  <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2.5 animate-in fade-in duration-200">
+                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto">
+                      <Check className="w-5 h-5 stroke-[3]" />
+                    </div>
+                    <h4 className="text-sm font-bold text-emerald-950">Gửi Yêu Cầu Thành Công!</h4>
+                    <p className="text-xs text-emerald-800 leading-relaxed font-medium">
+                      {returnSuccessMessage}
+                    </p>
+                  </div>
+                ) : confirmReturnStep ? (
+                  <div className="p-5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="space-y-2 text-center">
+                      <div className="text-sm font-semibold text-slate-900 leading-relaxed px-1">
+                        &ldquo;Chúng tôi sẽ liên hệ {refundMethod === 'EXCHANGE' ? 'đổi hàng' : 'hoàn hàng'} qua <span className="font-bold text-slate-950 underline decoration-amber-500 decoration-2">{contactPhone || orderSuccess?.customer_phone || user?.phone}</span> này nhé, bạn nhớ để ý điện thoại nhé&rdquo;
+                      </div>
+                      <p className="text-xs text-slate-600">
+                        Đội ngũ Chăm sóc khách hàng DE&apos;GENT sẽ liên hệ qua Zalo / cuộc gọi để xác nhận chi tiết và cử shipper đến nhận hàng tận nơi.
+                      </p>
+                    </div>
+
+                    {returnError && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+                        ⚠ {returnError}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-center gap-2.5 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmReturnStep(false)}
+                        disabled={isSubmittingReturn}
+                        className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 transition-colors cursor-pointer"
+                      >
+                        Chỉnh sửa lại
+                      </button>
+                      <button
+                        type="button"
+                        onClick={proceedSendReturnRequest}
+                        disabled={isSubmittingReturn}
+                        className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        {isSubmittingReturn ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Đang gửi yêu cầu...</span>
+                          </>
+                        ) : (
+                          <span>Xác nhận gửi yêu cầu</span>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handlePreSendReturnRequest} className="space-y-4">
+                    {/* 1. Chọn Đổi hàng hoặc Hoàn hàng */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                        1. Bạn muốn đổi hàng hay hoàn hàng?
+                      </label>
+                      <div className="grid grid-cols-2 gap-2.5">
+                        <button
+                          type="button"
+                          onClick={() => setRefundMethod('EXCHANGE')}
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            refundMethod === 'EXCHANGE'
+                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wide">Đổi hàng</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${refundMethod === 'EXCHANGE' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>Miễn phí</span>
+                          </div>
+                          <div className={`text-[11px] mt-1 ${refundMethod === 'EXCHANGE' ? 'text-slate-300' : 'text-slate-500'}`}>
+                            Đổi size vừa vặn hoặc đổi sang mẫu khác
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setRefundMethod('REFUND')}
+                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                            refundMethod === 'REFUND'
+                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
+                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wide">Hoàn hàng</span>
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${refundMethod === 'REFUND' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>Trả hàng</span>
+                          </div>
+                          <div className={`text-[11px] mt-1 ${refundMethod === 'REFUND' ? 'text-slate-300' : 'text-slate-500'}`}>
+                            Thu hồi sản phẩm & nhận tiền qua ngân hàng
+                          </div>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* 2. Lý do hoàn hàng */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                        2. Lý do hoàn trả:
+                      </label>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                        {[
+                          { id: 'TIGHT', label: 'Mặc bị chật / Kích size' },
+                          { id: 'LOOSE', label: 'Mặc bị rộng / Dài' },
+                          { id: 'DEFECT', label: 'Sản phẩm lỗi may / lỗi vải' },
+                          { id: 'WRONG_ITEM', label: 'Giao sai mẫu / sai size' },
+                          { id: 'OTHER', label: 'Lý do khác (không hợp...)' },
+                        ].map(r => (
+                          <label
+                            key={r.id}
+                            className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
+                              returnReason === r.id
+                                ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
+                                : 'border-slate-200 hover:bg-slate-50/50 text-slate-600'
+                            }`}
+                          >
+                            <input
+                              type="radio"
+                              name="return_reason"
+                              value={r.id}
+                              checked={returnReason === r.id}
+                              onChange={() => setReturnReason(r.id)}
+                              className="accent-slate-900"
+                            />
+                            <span>{r.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* 3. Số điện thoại liên hệ (có sử dụng Zalo) */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
+                        <span>3. Số điện thoại liên hệ (có Zalo):</span>
+                        <span className="text-[11px] font-normal text-emerald-600 flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
+                          Số đăng ký
+                        </span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="Ví dụ: 0912345678 (số có dùng Zalo)"
+                        value={contactPhone}
+                        onChange={e => setContactPhone(e.target.value)}
+                        className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:border-slate-900 focus:outline-none"
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        Shop sẽ liên hệ qua Zalo hoặc gọi đến số này để xác nhận hỗ trợ đổi trả tận nơi.
+                      </p>
+                    </div>
+
+                    {/* 4. Nếu chọn Hoàn tiền: Nhập STK */}
+                    {refundMethod === 'REFUND' && (
+                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
+                        <div className="text-xs font-bold text-slate-900">
+                          Thông tin nhận tiền hoàn:
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          <div>
+                            <label className="text-[11px] text-slate-500 block mb-1">Tên ngân hàng:</label>
+                            <input
+                              type="text"
+                              placeholder="Ví dụ: Vietcombank, MB..."
+                              value={bankName}
+                              onChange={e => setBankName(e.target.value)}
+                              className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded text-xs focus:border-slate-900 focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[11px] text-slate-500 block mb-1">Số tài khoản:</label>
+                            <input
+                              type="text"
+                              placeholder="Số tài khoản ngân hàng"
+                              value={bankAccount}
+                              onChange={e => setBankAccount(e.target.value)}
+                              className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded text-xs font-mono focus:border-slate-900 focus:outline-none"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-[11px] text-slate-500 block mb-1">Tên chủ tài khoản:</label>
+                          <input
+                            type="text"
+                            placeholder="NGUYEN VAN A"
+                            value={accountHolder}
+                            onChange={e => setAccountHolder(e.target.value)}
+                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded text-xs uppercase focus:border-slate-900 focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* 5. Ghi chú chi tiết */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                        {refundMethod === 'REFUND' ? '5.' : '4.'} Ghi chú chi tiết (nếu có):
+                      </label>
+                      <textarea
+                        rows={2}
+                        placeholder="Ví dụ: Áo mặc bị chật vai, muốn đổi sang size XL cùng màu..."
+                        value={returnNotes}
+                        onChange={e => setReturnNotes(e.target.value)}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs focus:border-slate-900 focus:outline-none leading-relaxed"
+                      />
+                    </div>
+
+                    {/* Policy note */}
+                    <div className="p-3 bg-slate-50 rounded-lg text-[11px] text-slate-500 leading-relaxed">
+                      ✓ Cam kết chính sách DE&apos;GENT: Hỗ trợ đổi trả miễn phí trong 7 ngày nếu sản phẩm chưa qua giặt tẩy, còn nguyên tem mác. Shipper sẽ liên hệ nhận hàng tận nhà.
+                    </div>
+
+                    {returnError && (
+                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
+                        ⚠ {returnError}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div className="pt-2 flex items-center justify-end gap-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowReturnModal(false);
+                          setConfirmReturnStep(false);
+                        }}
+                        disabled={isSubmittingReturn}
+                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 transition-colors cursor-pointer"
+                      >
+                        Hủy bỏ
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={isSubmittingReturn}
+                        className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        <span>{refundMethod === 'EXCHANGE' ? 'Gửi Yêu Cầu Đổi Hàng' : 'Gửi Yêu Cầu Hoàn Hàng'}</span>
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -1541,6 +2337,84 @@ export default function CheckoutPage() {
                     </div>
                   </div>
 
+                  {/* Facebook Freeship Hunt Deal Banner */}
+                  {fbConfig?.is_enabled && (
+                    <div className={`rounded-xl border transition-all ${
+                      isFbFreeshipActive
+                        ? 'border-emerald-200/90 bg-emerald-50/60 p-3.5 shadow-2xs'
+                        : 'border-slate-200/90 bg-slate-50/70 hover:bg-slate-50 hover:border-slate-300 p-3.5 shadow-2xs'
+                    }`}>
+                      <div className="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${
+                            isFbFreeshipActive ? 'bg-emerald-700 text-white' : 'bg-slate-900 text-white'
+                          }`}>
+                            {isFbFreeshipActive ? <CheckCircle2 className="w-4 h-4" /> : <ThumbsUp className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-slate-900">
+                                {isFbFreeshipActive ? 'Đã kích hoạt Deal Freeship Facebook' : (fbConfig?.badge_label || 'Săn Deal Freeship 0₫')}
+                              </span>
+                              <span className={`text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold uppercase ${
+                                isFbFreeshipActive
+                                  ? 'bg-emerald-200/90 text-emerald-900'
+                                  : 'bg-slate-200/80 text-slate-700'
+                              }`}>
+                                {isFbFreeshipActive ? `@${fbVerifiedProfileName || 'Đã like'}` : 'Chia sẻ & Like'}
+                              </span>
+                              {!isFbFreeshipActive && (
+                                <span className="text-[10px] font-mono text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/70 px-1.5 py-0.5 rounded">
+                                  -40.000₫
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                              {isFbFreeshipActive
+                                ? (hcmShippingType === 'express' ? 'Đã giảm 40.000₫ vào phí Ship nhanh hỏa tốc.' : 'Đã miễn phí vận chuyển 0₫ cho đơn hàng này.')
+                                : 'Chia sẻ bài viết cho bạn bè bấm Like để nhận ngay Freeship 0₫ cho đơn hàng này.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          {isFbFreeshipActive ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setIsFbModalOpen(true)}
+                                className="text-[11px] text-emerald-900 hover:underline font-semibold cursor-pointer"
+                              >
+                                Xem chi tiết
+                              </button>
+                              <span className="text-slate-300 text-xs">•</span>
+                              <button
+                                type="button"
+                                onClick={handleRemoveFbFreeship}
+                                className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="Bỏ áp dụng deal này"
+                              >
+                                Hủy áp dụng
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsFbModalOpen(true);
+                                setFbVerifyError('');
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                              <span>Chia sẻ nhận Freeship</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-2.5">
                     {/* Option 1: Ship thường 40k */}
                     <label
@@ -1564,7 +2438,7 @@ export default function CheckoutPage() {
                             Ship thường
                           </span>
                           <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
-                            Giao linh hoạt trong ngày theo tuyến đường của shipper riêng CAISHOP.
+                            Giao linh hoạt trong ngày theo tuyến đường của shipper riêng DE&apos;GENT.
                           </p>
                         </div>
                       </div>
@@ -1700,27 +2574,107 @@ export default function CheckoutPage() {
                 </div>
               ) : (
                 /* Standard Shipping Partner for outer regions */
-                <div className="p-4 rounded-xl border border-slate-200/90 bg-white flex items-center justify-between gap-3 shadow-xs">
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-700">
-                      <Truck className="w-4 h-4" />
-                    </div>
-                    <div>
-                      <div className="text-xs font-bold text-slate-900">
-                        Đơn vị vận chuyển tiêu chuẩn
+                <div className="space-y-3">
+                  {/* Facebook Freeship Hunt Deal Banner for outer regions */}
+                  {fbConfig?.is_enabled && (
+                    <div className={`rounded-xl border transition-all ${
+                      isFbFreeshipActive
+                        ? 'border-emerald-200/90 bg-emerald-50/60 p-3.5 shadow-2xs'
+                        : 'border-slate-200/90 bg-slate-50/70 hover:bg-slate-50 hover:border-slate-300 p-3.5 shadow-2xs'
+                    }`}>
+                      <div className="flex items-start sm:items-center justify-between gap-3 flex-col sm:flex-row">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-2xs ${
+                            isFbFreeshipActive ? 'bg-emerald-700 text-white' : 'bg-slate-900 text-white'
+                          }`}>
+                            {isFbFreeshipActive ? <CheckCircle2 className="w-4 h-4" /> : <ThumbsUp className="w-4 h-4" />}
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-xs font-bold text-slate-900">
+                                {isFbFreeshipActive ? 'Đã kích hoạt Deal Freeship Facebook' : (fbConfig?.badge_label || 'Săn Deal Freeship 0₫')}
+                              </span>
+                              <span className={`text-[10px] font-mono tracking-wider px-2 py-0.5 rounded-full font-semibold uppercase ${
+                                isFbFreeshipActive
+                                  ? 'bg-emerald-200/90 text-emerald-900'
+                                  : 'bg-slate-200/80 text-slate-700'
+                              }`}>
+                                {isFbFreeshipActive ? `@${fbVerifiedProfileName || 'Đã like'}` : 'Chia sẻ & Like'}
+                              </span>
+                              {!isFbFreeshipActive && (
+                                <span className="text-[10px] font-mono text-emerald-700 font-semibold bg-emerald-50 border border-emerald-200/70 px-1.5 py-0.5 rounded">
+                                  Miễn phí
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                              {isFbFreeshipActive
+                                ? 'Đã miễn phí vận chuyển toàn quốc 0₫ cho đơn hàng này.'
+                                : 'Chia sẻ bài viết cho bạn bè bấm Like để nhận ngay ưu đãi Freeship 0₫ toàn quốc.'}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          {isFbFreeshipActive ? (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setIsFbModalOpen(true)}
+                                className="text-[11px] text-emerald-900 hover:underline font-semibold cursor-pointer"
+                              >
+                                Xem chi tiết
+                              </button>
+                              <span className="text-slate-300 text-xs">•</span>
+                              <button
+                                type="button"
+                                onClick={handleRemoveFbFreeship}
+                                className="text-[11px] text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                                title="Bỏ áp dụng deal này"
+                              >
+                                Hủy áp dụng
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setIsFbModalOpen(true);
+                                setFbVerifyError('');
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-semibold shadow-2xs transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                            >
+                              <Share2 className="w-3.5 h-3.5" />
+                              <span>Chia sẻ nhận Freeship</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
-                        Giao hàng tiêu chuẩn toàn quốc. Mặc định thanh toán Chuyển khoản QR.
-                      </p>
                     </div>
+                  )}
+
+                  <div className="p-4 rounded-xl border border-slate-200/90 bg-white flex items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-slate-100 text-slate-700">
+                        <Truck className="w-4 h-4" />
+                      </div>
+                      <div>
+                        <div className="text-xs font-bold text-slate-900">
+                          Đơn vị vận chuyển tiêu chuẩn
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          Giao hàng tiêu chuẩn toàn quốc. Mặc định thanh toán Chuyển khoản QR.
+                        </p>
+                      </div>
+                    </div>
+                    <span className="text-xs font-semibold text-slate-900 shrink-0 tabular-nums">
+                      {shippingFee === 0 ? (
+                        <span className="text-emerald-600 font-bold">Miễn phí</span>
+                      ) : (
+                        formatMoney(shippingFee)
+                      )}
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold text-slate-900 shrink-0 tabular-nums">
-                    {shippingFee === 0 ? (
-                      <span className="text-emerald-600">Miễn phí</span>
-                    ) : (
-                      formatMoney(shippingFee)
-                    )}
-                  </span>
                 </div>
               )}
 
@@ -1816,7 +2770,7 @@ export default function CheckoutPage() {
                         </div>
                         <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
                           {isHcmInnerCity
-                            ? (paymentSettings.cod_note || 'Đơn hàng được giao bởi shipper riêng của CAISHOP. Quý khách thanh toán tiền mặt trực tiếp cho shipper khi nhận hàng.')
+                            ? (paymentSettings.cod_note || "Đơn hàng được giao bởi shipper riêng của DE'GENT. Quý khách thanh toán tiền mặt trực tiếp cho shipper khi nhận hàng.")
                             : 'Chỉ hỗ trợ COD cho đơn nội thành TP.HCM (Trước sáp nhập) do có shipper riêng của shop đi giao. Các khu vực khác mặc định thanh toán Chuyển khoản QR.'}
                         </p>
                       </div>
@@ -2024,7 +2978,11 @@ export default function CheckoutPage() {
                   <span>Phí vận chuyển:</span>
                   <span className="tabular-nums font-medium text-slate-800">
                     {isFreeshipDeal && shippingFee === 0
-                      ? 'Miễn phí (Voucher Freeship)'
+                      ? isFbFreeshipActive
+                        ? 'Miễn phí (Deal Like Facebook)'
+                        : 'Miễn phí (Voucher Freeship)'
+                      : isFbFreeshipActive && hcmShippingType === 'express'
+                      ? `${formatMoney(shippingFee)} (Đã giảm 40k từ Deal FB)`
                       : shippingFee === 0
                       ? 'Miễn phí'
                       : formatMoney(shippingFee)}
@@ -2057,6 +3015,250 @@ export default function CheckoutPage() {
               <p className="text-xs text-slate-500 leading-relaxed">
                 Đang kết nối cổng thanh toán bảo mật <strong>pay.payos.vn</strong>. Vui lòng chờ trong giây lát...
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Facebook Freeship Modal */}
+      {isFbModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-8">
+            {/* Modal Header: High-End Minimalist Atelier Carbon Black */}
+            <div className="p-6 bg-[#0a0a0a] text-white relative">
+              <button
+                type="button"
+                onClick={() => setIsFbModalOpen(false)}
+                className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/5 hover:bg-white/15 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="pr-8">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/10 text-slate-200 font-mono text-[10px] uppercase tracking-wider">
+                    DE&apos;GENT Atelier
+                  </span>
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-[10px] font-mono text-emerald-300 font-semibold tracking-wide">
+                    Tiết kiệm 40.000₫
+                  </span>
+                </div>
+                <h3 className="text-base font-bold text-white tracking-tight mt-2.5">
+                  Săn Deal Freeship 0₫ (Chia sẻ bài viết & Nhờ bạn Like)
+                </h3>
+                <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                  {fbConfig?.instructions || 'Chia sẻ bài viết đến bạn bè, nhờ bạn bè bấm Like để nhận ưu đãi Miễn phí vận chuyển.'}
+                </p>
+              </div>
+
+              {/* Step indicator: Clean, Quiet Minimalist Timeline */}
+              <div className="flex items-center justify-between gap-1 mt-5 pt-4 border-t border-white/10 text-[11px]">
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-white text-black text-[10px] font-bold flex items-center justify-center shrink-0">
+                    1
+                  </span>
+                  <span className="font-semibold text-white">Chia sẻ bài viết</span>
+                </div>
+                <div className="h-[1px] flex-1 bg-white/15 mx-2 min-w-4" />
+                <div className="flex items-center gap-2">
+                  <span className="w-5 h-5 rounded-full bg-white/15 text-slate-300 text-[10px] font-bold flex items-center justify-center shrink-0 border border-white/20">
+                    2
+                  </span>
+                  <span className="font-medium text-slate-400">Bạn bè bấm Like</span>
+                </div>
+                <div className="h-[1px] flex-1 bg-white/15 mx-2 min-w-4" />
+                <div className="flex items-center gap-2">
+                  <span className={`w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center shrink-0 ${
+                    isFbFreeshipActive ? 'bg-emerald-500 text-white' : 'bg-white/15 text-slate-300 border border-white/20'
+                  }`}>
+                    3
+                  </span>
+                  <span className={`font-medium ${isFbFreeshipActive ? 'text-emerald-400 font-semibold' : 'text-slate-400'}`}>
+                    Dán link & Nhận 0₫
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5 bg-white">
+              {/* If already verified, show quiet success card */}
+              {isFbFreeshipActive ? (
+                <div className="p-5 rounded-xl bg-emerald-50/70 border border-emerald-200 text-slate-800 space-y-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-lg bg-emerald-700 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                      <CheckCircle2 className="w-5 h-5" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="text-sm font-bold text-emerald-950">
+                        Ưu đãi Freeship 0₫ đã kích hoạt thành công!
+                      </h4>
+                      <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                        Hệ thống đã xác nhận tài khoản: <strong className="font-mono text-emerald-950">@{fbVerifiedProfileName}</strong> đã Like bài viết được bạn chia sẻ.
+                      </p>
+                      <div className="mt-2 text-[11px] text-emerald-900 font-mono bg-emerald-100/70 p-2 rounded-md border border-emerald-200/60">
+                        {hcmShippingType === 'express'
+                          ? 'Phí Ship nhanh TP.HCM: Đã giảm 40.000₫ từ 100.000₫ xuống 60.000₫'
+                          : 'Phí Vận chuyển: 0₫ (Miễn phí 100%)'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-3 border-t border-emerald-200 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={handleRemoveFbFreeship}
+                      className="text-xs text-slate-500 hover:text-rose-600 transition-colors cursor-pointer"
+                    >
+                      Hủy ưu đãi / Đổi tài khoản khác
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsFbModalOpen(false)}
+                      className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-semibold uppercase tracking-wider rounded-lg cursor-pointer transition-colors shadow-2xs"
+                    >
+                      Xong, tiếp tục đơn hàng
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Step 1 Box: Vào bài viết và chia sẻ đến người khác */}
+                  <div className="p-4 rounded-xl bg-slate-50/80 border border-slate-200/90 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                        <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] flex items-center justify-center font-bold">1</span>
+                        <span>Vào bài viết và chia sẻ đến người khác</span>
+                      </span>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-slate-600 font-semibold bg-slate-200/80 px-2 py-0.5 rounded">
+                        Chia sẻ & Nhờ like
+                      </span>
+                    </div>
+
+                    <div className="p-3.5 bg-white rounded-lg border border-slate-200/90 space-y-1.5">
+                      <div className="text-xs font-bold text-slate-900 leading-snug">
+                        {fbConfig?.facebook_post_title || "BST Áo Thun & Quần May Đo Heavy Cotton 2026 - DE'GENT"}
+                      </div>
+                      <div className="text-[11px] font-mono text-slate-500 break-all select-all bg-slate-50 px-2 py-1 rounded border border-slate-200/60">
+                        {fbConfig?.facebook_post_url}
+                      </div>
+                    </div>
+
+                    {/* Action buttons: Vào bài viết chia sẻ & Copy link gửi bạn bè */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-0.5">
+                      <a
+                        href={fbConfig?.facebook_post_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center justify-center gap-2 h-10 px-4 bg-slate-900 hover:bg-black text-white text-xs font-semibold rounded-lg transition-all cursor-pointer shadow-2xs active:scale-[0.99]"
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                        <span>Vào bài viết & Bấm Chia sẻ</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyFbPost}
+                        className={`inline-flex items-center justify-center gap-2 h-10 px-4 border text-xs font-semibold rounded-lg transition-all cursor-pointer active:scale-[0.99] ${
+                          fbPostCopied
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
+                            : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-800 shadow-2xs'
+                        }`}
+                      >
+                        {fbPostCopied ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Đã sao chép link!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5 text-slate-500" />
+                            <span>Sao chép link gửi bạn bè</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="text-[11px] text-slate-600 leading-relaxed bg-white p-3 rounded-lg border border-slate-200/70 space-y-1">
+                      <p className="font-semibold text-slate-800">👉 Hướng dẫn thực hiện:</p>
+                      <p>1. Bấm <strong>&quot;Vào bài viết & Bấm Chia sẻ&quot;</strong> hoặc bấm <strong>&quot;Sao chép link gửi bạn bè&quot;</strong> để gửi liên kết bài viết qua Messenger, Zalo hoặc Facebook.</p>
+                      <p>2. Người bạn đó mở bài viết và bấm <strong>Like</strong> 👍 bài viết của shop.</p>
+                    </div>
+                  </div>
+
+                  {/* Step 2 Box: Dán link profile của người đã Like để kiểm tra */}
+                  <div className="space-y-3 pt-1">
+                    <span className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                      <span className="w-4 h-4 rounded-full bg-slate-900 text-white text-[9px] flex items-center justify-center font-bold">2</span>
+                      <span>Dán link Facebook của người đã Like bài viết:</span>
+                    </span>
+
+                    <div className="space-y-2">
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={fbProfileUrl}
+                          onChange={(e) => {
+                            setFbProfileUrl(e.target.value);
+                            setFbVerifyError('');
+                          }}
+                          placeholder="Dán link Facebook người đã Like (VD: https://facebook.com/ten_cua_ban_be)"
+                          className="w-full h-11 pl-3.5 pr-24 text-xs font-mono bg-slate-50/70 border border-slate-200 rounded-lg focus:outline-none focus:border-slate-900 focus:bg-white focus:ring-1 focus:ring-slate-900 text-slate-900 transition-all placeholder:text-slate-400 placeholder:font-sans"
+                        />
+                        {/* Quick paste button */}
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              const text = await navigator.clipboard.readText();
+                              if (text) {
+                                setFbProfileUrl(text);
+                                setFbVerifyError('');
+                              }
+                            } catch (e) {
+                              // Clipboard read not permitted in this context
+                            }
+                          }}
+                          className="absolute right-1.5 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-100 rounded-md border border-slate-200 transition-colors shadow-2xs cursor-pointer"
+                        >
+                          Dán nhanh
+                        </button>
+                      </div>
+
+                      <div className="text-[11px] text-slate-500 space-y-1 px-0.5">
+                        <p className="font-medium text-slate-700">📌 Lấy link cá nhân của người đã Like:</p>
+                        <p>• Dán link Facebook của người bạn mà bạn đã nhờ Like bài viết (hoặc link tài khoản của bạn nếu tự like).</p>
+                        <p>• Cách lấy: Vào trang cá nhân của tài khoản đó &gt; Bấm dấu ba chấm <strong>(...)</strong> &gt; Chọn <strong>&quot;Sao chép liên kết vào trang cá nhân&quot;</strong>.</p>
+                      </div>
+                    </div>
+
+                    {/* Error Alert */}
+                    {fbVerifyError && (
+                      <div className="p-3 rounded-lg bg-rose-50 border border-rose-200 flex items-start gap-2 text-rose-700 text-xs">
+                        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                        <span>{fbVerifyError}</span>
+                      </div>
+                    )}
+
+                    {/* Verify Button */}
+                    <button
+                      type="button"
+                      onClick={handleVerifyFbLike}
+                      disabled={isVerifyingFb}
+                      className="w-full h-12 bg-[#0a0a0a] hover:bg-black text-white text-xs font-bold uppercase tracking-wider rounded-xl transition-all active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2 shadow-xs mt-2"
+                    >
+                      {isVerifyingFb ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Đang kiểm tra tài khoản đã Like bài viết...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span>Kiểm tra Like & Nhận Deal Freeship 0₫</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

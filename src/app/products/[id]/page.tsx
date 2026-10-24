@@ -8,8 +8,8 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     return { title: 'Product Not Found — ATELIER' };
   }
   return {
-    title: `${product.name} — ATELIER / CAISHOP`,
-    description: product.description || 'Chi tiết sản phẩm thời trang cao cấp CAISHOP ATELIER.'
+    title: `${product.name} — DE'GENT`,
+    description: product.description || "Chi tiết sản phẩm thời trang cao cấp DE'GENT."
   };
 }
 

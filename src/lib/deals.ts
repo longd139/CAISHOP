@@ -22,7 +22,7 @@ export const AVAILABLE_DEALS: CustomDeal[] = [
     is_active: true
   },
   {
-    code: 'CAISHOP50K',
+    code: 'DEGENT50K',
     title: 'Voucher Độc Quyền Tài Khoản',
     discount: 'Giảm 50.000đ',
     discount_amount: 50000,
@@ -32,7 +32,7 @@ export const AVAILABLE_DEALS: CustomDeal[] = [
     is_active: true
   },
   {
-    code: 'CAISHOP100K',
+    code: 'DEGENT100K',
     title: 'Ưu Đãi Đơn Hàng VIP',
     discount: 'Giảm 100.000đ',
     discount_amount: 100000,
