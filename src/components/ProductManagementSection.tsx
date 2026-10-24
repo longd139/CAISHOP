@@ -1508,7 +1508,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-800">
                         <ImageIcon className="w-4 h-4 text-slate-600" />
-                        <span>Bộ 5 hình ảnh chi tiết sản phẩm (Góc chụp lookbook)</span>
+                        <span>Bộ 5 hình ảnh chi tiết sản phẩm (Khuyên dùng: 800 × 1000 px • Tỷ lệ 4:5)</span>
                       </div>
                       <span className="text-[11px] font-mono text-slate-500">
                         {imageUrls.filter(Boolean).length} / 5 ảnh đã nhập
@@ -1555,11 +1555,19 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                                 </button>
                               </>
                             ) : (
-                              <div className="text-center p-2 text-slate-300 flex flex-col items-center">
+                              <div className="text-center p-2 text-slate-400 flex flex-col items-center justify-center h-full select-none">
                                 <ImageIcon className="w-6 h-6 stroke-1 mb-1 text-slate-300" />
-                                <span className="text-[9px] font-mono text-slate-400 leading-tight">
+                                <span className="text-[10px] font-mono text-slate-600 font-semibold leading-tight">
                                   {slot.label}
                                 </span>
+                                <div className="mt-2 flex flex-col items-center gap-0.5">
+                                  <span className="text-[9px] font-mono text-slate-500 font-bold px-1.5 py-0.5 bg-slate-100/90 rounded border border-slate-200/80">
+                                    800 × 1000 px
+                                  </span>
+                                  <span className="text-[8px] font-mono text-slate-400">
+                                    (Tỷ lệ 4:5)
+                                  </span>
+                                </div>
                               </div>
                             )}
                           </div>
@@ -1567,7 +1575,7 @@ export default function ProductManagementSection({ onDataChanged }: ProductManag
                           {/* URL input */}
                           <input
                             type="url"
-                            placeholder="Dán link ảnh..."
+                            placeholder="Dán link ảnh (800 × 1000)..."
                             value={imageUrls[idx]}
                             onChange={e => handleImageChange(idx, e.target.value)}
                             className="w-full px-2 py-1 text-[11px] border border-slate-200 rounded focus:outline-none focus:ring-1 focus:ring-slate-900 bg-white font-mono"
