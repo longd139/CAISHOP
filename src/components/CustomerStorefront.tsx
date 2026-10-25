@@ -68,18 +68,22 @@ export default function CustomerStorefront() {
 
   const displayedProducts = useMemo(() => {
     if (products.length === 0) return [];
-    if (hotMode === 'all') return products;
+    if (hotMode === 'all') return products.slice(0, 10);
 
     if (hotProductIds && hotProductIds.length > 0) {
       const productMap = new Map(products.map((p) => [p.id, p]));
       const selected = hotProductIds
         .map((id) => productMap.get(id))
         .filter((p): p is Product => Boolean(p));
-      if (selected.length > 0) return selected;
+
+      // Ưu tiên các sản phẩm hot được chọn, sau đó bù thêm các sản phẩm còn lại cho đủ tối đa 10 sản phẩm (2 hàng x 5)
+      const selectedSet = new Set(selected.map((p) => p.id));
+      const remaining = products.filter((p) => !selectedSet.has(p.id));
+      return [...selected, ...remaining].slice(0, 10);
     }
 
-    // Default fallback to first 3 products
-    return products.slice(0, 3);
+    // Mặc định hiển thị tối đa 10 sản phẩm (2 hàng x 5 sản phẩm)
+    return products.slice(0, 10);
   }, [products, hotProductIds, hotMode]);
 
   const [scrolled, setScrolled] = useState(false);
@@ -835,25 +839,25 @@ export default function CustomerStorefront() {
           </div>
         </div>
 
-        {/* Grid of Product Cards */}
+        {/* Grid of Product Cards (5 items per row, max 2 rows = 10 items) */}
         {loading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[1, 2, 3].map((n) => (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
+            {Array.from({ length: 10 }).map((_, n) => (
               <div key={n} className="aspect-[4/5] bg-[#0a0a0a]/5 animate-pulse" />
             ))}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-16">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 md:gap-x-5 lg:gap-x-6 gap-y-10 md:gap-y-12">
             {displayedProducts.map((product, idx) => {
               const minPrice = Math.min(...product.variants.map((v) => v.selling_price));
 
               return (
                 <article
                   key={product.id}
-                  style={{ transitionDelay: `${(idx % 3) * 140}ms` }}
-                  className="reveal group flex flex-col justify-between border-b hairline pb-8"
+                  style={{ transitionDelay: `${(idx % 5) * 80}ms` }}
+                  className="reveal group flex flex-col justify-between border-b hairline pb-6"
                 >
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {/* Product Image Plate */}
                     <div className="relative group/plate">
                       <Link
@@ -869,41 +873,41 @@ export default function CustomerStorefront() {
                     </div>
 
                     {/* Metadata & Title */}
-                    <div className="pt-2.5 space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
+                    <div className="pt-1.5 space-y-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[9px] md:text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
                           {product.category}
                         </span>
-                        <span className="text-[10px] font-mono text-[#0a0a0a]/40">•</span>
-                        <span className="text-[10px] font-mono text-[#0a0a0a]/50">
+                        <span className="text-[9px] md:text-[10px] font-mono text-[#0a0a0a]/40">•</span>
+                        <span className="text-[9px] md:text-[10px] font-mono text-[#0a0a0a]/50">
                           {product.variants.length} Sizes
                         </span>
                       </div>
                       <Link
                         href={`/products/${product.id}`}
-                        className="font-wide uppercase text-base md:text-lg font-semibold cursor-pointer group-hover:opacity-70 transition-opacity block min-h-[2.5rem] line-clamp-2 leading-snug text-slate-950"
+                        className="font-wide uppercase text-xs sm:text-sm md:text-sm font-semibold cursor-pointer group-hover:opacity-70 transition-opacity block min-h-[2.4rem] line-clamp-2 leading-snug text-slate-950"
                       >
                         {product.name}
                       </Link>
-                      {/* Price moved below title & enlarged */}
+                      {/* Price moved below title */}
                       <div className="pt-0.5">
-                        <span className="text-lg md:text-xl font-mono font-bold text-slate-950 tracking-tight">
+                        <span className="text-base md:text-lg font-mono font-bold text-slate-950 tracking-tight">
                           {formatMoney(minPrice)}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-[13px] text-[#0a0a0a]/70 line-clamp-2 font-light leading-relaxed min-h-[2.5rem]">
+                    <p className="text-[12px] text-[#0a0a0a]/70 line-clamp-2 font-light leading-relaxed min-h-[2.2rem]">
                       {product.description}
                     </p>
                   </div>
 
                   {/* Actions */}
-                  <div className="pt-4">
+                  <div className="pt-3">
                     <button
                       type="button"
                       onClick={(e) => handleQuickAddToCart(e, product)}
-                      className="w-full py-2.5 bg-[#0a0a0a] text-white text-[11px] font-mono uppercase tracking-wider hover:bg-black/85 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                      className="w-full py-2 bg-[#0a0a0a] text-white text-[10px] md:text-[11px] font-mono uppercase tracking-wider hover:bg-black/85 flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <ShoppingBag className="w-3.5 h-3.5" />
                       <span>Thêm vào giỏ hàng</span>

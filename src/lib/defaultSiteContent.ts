@@ -44,8 +44,8 @@ export const defaultSiteContent = {
     collection_badge: 'LOOKBOOK 4 HÃNG NỔI TIẾNG',
     collection_title: 'THIẾT KẾ ĐƯỢC CHĂM CHÚT NHẤT',
     collection_subtitle: '● Xác thực tồn kho thực tế toàn hệ thống',
-    collection_hot_products_mode: 'manual', // 'manual' | 'all'
-    collection_hot_product_ids: ['prod-1', 'prod-2', 'prod-3'],
+    collection_hot_products_mode: 'all', // 'manual' | 'all'
+    collection_hot_product_ids: ['prod-1', 'prod-2', 'prod-3', 'prod-4', 'prod-5'],
     
     // Khối 4: Studio Fitting Room
     studio_badge: 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC',
