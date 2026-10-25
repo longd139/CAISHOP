@@ -46,6 +46,7 @@ caishop.db
 *.db-journal
 *.sqlite
 .wrangler/
+*dump*.sql
 
 # editor
 .vscode/
