@@ -1945,6 +1945,27 @@ export default function ExecutiveDashboard() {
                                 />
                               </div>
 
+                              {/* HƯỚNG DẪN CẤU HÌNH HÌNH ẢNH SẢN PHẨM */}
+                              <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-xl text-xs space-y-2">
+                                <div className="font-semibold text-amber-900 flex items-center justify-between flex-wrap gap-2">
+                                  <span className="flex items-center gap-1.5 text-xs font-bold">
+                                    <span>📸</span>
+                                    <span>Hình ảnh sản phẩm của khối này:</span>
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActiveTab('products')}
+                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                  >
+                                    <Package className="w-3.5 h-3.5" />
+                                    <span>Đến mục Kho & Sản phẩm để đổi ảnh ↗</span>
+                                  </button>
+                                </div>
+                                <p className="text-[11px] text-amber-800 leading-relaxed">
+                                  Hình ảnh hiển thị ở khối này được liên kết tự động từ <strong>ảnh đại diện của từng sản phẩm trong hệ thống</strong>. Để cập nhật hình ảnh cho từng mẫu (Áo thun, Sơ mi, Quần Jean...), bạn hãy bấm vào nút <strong>&quot;Đến mục Kho &amp; Sản phẩm để đổi ảnh&quot;</strong> ở trên, chọn sản phẩm cần sửa và tải ảnh mới lên.
+                                </p>
+                              </div>
+
                               {/* CHỌN SẢN PHẨM HOT */}
                               <div className="pt-3 border-t border-slate-200/80 space-y-3">
                                 <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1958,23 +1979,40 @@ export default function ExecutiveDashboard() {
                                     </p>
                                   </div>
 
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const top3 = availableProducts.slice(0, 3).map((p: any) => p.id);
+                                        const top5 = availableProducts.slice(0, 5).map((p: any) => p.id);
                                         setCmsContent({
                                           ...cmsContent,
                                           home: {
                                             ...cmsContent.home,
                                             collection_hot_products_mode: 'manual',
-                                            collection_hot_product_ids: top3
+                                            collection_hot_product_ids: top5
                                           }
                                         });
                                       }}
                                       className="px-2.5 py-1 text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
                                     >
-                                      Chọn 3 mẫu đầu
+                                      Chọn 5 mẫu (1 hàng)
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        const top10 = availableProducts.slice(0, 10).map((p: any) => p.id);
+                                        setCmsContent({
+                                          ...cmsContent,
+                                          home: {
+                                            ...cmsContent.home,
+                                            collection_hot_products_mode: 'manual',
+                                            collection_hot_product_ids: top10
+                                          }
+                                        });
+                                      }}
+                                      className="px-2.5 py-1 text-[11px] font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded transition-colors cursor-pointer"
+                                    >
+                                      Chọn 10 mẫu (2 hàng)
                                     </button>
                                     <button
                                       type="button"
@@ -2632,8 +2670,8 @@ export default function ExecutiveDashboard() {
                               </div>
                             </div>
 
-                            {/* Hot Product Cards Live Preview */}
-                            <div className="grid grid-cols-3 gap-2.5 pt-1">
+                            {/* Hot Product Cards Live Preview (5 items per row, max 2 rows = 10 items) */}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 pt-1">
                               {(() => {
                                 const hotIds: string[] = cmsContent?.home?.collection_hot_product_ids || [];
                                 const hotMode: string = cmsContent?.home?.collection_hot_products_mode || 'manual';
@@ -2642,13 +2680,15 @@ export default function ExecutiveDashboard() {
                                 if (hotMode === 'manual' && hotIds.length > 0) {
                                   const pMap = new Map(availableProducts.map((p: any) => [p.id, p]));
                                   const filtered = hotIds.map((id: string) => pMap.get(id)).filter(Boolean);
-                                  if (filtered.length > 0) previewProds = filtered;
+                                  const filteredSet = new Set(filtered.map((p: any) => p.id));
+                                  const remaining = availableProducts.filter((p: any) => !filteredSet.has(p.id));
+                                  previewProds = [...filtered, ...remaining];
                                 }
 
-                                const list = previewProds.slice(0, 3);
+                                const list = previewProds.slice(0, 10);
                                 if (list.length === 0) {
                                   return (
-                                    <div className="col-span-3 py-6 text-center text-xs text-neutral-400 font-mono">
+                                    <div className="col-span-full py-6 text-center text-xs text-neutral-400 font-mono">
                                       Chưa có sản phẩm nào được chọn.
                                     </div>
                                   );
@@ -2661,9 +2701,16 @@ export default function ExecutiveDashboard() {
                                   const imgUrl = prod.image_url ? prod.image_url.split(',')[0] : 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg';
 
                                   return (
-                                    <div key={prod.id || idx} className="border border-neutral-200 rounded p-2 bg-neutral-50/50 space-y-1.5 relative overflow-hidden group">
-                                      <div className="aspect-[3/4] bg-neutral-200/80 rounded relative overflow-hidden">
-                                        <img src={imgUrl} alt={prod.name} className="w-full h-full object-cover" />
+                                    <div key={prod.id || idx} className="border border-neutral-200 rounded p-1.5 bg-neutral-50/50 space-y-1 relative overflow-hidden group">
+                                      <div className="aspect-[4/5] bg-neutral-200/80 rounded relative overflow-hidden">
+                                        <img
+                                          src={imgUrl}
+                                          alt={prod.name}
+                                          className="w-full h-full object-cover"
+                                          onError={(e: any) => {
+                                            e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg';
+                                          }}
+                                        />
                                       </div>
                                       <div className="text-[10px] font-semibold text-neutral-900 truncate" title={prod.name}>
                                         {prod.name}
