@@ -654,7 +654,7 @@ export default function CustomerStorefront() {
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] tracking-wide-2 uppercase font-medium pt-1">
                 {/* Nút 1: Săn đồ hiệu ngay (Micro-interaction: Liquid Bottom Fill + Shimmer Sheen + Arrow Eject) */}
                 <a
-                  href="#collection"
+                  href="#product"
                   className="group relative overflow-hidden inline-flex items-center gap-2.5 px-6 sm:px-7 py-3 bg-white text-[#0a0a0a] font-bold tracking-wider rounded-xs shadow-[0_10px_25px_rgba(0,0,0,0.4)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
                 >
                   {/* Background Liquid Fill (slides from bottom up) */}
@@ -825,7 +825,7 @@ export default function CustomerStorefront() {
       </section>
 
       {/* ================= 4. EDITORIAL PRODUCT GRID ================= */}
-      <section id="product" className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-16 md:py-24">
+      <section id="product" className="scroll-mt-20 md:scroll-mt-24 max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-16 md:py-24">
 
         {/* Section Header */}
         <div className="reveal flex flex-col sm:flex-row sm:items-end justify-between border-b hairline pb-6 mb-12 gap-4">
@@ -1979,7 +1979,7 @@ export default function CustomerStorefront() {
                   Đóng lại
                 </button>
                 <a
-                  href="#collection"
+                  href="#product"
                   onClick={() => setIsSizeGuideOpen(false)}
                   className="px-5 py-2 bg-white text-[#0a0a0a] text-[11px] tracking-wide uppercase font-semibold hover:bg-neutral-200 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
