@@ -621,7 +621,7 @@ export default function CustomerStorefront() {
       {/* ================= 2. EDITORIAL DISPLAY HERO (FULL VIEWPORT MINUS HEADER) ================= */}
       <section
         id="hero"
-        className="relative w-full border-b hairline overflow-hidden bg-[#0a0a0a] text-white flex flex-col justify-between h-[calc(100dvh-68px)] md:h-[calc(100dvh-88px)] min-h-[560px]"
+        className="relative w-full border-b hairline overflow-hidden bg-[#0a0a0a] text-white flex flex-col justify-between min-h-[calc(100dvh-68px)] md:min-h-[calc(100dvh-88px)]"
       >
         {/* Full-Bleed Background Image */}
         <div className="absolute inset-0 z-0 select-none pointer-events-none">
@@ -635,27 +635,27 @@ export default function CustomerStorefront() {
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-black/60" />
         </div>
 
-        {/* Content Container (Centered in available viewport space) */}
-        <div className="relative z-10 max-w-[1760px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 my-auto py-6 md:py-8">
-          <div className="space-y-4 md:space-y-6 max-w-3xl">
+        {/* Content Container (Centered in available viewport space, flexible on scaled screens) */}
+        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1760px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 md:py-10">
+          <div className="space-y-3 sm:space-y-4 md:space-y-5 max-w-3xl">
             <div className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/90 flex items-center gap-2.5 font-medium">
               <span>{siteContent?.home?.hero_badge || 'TUYỂN TẬP ĐỒ HIỆU ĐƯƠNG ĐẠI / CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}</span>
             </div>
 
-            <h1 className="font-wide uppercase leading-[0.92] tracking-tight text-[10vw] md:text-[7vw] lg:text-[5.8vw] xl:text-[78px] text-white drop-shadow-md">
+            <h1 className="font-wide uppercase leading-[0.94] tracking-tight text-[32px] sm:text-[44px] md:text-[54px] lg:text-[62px] xl:text-[72px] text-white drop-shadow-md">
               {siteContent?.home?.hero_title || 'ĐỒ HIỆU CHẤT LƯỢNG. ĐỊNH HÌNH PHONG CÁCH.'}
             </h1>
 
-            <div className="max-w-xl space-y-5 pt-1">
-              <p className="text-[14px] md:text-[16px] leading-relaxed text-white/90 font-light drop-shadow-sm">
+            <div className="max-w-xl space-y-4 pt-0.5">
+              <p className="text-[13px] sm:text-[14px] md:text-[15px] leading-relaxed text-white/90 font-light drop-shadow-sm">
                 {siteContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
               </p>
 
-              <div className="flex flex-wrap items-center gap-4 text-[11px] tracking-wide-2 uppercase font-medium pt-2">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] tracking-wide-2 uppercase font-medium pt-1">
                 {/* Nút 1: Săn đồ hiệu ngay (Micro-interaction: Liquid Bottom Fill + Shimmer Sheen + Arrow Eject) */}
                 <a
                   href="#collection"
-                  className="group relative overflow-hidden inline-flex items-center gap-3 px-7 py-3.5 bg-white text-[#0a0a0a] font-bold tracking-wider rounded-xs shadow-[0_10px_25px_rgba(0,0,0,0.4)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
+                  className="group relative overflow-hidden inline-flex items-center gap-2.5 px-6 sm:px-7 py-3 bg-white text-[#0a0a0a] font-bold tracking-wider rounded-xs shadow-[0_10px_25px_rgba(0,0,0,0.4)] transition-all duration-300 hover:shadow-[0_12px_32px_rgba(255,255,255,0.3)] hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer"
                 >
                   {/* Background Liquid Fill (slides from bottom up) */}
                   <span className="absolute inset-0 bg-[#0a0a0a] translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-0" />
@@ -664,9 +664,9 @@ export default function CustomerStorefront() {
                   <span className="absolute -inset-full top-0 bg-gradient-to-r from-transparent via-white/25 to-transparent -skew-x-12 translate-x-[-120%] group-hover:translate-x-[200%] transition-transform duration-1000 ease-in-out z-10 pointer-events-none" />
 
                   {/* Button Content */}
-                  <span className="relative z-20 flex items-center gap-2.5 transition-colors duration-300 group-hover:text-white">
+                  <span className="relative z-20 flex items-center gap-2 transition-colors duration-300 group-hover:text-white">
                     <span>{siteContent?.home?.hero_cta_1 || 'Săn đồ hiệu ngay'}</span>
-                    <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1.5" />
+                    <ArrowRight className="w-3.5 h-3.5 transition-transform duration-300 group-hover:translate-x-1" />
                   </span>
                 </a>
 
@@ -674,13 +674,13 @@ export default function CustomerStorefront() {
                 <button
                   type="button"
                   onClick={() => setIsSizeGuideOpen(true)}
-                  className="group relative overflow-hidden inline-flex items-center gap-2.5 px-6 py-3.5 border border-white/60 text-white backdrop-blur-md bg-white/5 rounded-xs transition-all duration-300 hover:border-white hover:bg-white shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer font-medium tracking-wider"
+                  className="group relative overflow-hidden inline-flex items-center gap-2 px-5 sm:px-6 py-3 border border-white/60 text-white backdrop-blur-md bg-white/5 rounded-xs transition-all duration-300 hover:border-white hover:bg-white shadow-lg hover:-translate-y-0.5 active:translate-y-0 active:scale-[0.98] cursor-pointer font-medium tracking-wider"
                 >
                   {/* Background Liquid Fill (slides from bottom up) */}
                   <span className="absolute inset-0 bg-white translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-out z-0" />
 
                   {/* Button Content */}
-                  <span className="relative z-10 flex items-center gap-2.5 transition-colors duration-300 group-hover:text-[#0a0a0a]">
+                  <span className="relative z-10 flex items-center gap-2 transition-colors duration-300 group-hover:text-[#0a0a0a]">
                     <Ruler className="w-3.5 h-3.5 transition-transform duration-300 group-hover:rotate-45" />
                     <span>{siteContent?.home?.hero_cta_2 || 'Bảng chọn size chuẩn'}</span>
                   </span>
@@ -692,31 +692,31 @@ export default function CustomerStorefront() {
 
         {/* 4-Plate Process Strip (Docked along bottom of screen, links to brand collections) */}
         <div className="relative z-10 border-t border-white/15 bg-black/85 backdrop-blur-md text-white shrink-0">
-          <div className="grid grid-cols-2 md:grid-cols-4">
+          <div className="max-w-[1760px] mx-auto grid grid-cols-2 md:grid-cols-4">
 
             {/* Plate 1 - Lacoste */}
             <Link
               href="/products?brand=col-lacoste"
-              className="group relative overflow-hidden border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer block"
+              className="group relative overflow-hidden border-r border-white/15 px-3.5 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-3.5 md:py-4 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer block"
             >
               {/* Left: Brand Icon on hover */}
-              <div className="flex items-center h-8 min-w-[40px] shrink-0">
+              <div className="flex items-center h-7 sm:h-8 min-w-[32px] sm:min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
                     src={siteContent?.home?.hero_plate1_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png'}
                     alt="Lacoste Logo"
-                    className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
+                    className="h-5 sm:h-6 md:h-7 w-auto max-w-[38px] sm:max-w-[48px] object-contain"
                     onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863867/degent/lacoste.png'; }}
                   />
                 </div>
               </div>
 
               {/* Right: Text remains intact, switches to dark on hover */}
-              <div className="text-right transition-colors duration-200">
-                <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
+              <div className="text-right transition-colors duration-200 min-w-0 pl-2">
+                <span className="text-[8px] sm:text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors truncate">
                   {siteContent?.home?.hero_plate1_tag || 'Áo Polo'}
                 </span>
-                <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
+                <span className="font-wide uppercase text-xs sm:text-sm md:text-sm lg:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors whitespace-nowrap">
                   {siteContent?.home?.hero_plate1_title || 'DÒNG CÁ SẤU'}
                 </span>
               </div>
@@ -725,26 +725,26 @@ export default function CustomerStorefront() {
             {/* Plate 2 - Calvin Klein */}
             <Link
               href="/products?brand=col-ck"
-              className="group relative overflow-hidden border-r md:border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer block"
+              className="group relative overflow-hidden border-r md:border-r border-white/15 px-3.5 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-3.5 md:py-4 flex items-center justify-between hover:bg-white transition-all duration-200 cursor-pointer block"
             >
               {/* Left: Brand Icon on hover */}
-              <div className="flex items-center h-8 min-w-[40px] shrink-0">
+              <div className="flex items-center h-7 sm:h-8 min-w-[32px] sm:min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
                     src={siteContent?.home?.hero_plate2_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png'}
                     alt="Calvin Klein Logo"
-                    className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
+                    className="h-5 sm:h-6 md:h-7 w-auto max-w-[38px] sm:max-w-[48px] object-contain"
                     onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863868/degent/ck.png'; }}
                   />
                 </div>
               </div>
 
               {/* Right: Text remains intact, switches to dark on hover */}
-              <div className="text-right transition-colors duration-200">
-                <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
+              <div className="text-right transition-colors duration-200 min-w-0 pl-2">
+                <span className="text-[8px] sm:text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors truncate">
                   {siteContent?.home?.hero_plate2_tag || 'Denim & Tee'}
                 </span>
-                <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
+                <span className="font-wide uppercase text-xs sm:text-sm md:text-sm lg:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors whitespace-nowrap">
                   {siteContent?.home?.hero_plate2_title || 'DÒNG XI-KÊ'}
                 </span>
               </div>
@@ -753,26 +753,26 @@ export default function CustomerStorefront() {
             {/* Plate 3 - Tommy Hilfiger */}
             <Link
               href="/products?brand=col-tommy"
-              className="group relative overflow-hidden border-r border-white/15 px-6 py-3.5 md:py-4.5 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer block"
+              className="group relative overflow-hidden border-r border-white/15 px-3.5 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-3.5 md:py-4 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer block"
             >
               {/* Left: Brand Icon on hover */}
-              <div className="flex items-center h-8 min-w-[40px] shrink-0">
+              <div className="flex items-center h-7 sm:h-8 min-w-[32px] sm:min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
                     src={siteContent?.home?.hero_plate3_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png'}
                     alt="Tommy Hilfiger Logo"
-                    className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
+                    className="h-5 sm:h-6 md:h-7 w-auto max-w-[38px] sm:max-w-[48px] object-contain"
                     onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863869/degent/tommy.png'; }}
                   />
                 </div>
               </div>
 
               {/* Right: Text remains intact, switches to dark on hover */}
-              <div className="text-right transition-colors duration-200">
-                <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
+              <div className="text-right transition-colors duration-200 min-w-0 pl-2">
+                <span className="text-[8px] sm:text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors truncate">
                   {siteContent?.home?.hero_plate3_tag || 'Phong cách Mỹ'}
                 </span>
-                <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
+                <span className="font-wide uppercase text-xs sm:text-sm md:text-sm lg:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors whitespace-nowrap">
                   {siteContent?.home?.hero_plate3_title || 'DÒNG TÔ-MÌ'}
                 </span>
               </div>
@@ -781,26 +781,26 @@ export default function CustomerStorefront() {
             {/* Plate 4 - Levi's */}
             <Link
               href="/products?brand=col-levis"
-              className="group relative overflow-hidden px-6 py-3.5 md:py-4.5 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer block"
+              className="group relative overflow-hidden px-3.5 sm:px-4 md:px-5 lg:px-6 py-3 sm:py-3.5 md:py-4 flex items-center justify-between border-t md:border-t-0 hover:bg-white transition-all duration-200 cursor-pointer block"
             >
               {/* Left: Brand Icon on hover */}
-              <div className="flex items-center h-8 min-w-[40px] shrink-0">
+              <div className="flex items-center h-7 sm:h-8 min-w-[32px] sm:min-w-[40px] shrink-0">
                 <div className="opacity-0 group-hover:opacity-100 transition-all duration-200 scale-90 group-hover:scale-100 pointer-events-none">
                   <img
                     src={siteContent?.home?.hero_plate4_logo || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png'}
                     alt="Levi's Logo"
-                    className="h-6 md:h-7 w-auto max-w-[50px] object-contain"
+                    className="h-5 sm:h-6 md:h-7 w-auto max-w-[38px] sm:max-w-[48px] object-contain"
                     onError={(e: any) => { e.currentTarget.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png'; }}
                   />
                 </div>
               </div>
 
               {/* Right: Text remains intact, switches to dark on hover */}
-              <div className="text-right transition-colors duration-200">
-                <span className="text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors">
+              <div className="text-right transition-colors duration-200 min-w-0 pl-2">
+                <span className="text-[8px] sm:text-[9px] font-mono text-white/50 group-hover:text-black/60 uppercase block tracking-wider transition-colors truncate">
                   {siteContent?.home?.hero_plate4_tag || 'Jeans Đinh Tán'}
                 </span>
-                <span className="font-wide uppercase text-sm md:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors">
+                <span className="font-wide uppercase text-xs sm:text-sm md:text-sm lg:text-base font-semibold text-white group-hover:text-black tracking-tight transition-colors whitespace-nowrap">
                   {siteContent?.home?.hero_plate4_title || 'DÒNG LÊ-VY'}
                 </span>
               </div>
