@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { useHeaderNav } from '@/lib/useSiteContent';
+import { useHeaderNav, useSiteContent } from '@/lib/useSiteContent';
 import { FolderTree, ChevronDown, ChevronRight, Layers, Tag, Filter, X, Sparkles, Package, ShoppingBag, Award, Crown, TrendingUp, User, Trash2 } from 'lucide-react';
 import { BrandCollection } from '@/app/api/collections/route';
 import { calculateTier, getNextTierInfo } from '@/lib/membership';
@@ -39,6 +39,7 @@ interface Product {
 
 export default function ProductCatalog() {
   const { items: headerNavItems } = useHeaderNav();
+  const { content: siteContent } = useSiteContent();
   const { user, isLoggedIn, logout } = useAuth();
   const { cart, setCart, appliedDeal, appliedDealCode, setAppliedDealCode } = useCart();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -801,10 +802,10 @@ export default function ProductCatalog() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
               <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-                COLLECTION 01 • EDITIONS CATALOGUE
+                {siteContent?.products?.badge || 'BỘ SƯU TẬP 01 • DANH MỤC TUYỂN CHỌN'}
               </span>
               <h1 className="font-wide uppercase text-3xl md:text-5xl lg:text-6xl tracking-tight text-[#0a0a0a]">
-                THE PRODUCT ARCHIVE
+                {siteContent?.products?.title || 'KHO LƯU TRỮ SẢN PHẨM'}
               </h1>
             </div>
           </div>
