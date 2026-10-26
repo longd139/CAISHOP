@@ -29,11 +29,11 @@ assert.ok(content.includes('onMouseEnter={() => setIsCollectionPaused(true)}'), 
 assert.ok(content.includes('onMouseLeave={() => setIsCollectionPaused(false)}'), 'Phải tiếp tục chạy slide khi người dùng rời chuột');
 console.log('✓ PASS [3/5]: Section banner slider ngang toàn màn hình được tích hợp hoàn chỉnh với hiệu ứng hover pause');
 
-// 4. Kiểm tra nút "Khám phá ngay" và lớp phủ thông tin
+// 4. Kiểm tra nút "Khám phá ngay", thông tin tiêu đề và không dùng filter làm tối ảnh
 assert.ok(content.includes('Khám phá ngay'), 'Trên mỗi slide phải có nút "Khám phá ngay"');
 assert.ok(content.includes('href={slide.href}'), 'Nút khám phá phải liên kết tới khu vực bộ sưu tập / sản phẩm');
-assert.ok(content.includes('bg-gradient-to-t from-black'), 'Phải có gradient bảo đảm độ tương phản chữ trên nền ảnh');
-console.log('✓ PASS [4/5]: Lớp phủ tiêu đề, mô tả và nút "Khám phá ngay" được hiển thị nổi bật và tương phản cao');
+assert.strictEqual(content.includes('bg-gradient-to-t from-black via-black/55'), false, 'Không dùng filter làm tối ảnh');
+console.log('✓ PASS [4/5]: Tiêu đề, mô tả và nút "Khám phá ngay" hiển thị trực tiếp trên ảnh gốc sáng rõ, không qua filter tối');
 
 // 5. Kiểm tra loại bỏ 3 thành phần theo yêu cầu (Badge, Button chuyển ảnh, Tiêu đề ảnh phía dưới)
 assert.strictEqual(content.includes('aria-label="Previous Collection Slide"'), false, 'Đã loại bỏ nút chuyển slide trước');

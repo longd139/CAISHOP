@@ -1203,9 +1203,7 @@ export default function CustomerStorefront() {
               style={{ backgroundImage: `url(${slide.imageUrl})` }}
             />
 
-            {/* Gradient Overlays for contrast and cinematic look */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/30" />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-transparent" />
+
 
             {/* Content Container */}
             <div className="relative z-20 h-full max-w-[1760px] mx-auto px-6 md:px-12 flex flex-col justify-end pb-16 md:pb-20 space-y-4">
