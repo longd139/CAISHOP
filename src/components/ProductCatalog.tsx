@@ -34,7 +34,67 @@ interface Product {
   category: string;
   description: string;
   image_url: string;
+  size_specs?: any;
   variants: ProductVariant[];
+}
+
+export const SHIRT_FITS = ['ALL', 'SLIM FIT', 'CLASSIC FIT', 'REGULAR FIT', 'OVERSIZED'] as const;
+export type ShirtFit = (typeof SHIRT_FITS)[number];
+
+function matchesShirtFit(product: Product, fit: ShirtFit): boolean {
+  if (fit === 'ALL') return true;
+
+  if (product.size_specs) {
+    try {
+      const specs = typeof product.size_specs === 'string' ? JSON.parse(product.size_specs) : product.size_specs;
+      const fitType = (specs.fitType || specs.fitName || '').toUpperCase();
+      if (fit === 'SLIM FIT' && fitType.includes('SLIM')) return true;
+      if (fit === 'CLASSIC FIT' && (fitType.includes('CLASSIC') || fitType.includes('REGULAR'))) return true;
+      if (fit === 'REGULAR FIT' && (fitType.includes('REGULAR') || fitType.includes('CLASSIC'))) return true;
+      if (fit === 'OVERSIZED' && (fitType.includes('OVERSIZE') || fitType.includes('BOXY') || fitType.includes('LOOSE'))) return true;
+    } catch {
+      // ignore json parse error
+    }
+  }
+
+  const text = `${product.name} ${product.description || ''} ${product.slug || ''} ${product.category || ''}`
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+
+  switch (fit) {
+    case 'SLIM FIT':
+      return text.includes('slim') || text.includes('om sat') || text.includes('om dang') || text.includes('bo sat');
+    case 'CLASSIC FIT':
+      return (
+        text.includes('classic') ||
+        text.includes('co dien') ||
+        text.includes('suong') ||
+        text.includes('polo') ||
+        text.includes('oxford') ||
+        text.includes('regular')
+      );
+    case 'REGULAR FIT':
+      return (
+        text.includes('regular') ||
+        text.includes('tieu chuan') ||
+        text.includes('suong') ||
+        text.includes('bomber') ||
+        text.includes('polo')
+      );
+    case 'OVERSIZED':
+      return (
+        text.includes('oversize') ||
+        text.includes('oversized') ||
+        text.includes('form rong') ||
+        text.includes('phom rong') ||
+        text.includes('boxy') ||
+        text.includes('loose') ||
+        text.includes('thung')
+      );
+    default:
+      return true;
+  }
 }
 
 export default function ProductCatalog() {
@@ -81,7 +141,7 @@ export default function ProductCatalog() {
   }, [isBagOpen]);
 
   // Filter & Search states
-  const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
+  const [selectedFit, setSelectedFit] = useState<ShirtFit>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'name-asc'>('featured');
   const [inStockOnly, setInStockOnly] = useState<boolean>(false);
@@ -180,21 +240,12 @@ export default function ProductCatalog() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
-  // Categories list
-  const categories = useMemo(() => {
-    const set = new Set<string>();
-    products.forEach((p) => {
-      if (p.category) set.add(p.category);
-    });
-    return ['ALL', ...Array.from(set)];
-  }, [products]);
-
   // Filtered and sorted products
   const filteredProducts = useMemo(() => {
     return products
       .filter((p) => {
-        // Category tab filter
-        if (selectedCategory !== 'ALL' && p.category !== selectedCategory) {
+        // Shirt Fit tab filter (Form áo)
+        if (selectedFit !== 'ALL' && !matchesShirtFit(p, selectedFit)) {
           return false;
         }
 
@@ -265,7 +316,7 @@ export default function ProductCatalog() {
         if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
         return 0;
       });
-  }, [products, selectedCategory, selectedBrandId, selectedGroupId, selectedSubId, collections, searchQuery, sortBy]);
+  }, [products, selectedFit, selectedBrandId, selectedGroupId, selectedSubId, collections, searchQuery, sortBy]);
 
   // Active collection label helpers
   const activeBrandObj = collections.find((c) => c.id === selectedBrandId);
@@ -819,20 +870,20 @@ export default function ProductCatalog() {
         <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-3.5">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
 
-            {/* Category tabs */}
+            {/* Shirt Fit tabs (Form áo: Slim, Classic, Regular, Oversized) */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
-              {categories.map((cat) => {
-                const isActive = selectedCategory === cat;
+              {SHIRT_FITS.map((fit) => {
+                const isActive = selectedFit === fit;
                 return (
                   <button
-                    key={cat}
-                    onClick={() => setSelectedCategory(cat)}
-                    className={`px-3.5 py-1.5 text-[11px] tracking-wide-2 uppercase font-medium border transition-colors shrink-0 ${isActive
+                    key={fit}
+                    onClick={() => setSelectedFit(fit)}
+                    className={`px-3.5 py-1.5 text-[11px] tracking-wide-2 uppercase font-medium border transition-colors shrink-0 cursor-pointer ${isActive
                       ? 'bg-[#0a0a0a] text-white border-[#0a0a0a]'
                       : 'bg-white text-[#0a0a0a]/70 border-black/15 hover:border-black hover:text-black'
                       }`}
                   >
-                    {cat}
+                    {fit}
                   </button>
                 );
               })}
@@ -1157,10 +1208,10 @@ export default function ProductCatalog() {
               <div>
                 Hiển thị <strong>{filteredProducts.length}</strong> / {products.length} sản phẩm
               </div>
-              {(selectedCategory !== 'ALL' || searchQuery || inStockOnly || hasActiveCollectionFilter) && (
+              {(selectedFit !== 'ALL' || searchQuery || inStockOnly || hasActiveCollectionFilter) && (
                 <button
                   onClick={() => {
-                    setSelectedCategory('ALL');
+                    setSelectedFit('ALL');
                     setSelectedBrandId('ALL');
                     setSelectedGroupId('ALL');
                     setSelectedSubId('ALL');
@@ -1197,7 +1248,7 @@ export default function ProductCatalog() {
                 </p>
                 <button
                   onClick={() => {
-                    setSelectedCategory('ALL');
+                    setSelectedFit('ALL');
                     setSearchQuery('');
                     setInStockOnly(false);
                   }}
