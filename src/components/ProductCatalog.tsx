@@ -701,85 +701,97 @@ export default function ProductCatalog() {
 
           </div>
 
-          {/* Mobile Drawer */}
+          {/* Mobile Drawer (Overlay dropdown đè lên nội dung) */}
           <div
-            className={`lg:hidden overflow-hidden transition-[max-height] duration-300 ease-out border-t hairline ${isMenuOpen ? 'max-h-[500px]' : 'max-h-0'
-              }`}
+            className={`lg:hidden absolute top-full left-0 right-0 w-full bg-white/95 backdrop-blur-md border-b hairline shadow-2xl transition-all duration-300 ease-out overflow-hidden z-50 ${
+              isMenuOpen ? 'max-h-[500px] opacity-100 visible' : 'max-h-0 opacity-0 invisible pointer-events-none'
+            }`}
           >
-            <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
-              {headerNavItems.map((item) => {
-                const isCurrent = item.href === '/products' || item.href === '/product';
-                return (
-                  <li key={item.id}>
-                    <Link
-                      href={item.href}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={`block text-[#0a0a0a] ${isCurrent ? 'font-bold underline' : ''}`}
-                    >
-                      {item.label}
+            <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
+              <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
+                {headerNavItems.map((item) => {
+                  const isCurrent = item.href === '/products' || item.href === '/product';
+                  return (
+                    <li key={item.id}>
+                      <Link
+                        href={item.href}
+                        onClick={() => setIsMenuOpen(false)}
+                        className={`block text-[#0a0a0a] ${isCurrent ? 'font-bold underline' : ''}`}
+                      >
+                        {item.label}
+                      </Link>
+                    </li>
+                  );
+                })}
+                {isLoggedIn && user ? (
+                  <li className="pt-3 border-t hairline space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-bold text-[#0a0a0a] truncate flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 text-[#0a0a0a]/70 shrink-0" />
+                        {user.name}
+                      </span>
+                      {user.role === 'ADMIN' && (
+                        <Link
+                          href="/admin"
+                          onClick={() => setIsMenuOpen(false)}
+                          className="text-[10px] font-mono uppercase bg-slate-900 text-white px-2 py-0.5 rounded font-bold"
+                        >
+                          Quản trị ↗
+                        </Link>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => { setIsMenuOpen(false); setProfileActiveTab('profile'); setIsProfileOpen(true); }}
+                        className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
+                      >
+                        Hồ sơ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsMenuOpen(false); setProfileActiveTab('orders'); setIsProfileOpen(true); }}
+                        className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
+                      >
+                        Đơn hàng
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setIsMenuOpen(false); setIsBagOpen(true); }}
+                        className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
+                      >
+                        Giỏ hàng ({totalBagCount})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => { await logout(); setIsMenuOpen(false); }}
+                        className="py-1.5 px-3 border hairline text-[11px] font-mono text-rose-600 hover:bg-rose-50 transition-colors"
+                      >
+                        Thoát
+                      </button>
+                    </div>
+                  </li>
+                ) : (
+                  <li className="pt-3 border-t hairline">
+                    <Link href="/login" onClick={() => setIsMenuOpen(false)} className="block text-[#0a0a0a]/60">
+                      Tài khoản / Đăng nhập
                     </Link>
                   </li>
-                );
-              })}
-              {isLoggedIn && user ? (
-                <li className="pt-3 border-t hairline space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-bold text-[#0a0a0a] truncate flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#0a0a0a]/70 shrink-0" />
-                      {user.name}
-                    </span>
-                    {user.role === 'ADMIN' && (
-                      <Link
-                        href="/admin"
-                        onClick={() => setIsMenuOpen(false)}
-                        className="text-[10px] font-mono uppercase bg-slate-900 text-white px-2 py-0.5 rounded font-bold"
-                      >
-                        Quản trị ↗
-                      </Link>
-                    )}
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setIsMenuOpen(false); setProfileActiveTab('profile'); setIsProfileOpen(true); }}
-                      className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
-                    >
-                      Hồ sơ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setIsMenuOpen(false); setProfileActiveTab('orders'); setIsProfileOpen(true); }}
-                      className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
-                    >
-                      Đơn hàng
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setIsMenuOpen(false); setIsBagOpen(true); }}
-                      className="flex-1 py-1.5 text-center border hairline text-[11px] font-mono hover:bg-black hover:text-white transition-colors"
-                    >
-                      Giỏ hàng ({totalBagCount})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={async () => { await logout(); setIsMenuOpen(false); }}
-                      className="py-1.5 px-3 border hairline text-[11px] font-mono text-rose-600 hover:bg-rose-50 transition-colors"
-                    >
-                      Thoát
-                    </button>
-                  </div>
-                </li>
-              ) : (
-                <li className="pt-3 border-t hairline">
-                  <Link href="/login" onClick={() => setIsMenuOpen(false)} className="block text-[#0a0a0a]/60">
-                    Tài khoản / Đăng nhập
-                  </Link>
-                </li>
-              )}
-            </ul>
+                )}
+              </ul>
+            </div>
           </div>
         </nav>
       </header>
+
+      {/* Mobile Backdrop khi mở menu để bấm ra ngoài tự đóng và làm nổi bật menu */}
+      {isMenuOpen && (
+        <div
+          onClick={() => setIsMenuOpen(false)}
+          className="fixed inset-0 bg-black/30 backdrop-blur-xs z-40 lg:hidden animate-in fade-in duration-200"
+          aria-hidden="true"
+        />
+      )}
 
       {/* ================= 2. PAGE HEADER & EDITORIAL HERO ================= */}
       <section className="border-b hairline bg-white">
