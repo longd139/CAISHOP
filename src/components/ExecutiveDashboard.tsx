@@ -217,6 +217,84 @@ export const getTransactionTypeInfo = (type: string) => {
   }
 };
 
+export interface ParsedShippingDetails {
+  cleanAddress: string;
+  orderNote?: string;
+  shippingMethod?: string;
+  dealTag?: string;
+  codInfo?: {
+    raw?: string;
+    percent?: string;
+    deposited?: string;
+    remaining?: string;
+  };
+}
+
+export function parseOrderAddressDetails(rawAddress: string | null | undefined): ParsedShippingDetails {
+  if (!rawAddress) {
+    return { cleanAddress: 'Chưa có thông tin địa chỉ' };
+  }
+
+  let remainingText = rawAddress;
+  let orderNote: string | undefined;
+  let shippingMethod: string | undefined;
+  let dealTag: string | undefined;
+  let codInfo: ParsedShippingDetails['codInfo'];
+
+  // 1. Bóc tách [CỌC COD: ...]
+  const codMatch = remainingText.match(/\[CỌC COD:\s*([^\]]+)\]/i);
+  if (codMatch) {
+    const rawCod = codMatch[1].trim();
+    const percentMatch = rawCod.match(/(\d+%\s*(?:cọc)?)/i);
+    const depositedMatch = rawCod.match(/ĐÃ CỌC:\s*([^\-]+?)(?=\s*-\s*THU SHIPPER:|$)/i);
+    const remainingMatch = rawCod.match(/THU SHIPPER:\s*([^\]]+)/i);
+
+    codInfo = {
+      raw: rawCod,
+      percent: percentMatch ? percentMatch[1].trim() : undefined,
+      deposited: depositedMatch ? depositedMatch[1].trim() : undefined,
+      remaining: remainingMatch ? remainingMatch[1].trim() : undefined,
+    };
+    remainingText = remainingText.replace(codMatch[0], '');
+  }
+
+  // 2. Bóc tách [DEAL: ...]
+  const dealMatch = remainingText.match(/\[DEAL:\s*([^\]]+)\]/i);
+  if (dealMatch) {
+    dealTag = dealMatch[1].trim();
+    remainingText = remainingText.replace(dealMatch[0], '');
+  }
+
+  // 3. Bóc tách [VẬN CHUYỂN: ...]
+  const shippingMatch = remainingText.match(/\[VẬN CHUYỂN:\s*([^\]]+)\]/i);
+  if (shippingMatch) {
+    shippingMethod = shippingMatch[1].trim();
+    remainingText = remainingText.replace(shippingMatch[0], '');
+  }
+
+  // 4. Bóc tách Ghi chú: (Ghi chú: ...) hoặc [GHI CHÚ: ...]
+  const noteMatch = remainingText.match(/\((?:Ghi chú|Note):\s*([^)]+)\)/i) || remainingText.match(/\[(?:Ghi chú|Note):\s*([^\]]+)\]/i);
+  if (noteMatch) {
+    orderNote = noteMatch[1].trim();
+    remainingText = remainingText.replace(noteMatch[0], '');
+  }
+
+  // Làm sạch các dấu gạch nối và khoảng trắng thừa còn lại
+  const cleanAddress = remainingText
+    .replace(/^(\s*-\s*)+/, '')
+    .replace(/(\s*-\s*)+$/, '')
+    .replace(/\s*-\s*-\s*/g, ' - ')
+    .trim();
+
+  return {
+    cleanAddress: cleanAddress || 'Chưa có thông tin địa chỉ',
+    orderNote,
+    shippingMethod,
+    dealTag,
+    codInfo,
+  };
+}
+
 export default function ExecutiveDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [contentSubTab, setContentSubTab] = useState<ContentSubTab>('header');
@@ -4555,44 +4633,118 @@ export default function ExecutiveDashboard() {
                   )}
                 </div>
 
-                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-1.5">
-                  <div className="font-bold text-slate-900 flex items-center gap-1.5 uppercase text-[11px] tracking-wide">
-                    <MapPin className="w-3.5 h-3.5 text-slate-500" />
-                    <span>Địa chỉ nhận hàng & Thanh toán</span>
-                  </div>
-                  <div className="text-slate-700 leading-relaxed font-medium">
-                    {selectedOrderForDetail.shipping_address}
-                  </div>
-                  <div className="pt-1 flex items-center gap-2 flex-wrap">
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-800 uppercase">
-                      {selectedOrderForDetail.payment_method === 'cod' ? 'COD (Tiền mặt)' : 'VietQR Chuyển khoản'}
-                    </span>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                      selectedOrderForDetail.payment_status === 'PAID'
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : 'bg-amber-50 text-amber-800 border border-amber-200'
-                    }`}>
-                      {selectedOrderForDetail.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
-                    </span>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 font-mono flex items-center gap-1.5">
-                      <img
-                        src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
-                        alt="ĐVVC"
-                        className="w-3.5 h-3.5 rounded object-cover inline-block"
-                      />
-                      <span>{selectedOrderForDetail.carrier || 'Viettel Post'}: {selectedOrderForDetail.tracking_code || `VTP${(selectedOrderForDetail.order_code || '').replace(/\D/g, '') || '881865'}VN`}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleOpenDispatchModal(selectedOrderForDetail)}
-                      className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
-                    >
-                      <Truck className="w-3 h-3 text-slate-500" />
-                      <span>{selectedOrderForDetail.tracking_code ? 'Sửa mã ĐVVC' : 'Lên đơn & Gửi mã'}</span>
-                    </button>
-                  </div>
-                </div>
+                {(() => {
+                  const parsed = parseOrderAddressDetails(selectedOrderForDetail.shipping_address);
+                  return (
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/60 space-y-2.5">
+                      <div className="font-bold text-slate-900 flex items-center justify-between uppercase text-[11px] tracking-wide border-b border-slate-200/80 pb-1.5">
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Địa chỉ nhận hàng & Thanh toán</span>
+                        </div>
+                      </div>
+
+                      {/* 1. Khối Địa chỉ giao hàng thực tế */}
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                          Địa chỉ giao hàng:
+                        </div>
+                        <div className="text-slate-800 font-semibold leading-relaxed bg-white p-2.5 rounded-lg border border-slate-200 text-xs shadow-2xs">
+                          {parsed.cleanAddress}
+                        </div>
+                      </div>
+
+                      {/* Ghi chú đơn hàng nếu có */}
+                      {parsed.orderNote && (
+                        <div className="text-[11px] bg-amber-50 text-amber-900 border border-amber-200/80 rounded-lg p-2 flex items-start gap-1.5">
+                          <span className="font-bold shrink-0">Ghi chú:</span>
+                          <span className="font-medium">{parsed.orderNote}</span>
+                        </div>
+                      )}
+
+                      {/* 2. Khối Hình thức vận chuyển */}
+                      {(parsed.shippingMethod || parsed.dealTag) && (
+                        <div className="bg-sky-50/90 border border-sky-200/80 rounded-lg p-2.5 text-xs space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-sky-950 text-[11px]">
+                            <Truck className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                            <span>Hình thức vận chuyển:</span>
+                          </div>
+                          <div className="text-sky-900 font-medium pl-5 leading-normal">
+                            {parsed.shippingMethod}
+                          </div>
+                          {parsed.dealTag && (
+                            <div className="pl-5 pt-0.5">
+                              <span className="inline-block bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">
+                                {parsed.dealTag}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 3. Khối Chi tiết Cọc COD & Tiền thu Shipper */}
+                      {parsed.codInfo && (
+                        <div className="bg-amber-50/90 border border-amber-300/80 rounded-lg p-2.5 text-xs space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-bold text-amber-950 text-[11px] uppercase tracking-wide">
+                              Chi tiết thanh toán COD:
+                            </span>
+                            {parsed.codInfo.percent && (
+                              <span className="px-2 py-0.5 rounded bg-amber-200 text-amber-900 font-bold text-[10px]">
+                                Cọc {parsed.codInfo.percent}
+                              </span>
+                            )}
+                          </div>
+                          <div className="grid grid-cols-2 gap-2 pt-1 border-t border-amber-200/80">
+                            {parsed.codInfo.deposited && (
+                              <div>
+                                <div className="text-[10px] text-slate-500 font-medium">Đã cọc trước:</div>
+                                <div className="font-bold text-emerald-700">{parsed.codInfo.deposited}</div>
+                              </div>
+                            )}
+                            {parsed.codInfo.remaining && (
+                              <div>
+                                <div className="text-[10px] text-rose-700 font-bold uppercase">Shipper cần thu:</div>
+                                <div className="font-black text-rose-700 text-sm">{parsed.codInfo.remaining}</div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* 4. Trạng thái thanh toán & Mã vận đơn ĐVVC */}
+                      <div className="pt-1 flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-800 uppercase">
+                          {selectedOrderForDetail.payment_method === 'cod' ? 'COD (Tiền mặt)' : 'VietQR Chuyển khoản'}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          selectedOrderForDetail.payment_status === 'PAID'
+                            ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            : 'bg-amber-50 text-amber-800 border border-amber-200'
+                        }`}>
+                          {selectedOrderForDetail.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-red-50 text-red-700 border border-red-200 font-mono flex items-center gap-1.5">
+                          <img
+                            src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                            onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
+                            alt="ĐVVC"
+                            className="w-3.5 h-3.5 rounded object-cover inline-block"
+                          />
+                          <span>{selectedOrderForDetail.carrier || 'Viettel Post'}: {selectedOrderForDetail.tracking_code || `VTP${(selectedOrderForDetail.order_code || '').replace(/\D/g, '') || '881865'}VN`}</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenDispatchModal(selectedOrderForDetail)}
+                          className="px-2 py-0.5 rounded bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 text-[10px] font-semibold transition-colors cursor-pointer inline-flex items-center gap-1 shadow-2xs"
+                        >
+                          <Truck className="w-3 h-3 text-slate-500" />
+                          <span>{selectedOrderForDetail.tracking_code ? 'Sửa mã ĐVVC' : 'Gửi mã ĐVVC'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Chi tiết Sản phẩm đã đặt */}
