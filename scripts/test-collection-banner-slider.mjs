@@ -35,10 +35,11 @@ assert.ok(content.includes('href={slide.href}'), 'Nút khám phá phải liên k
 assert.ok(content.includes('bg-gradient-to-t from-black'), 'Phải có gradient bảo đảm độ tương phản chữ trên nền ảnh');
 console.log('✓ PASS [4/5]: Lớp phủ tiêu đề, mô tả và nút "Khám phá ngay" được hiển thị nổi bật và tương phản cao');
 
-// 5. Kiểm tra hệ thống điều hướng (Nút mũi tên & Thanh tiến trình)
-assert.ok(content.includes('aria-label="Previous Collection Slide"'), 'Có nút chuyển slide trước');
-assert.ok(content.includes('aria-label="Next Collection Slide"'), 'Có nút chuyển slide tiếp theo');
-assert.ok(content.includes('grid grid-cols-4'), 'Thanh tiến trình 4 bộ sưu tập ở cạnh dưới');
-console.log('✓ PASS [5/5]: Bộ nút điều hướng mũi tên và thanh timeline phân đoạn 4 slide hoạt động hoàn hảo');
+// 5. Kiểm tra loại bỏ 3 thành phần theo yêu cầu (Badge, Button chuyển ảnh, Tiêu đề ảnh phía dưới)
+assert.strictEqual(content.includes('aria-label="Previous Collection Slide"'), false, 'Đã loại bỏ nút chuyển slide trước');
+assert.strictEqual(content.includes('aria-label="Next Collection Slide"'), false, 'Đã loại bỏ nút chuyển slide tiếp theo');
+assert.strictEqual(content.includes('• 0{idx + 1} / 0{COLLECTION_BANNER_SLIDES.length}'), false, 'Đã loại bỏ badge số slide và tag');
+assert.strictEqual(content.includes('0{idx + 1} • {slide.tag.split(\' \')[0]}'), false, 'Đã loại bỏ tiêu đề của ảnh phía dưới');
+console.log('✓ PASS [5/5]: Đã loại bỏ hoàn toàn 3 thành phần: badge, nút mũi tên và tiêu đề ảnh phía dưới');
 
 console.log('\n=== TẤT CẢ 5/5 KIỂM THỬ ĐÃ PASS THÀNH CÔNG ===');

@@ -1209,15 +1209,6 @@ export default function CustomerStorefront() {
 
             {/* Content Container */}
             <div className="relative z-20 h-full max-w-[1760px] mx-auto px-6 md:px-12 flex flex-col justify-end pb-16 md:pb-20 space-y-4">
-              <div className="inline-flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="text-[10px] md:text-xs font-mono font-bold tracking-mono uppercase text-amber-300">
-                  {slide.tag}
-                </span>
-                <span className="text-[10px] font-mono text-white/40">
-                  • 0{idx + 1} / 0{COLLECTION_BANNER_SLIDES.length}
-                </span>
-              </div>
 
               <h2 className="font-wide uppercase text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-white tracking-tight leading-[1.05] max-w-4xl drop-shadow-md">
                 {slide.title}
@@ -1240,52 +1231,7 @@ export default function CustomerStorefront() {
           </div>
         ))}
 
-        {/* Navigation Controls: Arrows */}
-        <div className="absolute top-1/2 -translate-y-1/2 right-6 md:right-12 z-30 flex flex-col gap-2">
-          <button
-            type="button"
-            onClick={() => setCollectionSlideIndex((prev) => (prev - 1 + COLLECTION_BANNER_SLIDES.length) % COLLECTION_BANNER_SLIDES.length)}
-            className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/60 hover:bg-white hover:text-black text-white border border-white/20 backdrop-blur-sm transition-all cursor-pointer text-sm font-mono active:scale-95 shadow-lg"
-            aria-label="Previous Collection Slide"
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            onClick={() => setCollectionSlideIndex((prev) => (prev + 1) % COLLECTION_BANNER_SLIDES.length)}
-            className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/60 hover:bg-white hover:text-black text-white border border-white/20 backdrop-blur-sm transition-all cursor-pointer text-sm font-mono active:scale-95 shadow-lg"
-            aria-label="Next Collection Slide"
-          >
-            →
-          </button>
-        </div>
 
-        {/* Bottom Progress Indicators Bar */}
-        <div className="absolute bottom-0 inset-x-0 z-30 grid grid-cols-4 border-t hairline-dark bg-black/60 backdrop-blur-xs">
-          {COLLECTION_BANNER_SLIDES.map((slide, idx) => (
-            <button
-              key={slide.tag}
-              type="button"
-              onClick={() => setCollectionSlideIndex(idx)}
-              className="group py-2.5 px-3 md:px-6 text-left cursor-pointer transition-colors relative"
-              aria-label={`Go to slide ${idx + 1}: ${slide.tag}`}
-            >
-              {/* Active Indicator Line */}
-              <div
-                className={`h-1 w-full transition-all duration-300 mb-1.5 ${
-                  idx === collectionSlideIndex ? 'bg-amber-400' : 'bg-white/20 group-hover:bg-white/40'
-                }`}
-              />
-              <span
-                className={`hidden md:block text-[10px] font-mono tracking-mono uppercase truncate ${
-                  idx === collectionSlideIndex ? 'text-white font-bold' : 'text-white/40 group-hover:text-white/70'
-                }`}
-              >
-                0{idx + 1} • {slide.tag.split(' ')[0]}
-              </span>
-            </button>
-          ))}
-        </div>
       </section>
 
       {/* ================= 7. DARK FULL-BLEED CTA (Overlays Stationary Manifesto like a curtain) ================= */}
