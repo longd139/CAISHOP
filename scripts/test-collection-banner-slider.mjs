@@ -22,12 +22,13 @@ assert.ok(content.includes('const [isCollectionPaused, setIsCollectionPaused] = 
 assert.ok(content.includes('setCollectionSlideIndex((prev) => (prev + 1) % COLLECTION_BANNER_SLIDES.length);'), 'Phải có logic auto-play xoay vòng slide');
 console.log('✓ PASS [2/5]: Logic quản lý trạng thái slide và tự động chuyển trang hoạt động chuẩn xác');
 
-// 3. Kiểm tra Section giao diện Banner Slide ngang qua
+// 3. Kiểm tra Section giao diện Banner Slide ngang qua và hiệu ứng Sticky Pin ngưng lại
 assert.ok(content.includes('id="collections-banner"'), 'Section phải có id="collections-banner"');
-assert.ok(content.includes('h-[520px] md:h-[620px] lg:h-[700px]'), 'Banner phải có chiều cao tỉ lệ chuẩn full-bleed');
+assert.ok(content.includes('sticky top-0 h-[100dvh]'), 'Banner phải có class sticky top-0 h-[100dvh] để ngưng lại khi cuộn');
+assert.ok(content.includes('h-[40vh] md:h-[60vh]'), 'Phải có spacer khoảng dừng dwell để khối dưới kéo lên đè');
 assert.ok(content.includes('onMouseEnter={() => setIsCollectionPaused(true)}'), 'Phải tạm dừng slide khi người dùng rê chuột vào đọc');
 assert.ok(content.includes('onMouseLeave={() => setIsCollectionPaused(false)}'), 'Phải tiếp tục chạy slide khi người dùng rời chuột');
-console.log('✓ PASS [3/5]: Section banner slider ngang toàn màn hình được tích hợp hoàn chỉnh với hiệu ứng hover pause');
+console.log('✓ PASS [3/5]: Hiệu ứng sticky pin ngưng lại và khối dưới trượt lên đè lên banner được cài đặt hoàn hảo');
 
 // 4. Kiểm tra nút "Khám phá ngay", thông tin tiêu đề, hover nền đen chữ trắng và không dùng filter làm tối ảnh
 assert.ok(content.includes('Khám phá ngay'), 'Trên mỗi slide phải có nút "Khám phá ngay"');

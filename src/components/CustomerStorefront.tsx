@@ -1202,10 +1202,10 @@ export default function CustomerStorefront() {
         </div>
       </section>
 
-      {/* ================= 6. COLLECTION BANNER SLIDER (Full-bleed Horizontal Carousel) ================= */}
+      {/* ================= 6. COLLECTION BANNER SLIDER (Stationary Sticky Pin while next section slides over) ================= */}
       <section
         id="collections-banner"
-        className="relative z-10 w-full h-[520px] md:h-[620px] lg:h-[700px] bg-black overflow-hidden select-none border-y hairline-dark"
+        className="sticky top-0 h-[100dvh] w-full bg-black overflow-hidden select-none z-10 border-y hairline-dark"
         onMouseEnter={() => setIsCollectionPaused(true)}
         onMouseLeave={() => setIsCollectionPaused(false)}
       >
@@ -1252,6 +1252,9 @@ export default function CustomerStorefront() {
 
 
       </section>
+
+      {/* Spacer tạo khoảng dừng đọc để Banner đứng yên trước khi Section dưới kéo lên đè */}
+      <div className="h-[40vh] md:h-[60vh] pointer-events-none" aria-hidden="true" />
 
       {/* ================= 7. DARK FULL-BLEED CTA WITH INTERACTIVE HOVER REVEAL IMAGE GRID ================= */}
       <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-28 md:py-36 px-6 md:px-10 text-center border-t hairline-dark overflow-hidden shadow-[0_-30px_70px_rgba(0,0,0,0.6)]">
