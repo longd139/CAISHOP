@@ -1047,7 +1047,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
             {/* Scrollable Body: Items List + Deal selection (flex-1 overflow-y-auto min-h-0) */}
             <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6 min-h-0">
               {/* Items List */}
-              <div className="space-y-4 divide-y divide-black/10">
+              <div className="divide-y divide-black/10">
                 {cart.length === 0 ? (
                   <div className="py-12 text-center text-xs font-mono text-[#0a0a0a]/50 uppercase space-y-3">
                     <p>Giỏ hàng của bạn đang trống.</p>
@@ -1060,7 +1060,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                   </div>
                 ) : (
                   cart.map((item) => (
-                    <div key={item.variant_id} className="pt-4 first:pt-0 flex gap-4 items-start">
+                    <div key={item.variant_id} className="py-5 first:pt-0 last:pb-2 flex gap-4 items-start">
                       <img
                         src={getPrimaryImageUrl(item.product_image)}
                         alt={item.product_name}
