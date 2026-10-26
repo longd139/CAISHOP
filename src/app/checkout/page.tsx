@@ -1021,7 +1021,7 @@ export default function CheckoutPage() {
                 <AlertCircle className="w-7 h-7" />
               </div>
             ) : (
-              <div className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+              <div className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
                 <Clock className="w-7 h-7 animate-pulse" />
               </div>
             )}
@@ -1334,38 +1334,36 @@ export default function CheckoutPage() {
           {/* Conditional View: Pending Deposit / Payment */}
           {!isPaid && !isOrderExpired && (
             <div className="border border-slate-200 rounded-xl p-5 sm:p-6 bg-slate-50/70 text-center space-y-4">
-              {/* 1-Hour Expiration Live Countdown Box */}
+              {/* 1-Hour Expiration Live Countdown Box (Monochrome Atelier) */}
               {secondsRemaining !== null && (
-                <div className="p-4 sm:p-5 bg-gradient-to-br from-amber-50 via-orange-50 to-amber-100/50 border border-amber-300 rounded-2xl space-y-3 text-amber-950 shadow-xs text-left">
+                <div className="p-4 sm:p-5 bg-white border border-neutral-200 rounded-2xl space-y-3 text-neutral-900 shadow-2xs text-left">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
                     <div className="flex items-center gap-2.5">
-                      <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center text-amber-800 shrink-0">
-                        <Clock className="w-4 h-4 animate-spin text-amber-700 [animation-duration:10s]" />
+                      <div className="w-8 h-8 rounded-full bg-neutral-100 border border-neutral-200/80 flex items-center justify-center text-neutral-800 shrink-0">
+                        <Clock className="w-4 h-4 animate-spin text-neutral-700 [animation-duration:10s]" />
                       </div>
                       <div>
-                        <div className="text-xs font-bold text-amber-900 uppercase tracking-wide">
+                        <div className="text-xs font-bold text-neutral-900 uppercase tracking-wide">
                           Thời gian lưu giữ đơn hàng
                         </div>
-                        <div className="text-[11px] text-amber-700">
+                        <div className="text-[11px] text-neutral-500">
                           Tự động hủy đơn nếu không hoàn tất thanh toán sau 1 giờ
                         </div>
                       </div>
                     </div>
 
                     {/* Big Countdown Digits */}
-                    <div className="flex items-center gap-1 bg-amber-950 text-amber-100 px-3 py-1.5 rounded-xl font-mono font-bold text-base sm:text-lg tracking-widest shadow-inner shrink-0">
+                    <div className="flex items-center gap-1 bg-neutral-900 text-white px-3.5 py-1.5 rounded-xl font-mono font-bold text-base sm:text-lg tracking-widest shadow-sm shrink-0">
                       <span>{String(Math.floor(secondsRemaining / 60)).padStart(2, '0')}</span>
-                      <span className="animate-pulse">:</span>
+                      <span className="animate-pulse text-neutral-400">:</span>
                       <span>{String(secondsRemaining % 60).padStart(2, '0')}</span>
                     </div>
                   </div>
 
                   {/* Visual Progress Bar */}
-                  <div className="w-full bg-amber-200/80 h-2 rounded-full overflow-hidden">
+                  <div className="w-full bg-neutral-200 h-2 rounded-full overflow-hidden">
                     <div
-                      className={`h-full transition-all duration-1000 ${
-                        secondsRemaining < 600 ? 'bg-rose-500' : secondsRemaining < 1800 ? 'bg-amber-500' : 'bg-emerald-500'
-                      }`}
+                      className="h-full transition-all duration-1000 bg-neutral-900"
                       style={{ width: `${Math.max(0, Math.min(100, (secondsRemaining / 3600) * 100))}%` }}
                     />
                   </div>
