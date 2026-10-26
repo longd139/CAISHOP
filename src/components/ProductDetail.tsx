@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useHeaderNav } from '@/lib/useSiteContent';
-import { ChevronLeft, ChevronRight, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag, Trash2, Ruler } from 'lucide-react';
 import { getProductGallery, getPrimaryImageUrl, ProductImagePlate } from '@/lib/productImages';
 import { calculateTier, getNextTierInfo } from '@/lib/membership';
 import { useAuth } from '@/lib/useAuth';
@@ -71,6 +71,30 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
   const [scrolled, setScrolled] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBagOpen, setIsBagOpen] = useState(false);
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
+  const [customHeight, setCustomHeight] = useState<string>('');
+  const [customWeight, setCustomWeight] = useState<string>('');
+
+  // Bảng thông số đo chuẩn DE'GENT
+  const sizeChartData = [
+    { size: 'S', height: '1m55 - 1m65', weight: '48 - 55 kg', chest: '104 cm', length: '68 cm', shoulder: '48 cm', fit: 'Vừa vặn (Regular)' },
+    { size: 'M', height: '1m65 - 1m72', weight: '55 - 65 kg', chest: '108 cm', length: '71 cm', shoulder: '50 cm', fit: 'Vừa vặn (Regular/Fit)' },
+    { size: 'L', height: '1m70 - 1m78', weight: '65 - 75 kg', chest: '114 cm', length: '74 cm', shoulder: '52 cm', fit: 'Thoải mái (Comfort)' },
+    { size: 'XL', height: '1m75 - 1m85', weight: '75 - 85 kg', chest: '120 cm', length: '77 cm', shoulder: '54 cm', fit: 'Rộng rãi (Oversize)' },
+    { size: 'XXL', height: '1m80 - 1m92', weight: '85 - 95 kg', chest: '126 cm', length: '80 cm', shoulder: '56 cm', fit: 'Rộng rãi (Big size)' },
+  ];
+
+  // Gợi ý size thông minh theo chiều cao và cân nặng
+  const suggestedSize = useMemo(() => {
+    const h = parseFloat(customHeight);
+    const w = parseFloat(customWeight);
+    if (!h || !w || h < 100 || w < 30) return null;
+    if (w >= 85 || h >= 183) return 'XXL';
+    if (w >= 75 || h >= 177) return 'XL';
+    if (w >= 65 || h >= 170) return 'L';
+    if (w >= 54 || h >= 163) return 'M';
+    return 'S';
+  }, [customHeight, customWeight]);
 
   // Lock body scroll when bag drawer is open
   useEffect(() => {
@@ -854,12 +878,24 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 </div>
               </div>
 
-              {/* Size Selection */}
+              {/* Size Selection & Bảng size phù hợp */}
               <div className="space-y-3">
-                <div className="flex justify-between text-xs font-mono uppercase">
-                  <span className="text-[#0a0a0a]/60">Kích cỡ (Size):</span>
-                  <strong className="text-black">Size {selectedSize}</strong>
+                <div className="flex items-center justify-between text-xs font-mono uppercase">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#0a0a0a]/60">Kích cỡ (Size):</span>
+                    <strong className="text-black">Size {selectedSize}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsSizeGuideOpen(true)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-800 hover:text-black underline underline-offset-4 cursor-pointer transition-colors"
+                    title="Mở bảng hướng dẫn chọn size chuẩn"
+                  >
+                    <Ruler className="w-3.5 h-3.5" />
+                    <span>Bảng size phù hợp</span>
+                  </button>
                 </div>
+
                 <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {availableSizesForColor.map((v) => {
                     const isSelected = selectedSize === v.size;
@@ -877,6 +913,26 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                       </button>
                     );
                   })}
+                </div>
+
+                {/* Gợi ý size trực quan theo size đang chọn */}
+                <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-sm text-[11px] font-mono text-slate-600 flex items-center justify-between">
+                  <span>
+                    💡 <strong>Size {selectedSize}</strong>:{' '}
+                    {selectedSize === 'S' && 'Phù hợp 1m55 - 1m65 • 48 - 55 kg (Vừa vặn)'}
+                    {selectedSize === 'M' && 'Phù hợp 1m65 - 1m72 • 55 - 65 kg (Vừa vặn)'}
+                    {selectedSize === 'L' && 'Phù hợp 1m70 - 1m78 • 65 - 75 kg (Thoải mái)'}
+                    {selectedSize === 'XL' && 'Phù hợp 1m75 - 1m85 • 75 - 85 kg (Oversize)'}
+                    {selectedSize === 'XXL' && 'Phù hợp 1m80 - 1m92 • 85 - 95 kg (Rộng rãi)'}
+                    {!['S', 'M', 'L', 'XL', 'XXL'].includes(selectedSize) && 'Form chuẩn thương hiệu DE\'GENT'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsSizeGuideOpen(true)}
+                    className="text-slate-900 font-bold hover:underline shrink-0 ml-2 cursor-pointer"
+                  >
+                    Chi tiết &rarr;
+                  </button>
                 </div>
               </div>
 
@@ -1601,6 +1657,171 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
         cartCount={totalBagCount}
         initialTab={profileActiveTab}
       />
+
+      {/* ================= MODAL: BẢNG SIZE PHÙ HỢP ================= */}
+      {isSizeGuideOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white border hairline max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 sm:p-8 space-y-6 shadow-2xl relative">
+            {/* Header Modal */}
+            <div className="flex items-start justify-between border-b hairline pb-4">
+              <div>
+                <span className="text-[10px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
+                  HƯỚNG DẪN CHỌN KÍCH CỠ
+                </span>
+                <h3 className="font-wide uppercase text-xl font-bold tracking-tight">
+                  Bảng Size Phù Hợp • DE&apos;GENT
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Thông số chuẩn may đo form Regular / Oversize hiện đại, tôn dáng và thoải mái khi vận động.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSizeGuideOpen(false)}
+                className="p-1.5 hover:bg-black/5 text-slate-500 hover:text-black transition-colors cursor-pointer"
+                aria-label="Đóng bảng size"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Smart Size Calculator */}
+            <div className="bg-slate-50 border border-slate-200 p-4 rounded-sm space-y-3">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-600" />
+                <h4 className="text-xs font-bold font-mono uppercase text-slate-900">
+                  Gợi ý size nhanh theo số đo cơ thể
+                </h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-mono text-slate-500 block mb-1">
+                    Chiều cao của bạn (cm):
+                  </label>
+                  <input
+                    type="number"
+                    value={customHeight}
+                    onChange={(e) => setCustomHeight(e.target.value)}
+                    placeholder="Ví dụ: 172"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 focus:border-black outline-none bg-white font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-mono text-slate-500 block mb-1">
+                    Cân nặng của bạn (kg):
+                  </label>
+                  <input
+                    type="number"
+                    value={customWeight}
+                    onChange={(e) => setCustomWeight(e.target.value)}
+                    placeholder="Ví dụ: 65"
+                    className="w-full px-3 py-2 text-xs border border-slate-300 focus:border-black outline-none bg-white font-mono"
+                  />
+                </div>
+              </div>
+              {suggestedSize && (
+                <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-sm flex items-center justify-between flex-wrap gap-2">
+                  <div className="text-xs text-emerald-900">
+                    🎯 Size phù hợp nhất với bạn:{' '}
+                    <strong className="text-sm font-bold font-mono">Size {suggestedSize}</strong>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedSize(suggestedSize);
+                      setIsSizeGuideOpen(false);
+                    }}
+                    className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-sm transition-all cursor-pointer"
+                  >
+                    Chọn Size {suggestedSize} ngay
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Size Table: Chiều cao / Cân nặng */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold font-mono uppercase text-slate-900">
+                1. Bảng quy đổi theo Chiều cao & Cân nặng
+              </h4>
+              <div className="overflow-x-auto border hairline">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-slate-100 border-b hairline text-slate-700">
+                    <tr>
+                      <th className="p-2.5">Kích cỡ</th>
+                      <th className="p-2.5">Chiều cao</th>
+                      <th className="p-2.5">Cân nặng</th>
+                      <th className="p-2.5">Form dáng</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y hairline">
+                    {sizeChartData.map((row) => (
+                      <tr
+                        key={row.size}
+                        className={selectedSize === row.size ? 'bg-amber-50/60 font-bold' : 'hover:bg-slate-50'}
+                      >
+                        <td className="p-2.5 text-slate-900">Size {row.size}</td>
+                        <td className="p-2.5 text-slate-700">{row.height}</td>
+                        <td className="p-2.5 text-slate-700">{row.weight}</td>
+                        <td className="p-2.5 text-slate-600">{row.fit}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Size Table: Thông số thành phẩm */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold font-mono uppercase text-slate-900">
+                2. Bảng thông số đo chi tiết thành phẩm (cm)
+              </h4>
+              <div className="overflow-x-auto border hairline">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead className="bg-slate-100 border-b hairline text-slate-700">
+                    <tr>
+                      <th className="p-2.5">Size</th>
+                      <th className="p-2.5 text-center">Dài áo</th>
+                      <th className="p-2.5 text-center">Rộng ngực</th>
+                      <th className="p-2.5 text-center">Rộng vai</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y hairline">
+                    {sizeChartData.map((row) => (
+                      <tr
+                        key={row.size}
+                        className={selectedSize === row.size ? 'bg-amber-50/60 font-bold' : 'hover:bg-slate-50'}
+                      >
+                        <td className="p-2.5 text-slate-900">Size {row.size}</td>
+                        <td className="p-2.5 text-center text-slate-700">{row.length}</td>
+                        <td className="p-2.5 text-center text-slate-700">{row.chest}</td>
+                        <td className="p-2.5 text-center text-slate-700">{row.shoulder}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Notes & Policy */}
+            <div className="border-t hairline pt-4 space-y-1.5 text-[11px] font-mono text-slate-500">
+              <p>• <strong>Mẹo chọn:</strong> Nếu số đo của bạn ở giữa 2 size, hãy chọn size lớn hơn nếu thích mặc rộng thoải mái (Oversize), hoặc chọn size nhỏ hơn nếu thích ôm vừa vặn.</p>
+              <p>• <strong>Chính sách đổi hàng:</strong> Hỗ trợ đổi size miễn phí trong vòng 7 ngày kể từ khi nhận hàng nếu mặc không vừa.</p>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex justify-end pt-2 border-t hairline">
+              <button
+                type="button"
+                onClick={() => setIsSizeGuideOpen(false)}
+                className="px-6 py-2.5 bg-[#0a0a0a] text-white text-xs font-bold uppercase tracking-wider hover:bg-black/90 cursor-pointer transition-colors"
+              >
+                Đã hiểu & Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
