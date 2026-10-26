@@ -3833,30 +3833,19 @@ export default function ExecutiveDashboard() {
                               }`}
                             >
                               {(() => {
-                                const isDispatched = ord.fulfillment_status === 'DISPATCHED';
+                                const hasTracking = ord.fulfillment_status === 'DISPATCHED' || Boolean(ord.tracking_code);
 
-                                if (isDispatched) {
+                                if (hasTracking) {
                                   return (
-                                    <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenDispatchModal(ord)}
-                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-semibold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
-                                        title="Bấm để xem hoặc chỉnh sửa mã vận đơn"
-                                      >
-                                        <Truck className="w-3 h-3 text-sky-600 shrink-0" />
-                                        <span className="font-mono font-bold">{ord.tracking_code || 'Sửa mã'}</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleUpdateOrderStatus(ord.id, 'DELIVERED')}
-                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 hover:border-emerald-600 transition-all cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
-                                        title="Xác nhận khách đã nhận hàng thành công"
-                                      >
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 hover:text-white shrink-0" />
-                                        <span>Đã nhận</span>
-                                      </button>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenDispatchModal(ord)}
+                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+                                      title="Bấm để xem hoặc chỉnh sửa mã vận đơn"
+                                    >
+                                      <Truck className="w-3.5 h-3.5 text-sky-600 shrink-0" />
+                                      <span className="font-mono font-bold">{ord.tracking_code || 'Sửa mã ĐVVC'}</span>
+                                    </button>
                                   );
                                 }
 
