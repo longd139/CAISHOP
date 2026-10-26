@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getSiteContent } from '@/lib/db';
-import { defaultPaymentSettings, PaymentSettings } from '@/lib/paymentSettings';
+import { defaultPaymentSettings, PaymentSettings, getResolvedPaymentSettings } from '@/lib/paymentSettings';
 import { createPayOSPaymentRequest, formatPayOSDescription, generateNumericOrderCode } from '@/lib/payos';
 
 export async function POST(request: Request) {
@@ -16,10 +16,7 @@ export async function POST(request: Request) {
     }
 
     const raw = await getSiteContent('payment_settings', null);
-    const settings: PaymentSettings = {
-      ...defaultPaymentSettings,
-      ...(raw || {})
-    };
+    const settings = getResolvedPaymentSettings(raw);
 
     if (!settings.is_payos_enabled) {
       return NextResponse.json({

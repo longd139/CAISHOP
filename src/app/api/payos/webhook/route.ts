@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb, getSiteContent, confirmOrderPayment } from '@/lib/db';
-import { defaultPaymentSettings, PaymentSettings } from '@/lib/paymentSettings';
+import { defaultPaymentSettings, PaymentSettings, getResolvedPaymentSettings } from '@/lib/paymentSettings';
 import { verifyPayOSWebhook, PayOSWebhookPayload } from '@/lib/payos';
 
 export async function GET() {
@@ -13,10 +13,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const raw = await getSiteContent('payment_settings', null);
-    const settings: PaymentSettings = {
-      ...defaultPaymentSettings,
-      ...(raw || {})
-    };
+    const settings = getResolvedPaymentSettings(raw);
 
     if (!settings.payos_checksum_key) {
       console.warn('[PayOS Webhook] Checksum key not configured');

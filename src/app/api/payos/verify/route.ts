@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDb, getSiteContent, confirmOrderPayment } from '@/lib/db';
-import { defaultPaymentSettings, PaymentSettings } from '@/lib/paymentSettings';
+import { defaultPaymentSettings, PaymentSettings, getResolvedPaymentSettings } from '@/lib/paymentSettings';
 import { getPayOSPaymentInformation, generateNumericOrderCode } from '@/lib/payos';
 
 export async function POST(request: Request) {
@@ -34,10 +34,7 @@ export async function POST(request: Request) {
 
     // Nếu chưa thanh toán: Thực hiện đối soát trực tiếp từ máy chủ tới cổng PayOS
     const raw = await getSiteContent('payment_settings', null);
-    const settings: PaymentSettings = {
-      ...defaultPaymentSettings,
-      ...(raw || {})
-    };
+    const settings = getResolvedPaymentSettings(raw);
 
     const isMockEnabled = process.env.ENABLE_MOCK_PAYMENT === 'true' || process.env.NEXT_PUBLIC_ENABLE_MOCK_PAYMENT === 'true';
 
