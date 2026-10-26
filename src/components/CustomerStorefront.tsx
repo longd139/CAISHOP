@@ -34,6 +34,29 @@ interface Product {
   variants: ProductVariant[];
 }
 
+const STUDIO_SLIDES = [
+  {
+    url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg',
+    tag: 'ATELIER FITTING ROOM',
+    title: 'Phòng may & kiểm tra form dáng chuẩn tỉ lệ Á - Âu'
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=1200&auto=format&fit=crop',
+    tag: 'OXFORD TEXTILE SPEC',
+    title: 'Vải dệt thoi mật độ cao, hạn chế tối đa nhăn nhàu'
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1542272604-780c96856592?w=1200&auto=format&fit=crop',
+    tag: 'VINTAGE DENIM 12OZ',
+    title: 'Đinh tán đồng đúc nguyên khối & đường may chỉ kép chịu lực'
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1586363104862-3a5e2ab60d99?w=1200&auto=format&fit=crop',
+    tag: 'PIQUE HONEYCOMB KNIT',
+    title: 'Cấu trúc dệt mắt chim thông thoáng, giữ form cổ áo sắc nét'
+  }
+];
+
 export default function CustomerStorefront() {
   const { items: headerNavItems } = useHeaderNav();
   const { content: siteContent } = useSiteContent();
@@ -89,6 +112,8 @@ export default function CustomerStorefront() {
   const [scrolled, setScrolled] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const [heroProgress, setHeroProgress] = useState(0);
+  const [studioImageIndex, setStudioImageIndex] = useState(0);
+  const [isStudioPaused, setIsStudioPaused] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBagOpen, setIsBagOpen] = useState(false);
 
@@ -172,6 +197,15 @@ export default function CustomerStorefront() {
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Auto-play Studio Slide Carousel (pause on hover)
+  useEffect(() => {
+    if (isStudioPaused) return;
+    const timer = setInterval(() => {
+      setStudioImageIndex((prev) => (prev + 1) % STUDIO_SLIDES.length);
+    }, 3600);
+    return () => clearInterval(timer);
+  }, [isStudioPaused]);
 
   // IntersectionObserver for .reveal elements on scroll
   useEffect(() => {
@@ -993,14 +1027,94 @@ export default function CustomerStorefront() {
         <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-20 md:py-28">
           <div className="grid md:grid-cols-12 gap-12 lg:gap-16 items-start">
 
-            {/* Left Column: Big Headline */}
-            <div className="reveal md:col-span-6 space-y-4">
-              <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/60 block">
-                {siteContent?.home?.studio_badge || siteContent?.studio?.badge || 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC'}
-              </span>
-              <h2 className="font-wide uppercase text-[10vw] md:text-[52px] leading-[0.95] tracking-tight">
-                {siteContent?.home?.studio_title || siteContent?.studio?.title || 'Chất vải nguyên bản. Form dáng vừa vặn từng centimet.'}
-              </h2>
+            {/* Left Column: Big Headline + Dynamic Studio Motion Showcase */}
+            <div className="reveal md:col-span-6 space-y-6">
+              <div className="space-y-4">
+                <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/60 block">
+                  {siteContent?.home?.studio_badge || siteContent?.studio?.badge || 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC'}
+                </span>
+                <h2 className="font-wide uppercase text-[10vw] md:text-[52px] leading-[0.95] tracking-tight">
+                  {siteContent?.home?.studio_title || siteContent?.studio?.title || 'Chất vải nguyên bản. Form dáng vừa vặn từng centimet.'}
+                </h2>
+              </div>
+
+              {/* Dynamic Studio Image Carousel (Auto-playing with Crossfade & Controls) */}
+              <div
+                className="relative border hairline-dark overflow-hidden bg-black/60 group/studio select-none"
+                onMouseEnter={() => setIsStudioPaused(true)}
+                onMouseLeave={() => setIsStudioPaused(false)}
+              >
+                {/* Image Stage with Crossfade */}
+                <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden">
+                  {STUDIO_SLIDES.map((slide, idx) => (
+                    <div
+                      key={slide.url}
+                      className={`absolute inset-0 transition-all duration-700 ease-in-out ${
+                        idx === studioImageIndex ? 'opacity-100 scale-100 z-10' : 'opacity-0 scale-105 z-0 pointer-events-none'
+                      }`}
+                    >
+                      <img
+                        src={slide.url}
+                        alt={slide.title}
+                        className="w-full h-full object-cover object-center contrast-105 brightness-90"
+                      />
+                      {/* Gradient overlay for text contrast */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />
+                    </div>
+                  ))}
+
+                  {/* Top Bar: Slide Counter & Current Spec Tag */}
+                  <div className="absolute top-3.5 left-4 right-4 z-20 flex items-center justify-between text-[9px] font-mono tracking-mono text-white/80">
+                    <span className="px-2 py-0.5 bg-black/60 backdrop-blur-md border hairline-dark uppercase">
+                      {STUDIO_SLIDES[studioImageIndex].tag}
+                    </span>
+                    <span className="px-2 py-0.5 bg-black/60 backdrop-blur-md border hairline-dark">
+                      0{studioImageIndex + 1} / 0{STUDIO_SLIDES.length}
+                    </span>
+                  </div>
+
+                  {/* Bottom Bar: Slide Description + Manual Controls */}
+                  <div className="absolute bottom-3 left-4 right-4 z-20 flex items-end justify-between gap-3">
+                    <p className="text-xs sm:text-[13px] text-white/90 font-light max-w-sm line-clamp-1 drop-shadow-md">
+                      {STUDIO_SLIDES[studioImageIndex].title}
+                    </p>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setStudioImageIndex((prev) => (prev - 1 + STUDIO_SLIDES.length) % STUDIO_SLIDES.length)}
+                        className="w-7 h-7 flex items-center justify-center bg-black/70 hover:bg-white hover:text-black text-white border hairline-dark transition-colors cursor-pointer text-xs"
+                        aria-label="Previous Slide"
+                      >
+                        ←
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setStudioImageIndex((prev) => (prev + 1) % STUDIO_SLIDES.length)}
+                        className="w-7 h-7 flex items-center justify-center bg-black/70 hover:bg-white hover:text-black text-white border hairline-dark transition-colors cursor-pointer text-xs"
+                        aria-label="Next Slide"
+                      >
+                        →
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Progress Indicators Bar */}
+                <div className="grid grid-cols-4 border-t hairline-dark bg-black/80">
+                  {STUDIO_SLIDES.map((_, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setStudioImageIndex(idx)}
+                      className={`h-1.5 transition-all cursor-pointer ${
+                        idx === studioImageIndex ? 'bg-white' : 'bg-white/20 hover:bg-white/40'
+                      }`}
+                      aria-label={`Go to slide ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Right Column: Narrative + DL Definition List */}
