@@ -1027,25 +1027,36 @@ export default function CustomerStorefront() {
         <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-20 md:py-28">
           <div className="grid md:grid-cols-12 gap-12 lg:gap-16 items-start">
 
-            {/* Left Column: Big Headline + Dynamic Studio Motion Showcase */}
+            {/* Left Column: Big Headline + Narrative */}
             <div className="reveal md:col-span-6 space-y-6">
-              <div className="space-y-4">
-                <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/60 block">
-                  {siteContent?.home?.studio_badge || siteContent?.studio?.badge || 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC'}
-                </span>
-                <h2 className="font-wide uppercase text-[10vw] md:text-[52px] leading-[0.95] tracking-tight">
-                  {siteContent?.home?.studio_title || siteContent?.studio?.title || 'Chất vải nguyên bản. Form dáng vừa vặn từng centimet.'}
-                </h2>
-              </div>
+              <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/60 block">
+                {siteContent?.home?.studio_badge || siteContent?.studio?.badge || 'PHÒNG MAY & THỬ SIZE CHUẨN XÁC'}
+              </span>
+              <h2 className="font-wide uppercase text-[10vw] md:text-[52px] leading-[0.95] tracking-tight">
+                {siteContent?.home?.studio_title || siteContent?.studio?.title || 'Chất vải nguyên bản. Form dáng vừa vặn từng centimet.'}
+              </h2>
 
-              {/* Dynamic Studio Image Carousel (Auto-playing with Crossfade & Controls) */}
+              <p className="text-[15px] md:text-[16px] leading-relaxed text-white/70 font-light pt-2">
+                {siteContent?.home?.studio_narrative || siteContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, hệ thống tự động xác thực thanh toán sau 3 giây để đóng gói giao ngay.'}
+              </p>
+
+              <div className="pt-2">
+                <a href="#product" className="nav-link text-[11px] tracking-wide-2 uppercase font-medium text-white inline-flex items-center gap-2">
+                  <span>Chọn sản phẩm ngay</span>
+                  <span>→</span>
+                </a>
+              </div>
+            </div>
+
+            {/* Right Column: Dynamic Studio Image Carousel (Replaced here) */}
+            <div className="reveal md:col-span-6" style={{ transitionDelay: '150ms' }}>
               <div
-                className="relative border hairline-dark overflow-hidden bg-black/60 group/studio select-none"
+                className="relative border hairline-dark overflow-hidden bg-black/60 group/studio select-none shadow-2xl"
                 onMouseEnter={() => setIsStudioPaused(true)}
                 onMouseLeave={() => setIsStudioPaused(false)}
               >
                 {/* Image Stage with Crossfade */}
-                <div className="relative aspect-[16/10] sm:aspect-[16/9] w-full overflow-hidden">
+                <div className="relative aspect-[4/3] sm:aspect-[16/11] w-full overflow-hidden">
                   {STUDIO_SLIDES.map((slide, idx) => (
                     <div
                       key={slide.url}
@@ -1114,34 +1125,6 @@ export default function CustomerStorefront() {
                     />
                   ))}
                 </div>
-              </div>
-            </div>
-
-            {/* Right Column: Narrative + DL Definition List */}
-            <div className="reveal md:col-span-6 space-y-8" style={{ transitionDelay: '150ms' }}>
-              <p className="text-[15px] md:text-[16px] leading-relaxed text-white/70 font-light">
-                {siteContent?.home?.studio_narrative || siteContent?.studio?.narrative || 'Mỗi chiếc Polo Cá Sấu, quần jeans Lê-Vy hay áo thun Xi-Kê đều được chúng tôi kiểm tra kỹ lưỡng độ co giãn, form dáng thực tế và mã vạch trước khi lên kệ. Đặt hàng qua mã VietQR động, hệ thống tự động xác thực thanh toán sau 3 giây để đóng gói giao ngay.'}
-              </p>
-
-              <dl className="border-b hairline-dark">
-                <div className="flex justify-between py-5 border-t hairline-dark text-xs">
-                  <dt className="text-white/60 uppercase tracking-wide-2">Web Canvas</dt>
-                  <dd className="font-mono text-white">{siteContent?.home?.studio_canvas || siteContent?.studio?.spec_canvas || 'Form Á / Âu chuẩn size'}</dd>
-                </div>
-                <div className="flex justify-between py-5 border-t hairline-dark text-xs">
-                  <dt className="text-white/60 uppercase tracking-wide-2">Kho hàng thực tế</dt>
-                  <dd className="font-mono text-white">{siteContent?.home?.studio_ledger || siteContent?.studio?.spec_ledger || 'Hệ thống kho vận toàn quốc (Hà Nội & TP.HCM)'}</dd>
-                </div>
-                <div className="flex justify-between py-5 border-t hairline-dark text-xs">
-                  <dt className="text-white/60 uppercase tracking-wide-2">Vận chuyển</dt>
-                  <dd className="font-mono text-white">Giao hàng hỏa tốc toàn quốc</dd>
-                </div>
-              </dl>
-
-              <div>
-                <a href="#product" className="nav-link text-[11px] tracking-wide-2 uppercase font-medium text-white">
-                  Chọn sản phẩm ngay
-                </a>
               </div>
             </div>
 
