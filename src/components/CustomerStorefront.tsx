@@ -1123,28 +1123,29 @@ export default function CustomerStorefront() {
         </div>
       </section>
 
-      {/* ================= 6. STICKY PIN MANIFESTO (Curtain Reveal Pattern) ================= */}
-      <div className="relative min-h-[150dvh] md:min-h-[170dvh] bg-white">
-        <section
-          id="manifesto"
-          className="sticky top-0 h-[100dvh] w-full flex items-center justify-center text-center px-6 md:px-10 z-10 bg-white select-none overflow-hidden"
-        >
-          <div className="max-w-[1100px] mx-auto space-y-6 pt-12 md:pt-16">
-            <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-              {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI CÁI SHOP'}
-            </span>
-            <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight text-[#0a0a0a]">
-              "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
-            </blockquote>
-            <div className="text-[11px] tracking-mono uppercase text-[#0a0a0a]/50 font-mono pt-2">
-              {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
-            </div>
+      {/* ================= 6. STICKY PIN MANIFESTO (Stationary while next section slides over) ================= */}
+      <section
+        id="manifesto"
+        className="sticky top-0 h-[100dvh] w-full flex items-center justify-center text-center px-6 md:px-10 z-0 bg-white select-none overflow-hidden"
+      >
+        <div className="max-w-[1100px] mx-auto space-y-6 pt-12 md:pt-16">
+          <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
+            {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI CÁI SHOP'}
+          </span>
+          <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight text-[#0a0a0a]">
+            "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
+          </blockquote>
+          <div className="text-[11px] tracking-mono uppercase text-[#0a0a0a]/50 font-mono pt-2">
+            {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
           </div>
-        </section>
-      </div>
+        </div>
+      </section>
 
-      {/* ================= 7. DARK FULL-BLEED CTA (Overlays Sticky Manifesto like a curtain) ================= */}
-      <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark shadow-[0_-25px_60px_rgba(0,0,0,0.5)]">
+      {/* Spacer tạo khoảng dừng đọc để Manifesto đứng yên trước khi Section dưới kéo lên đè */}
+      <div className="h-[40vh] md:h-[60vh] pointer-events-none" aria-hidden="true" />
+
+      {/* ================= 7. DARK FULL-BLEED CTA (Overlays Stationary Manifesto like a curtain) ================= */}
+      <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark shadow-[0_-30px_70px_rgba(0,0,0,0.6)]">
         <div className="max-w-[1000px] mx-auto space-y-8">
           <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/50 block">
             {siteContent?.home?.cta_badge || 'SỐ LƯỢNG MỖI MẪU CÓ HẠN'}

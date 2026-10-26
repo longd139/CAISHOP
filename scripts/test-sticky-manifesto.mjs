@@ -9,12 +9,12 @@ const storefrontPath = path.resolve(process.cwd(), 'src/components/CustomerStore
 assert.ok(fs.existsSync(storefrontPath), 'CustomerStorefront.tsx không tồn tại');
 const content = fs.readFileSync(storefrontPath, 'utf-8');
 
-assert.ok(content.includes('STICKY PIN MANIFESTO (Curtain Reveal Pattern)'), 'Thiếu ghi chú sticky pin manifesto');
+assert.ok(content.includes('STICKY PIN MANIFESTO (Stationary while next section slides over)'), 'Thiếu ghi chú sticky pin manifesto');
 assert.ok(content.includes('sticky top-0 h-[100dvh]'), 'Thiếu class sticky top-0 h-[100dvh] để ngưng lại');
-assert.ok(content.includes('min-h-[150dvh] md:min-h-[170dvh]'), 'Thiếu chiều cao hành trình pin để tạo khoảng dừng');
+assert.ok(content.includes('h-[40vh] md:h-[60vh]'), 'Thiếu spacer khoảng dừng đọc dwell');
 assert.ok(content.includes('relative z-20 w-full bg-[#0a0a0a]'), 'Thiếu class z-20 trên section CTA kế tiếp để đè lên');
-assert.ok(content.includes('shadow-[0_-25px_60px_rgba(0,0,0,0.5)]'), 'Thiếu bóng đổ viền trên để tạo chiều sâu đè lên');
-console.log('✔ CustomerStorefront.tsx: Cấu trúc sticky pin và curtain overlay được thiết lập chuẩn xác.');
+assert.ok(content.includes('shadow-[0_-30px_70px_rgba(0,0,0,0.6)]'), 'Thiếu bóng đổ viền trên để tạo chiều sâu đè lên');
+console.log('✔ CustomerStorefront.tsx: Cấu trúc sticky pin cố định và khối dưới đè lên được thiết lập chuẩn xác.');
 
 // 2. Kiểm thử toán học mô phỏng hành vi cuộn (Scroll Simulation)
 // Giả sử viewportHeight = 800px.
