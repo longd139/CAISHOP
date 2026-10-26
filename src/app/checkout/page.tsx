@@ -101,6 +101,9 @@ export default function CheckoutPage() {
   const [customTimeSlot, setCustomTimeSlot] = useState<string>('');
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
+  // COD Deposit policy states (Bắt buộc cọc 50% hoặc 100%)
+  const [codDepositPercent, setCodDepositPercent] = useState<50 | 100>(50);
+
   // Facebook Freeship Hunt Deal states
   const [fbConfig, setFbConfig] = useState<FacebookFreeshipConfig>(DEFAULT_FACEBOOK_FREESHIP_CONFIG);
   const [isFbModalOpen, setIsFbModalOpen] = useState(false);
@@ -411,18 +414,25 @@ export default function CheckoutPage() {
     return () => clearInterval(timer);
   }, [orderSuccess]);
 
-  // Handler: Tiếp tục thanh toán qua PayOS
+  // Handler: Tiếp tục thanh toán qua PayOS (VietQR hoặc Cọc COD 50%/100%)
   const handleContinuePayment = async () => {
     if (!orderSuccess || isOrderExpired) return;
     setIsRedirectingToPayOS(true);
     try {
+      const isCodOrder = (orderSuccess.payment_method || paymentMethod) === 'cod';
+      const codDepositMatch = orderSuccess.shipping_address?.match(/\[CỌC COD:\s*(\d+)%/i);
+      const depositPercent = (codDepositMatch && parseInt(codDepositMatch[1], 10) === 100) ? 100 : 50;
+      const targetAmount = isCodOrder
+        ? (depositPercent === 100 ? orderSuccess.total_amount : Math.round(orderSuccess.total_amount * 0.5))
+        : orderSuccess.total_amount;
+
       const pRes = await fetch('/api/payos/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           order_id: orderSuccess.id,
           order_code: orderSuccess.order_code,
-          total_amount: orderSuccess.total_amount,
+          total_amount: targetAmount,
           customer_name: orderSuccess.customer_name,
           customer_phone: orderSuccess.customer_phone,
         }),
@@ -630,10 +640,17 @@ export default function CheckoutPage() {
           : `[VẬN CHUYỂN: Shipper riêng DE'GENT - Ship thường trong ngày (${shippingFee === 0 ? '0đ' : '40k'})]${fbTag}`
         : `[VẬN CHUYỂN: Giao hàng tiêu chuẩn (${shippingFee === 0 ? '0đ' : formatMoney(shippingFee)})]${fbTag}`;
 
+      const codDepositAmount = codDepositPercent === 100 ? finalTotal : Math.round(finalTotal * 0.5);
+      const codRemainingAmount = Math.max(0, finalTotal - codDepositAmount);
+      const codDepositTag = paymentMethod === 'cod'
+        ? ` [CỌC COD: ${codDepositPercent}% - ĐÃ CỌC: ${formatMoney(codDepositAmount)} - THU SHIPPER: ${formatMoney(codRemainingAmount)}]`
+        : '';
+
       const fullAddress = [
         shippingAddress.trim(),
         orderNote.trim() ? `(Ghi chú: ${orderNote.trim()})` : '',
         carrierTag,
+        codDepositTag,
       ].filter(Boolean).join(' - ');
 
       const payload = {
@@ -675,17 +692,18 @@ export default function CheckoutPage() {
         console.error('Không thể lưu thông tin nhận hàng vào localStorage:', saveErr);
       }
 
-      // If VietQR with PayOS enabled, generate link and REDIRECT DIRECTLY to pay.payos.vn
-      if (paymentMethod === 'vietqr' && paymentSettings.is_payos_enabled) {
+      // Cổng PayOS: Chuyển khoản VietQR hoặc Đặt cọc COD (50% hoặc 100%)
+      if (paymentSettings.is_payos_enabled) {
         setIsRedirectingToPayOS(true);
         try {
+          const targetPayAmount = paymentMethod === 'cod' ? codDepositAmount : data.order.total_amount;
           const pRes = await fetch('/api/payos/create-payment', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               order_id: data.order.id,
               order_code: data.order.order_code,
-              total_amount: data.order.total_amount,
+              total_amount: targetPayAmount,
               customer_name: customerName.trim(),
               customer_phone: customerPhone.trim(),
             }),
@@ -731,7 +749,8 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!orderSuccess?.id) return;
     const isVietQr = (orderSuccess.payment_method || paymentMethod) === 'vietqr';
-    if (!isVietQr || orderSuccess.payment_status === 'PAID') return;
+    const isCod = (orderSuccess.payment_method || paymentMethod) === 'cod';
+    if ((!isVietQr && !isCod) || orderSuccess.payment_status === 'PAID') return;
 
     const interval = setInterval(async () => {
       try {
@@ -959,6 +978,7 @@ export default function CheckoutPage() {
   // View: Order Success Screen
   if (orderSuccess) {
     const isVietQr = (orderSuccess.payment_method || paymentMethod) === 'vietqr';
+    const isCod = (orderSuccess.payment_method || paymentMethod) === 'cod';
     const isDelivered = orderSuccess.fulfillment_status === 'DELIVERED';
     const isReturned = orderSuccess.fulfillment_status === 'RETURNED';
     const returnNotesLower = (orderSuccess.return_notes || '').toLowerCase();
@@ -972,6 +992,12 @@ export default function CheckoutPage() {
     const isRefund = isReturned && !isExchange;
     const isPaid = orderSuccess.payment_status === 'PAID' || isDelivered || isReturned;
     const isPacking = (orderSuccess.fulfillment_status === 'PACKING' || isPaid) && !isDelivered && !isReturned;
+
+    // Trích xuất tỷ lệ cọc từ địa chỉ giao hàng
+    const codDepositMatch = orderSuccess.shipping_address?.match(/\[CỌC COD:\s*(\d+)%/i);
+    const orderDepositPercent: 50 | 100 = (codDepositMatch && parseInt(codDepositMatch[1], 10) === 100) ? 100 : 50;
+    const orderDepositAmount = orderDepositPercent === 100 ? orderSuccess.total_amount : Math.round(orderSuccess.total_amount * 0.5);
+    const orderRemainingCodAmount = Math.max(0, orderSuccess.total_amount - orderDepositAmount);
 
     return (
       <div className="min-h-screen bg-slate-50 py-10 px-4 sm:px-6 lg:px-8">
@@ -994,13 +1020,9 @@ export default function CheckoutPage() {
               <div className="w-14 h-14 bg-rose-100 text-rose-700 rounded-full flex items-center justify-center mx-auto border border-rose-200">
                 <AlertCircle className="w-7 h-7" />
               </div>
-            ) : isVietQr ? (
-              <div className="w-14 h-14 bg-slate-100 text-slate-800 rounded-full flex items-center justify-center mx-auto border border-slate-200">
-                <Clock className="w-7 h-7 animate-pulse" />
-              </div>
             ) : (
-              <div className="w-14 h-14 bg-slate-900 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
-                <Truck className="w-7 h-7" />
+              <div className="w-14 h-14 bg-amber-500 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+                <Clock className="w-7 h-7 animate-pulse" />
               </div>
             )}
 
@@ -1013,12 +1035,12 @@ export default function CheckoutPage() {
                   : isDelivered
                   ? 'Đã Nhận Hàng Thành Công!'
                   : isPaid
-                  ? 'Thanh Toán Thành Công!'
+                  ? (isCod ? 'Đặt Hàng & Đặt Cọc Thành Công!' : 'Thanh Toán Thành Công!')
                   : isOrderExpired
                   ? 'Đơn Hàng Đã Hết Hạn'
-                  : isVietQr
-                  ? 'Đơn Hàng Chờ Chuyển Khoản'
-                  : 'Đặt Hàng Thành Công!'}
+                  : isCod
+                  ? `Chờ Thanh Toán Tiền Cọc (${orderDepositPercent}%)`
+                  : 'Đơn Hàng Chờ Chuyển Khoản'}
               </h1>
               <p className="text-xs text-slate-500 mt-1">
                 Mã đơn hàng: <strong className="text-slate-900 font-bold tracking-wider">#{orderSuccess.order_code}</strong>
@@ -1053,20 +1075,30 @@ export default function CheckoutPage() {
                 </>
               ) : isPaid ? (
                 <>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-semibold border border-slate-200">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200">
                     <Check className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>Đã thanh toán</span>
+                    <span>{isCod ? `Đã cọc ${orderDepositPercent}% (${formatMoney(orderDepositAmount)})` : 'Đã thanh toán'}</span>
                   </span>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-xs">
-                    <PackageCheck className="w-3.5 h-3.5" />
-                    <span>Trạng thái: Chờ vận chuyển</span>
+                  <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-xs">
+                    <Truck className="w-3.5 h-3.5" />
+                    <span>Trạng thái: Bàn giao cho shipper</span>
                   </span>
                 </>
               ) : isOrderExpired ? (
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 text-xs font-semibold border border-rose-200">
                   <span>Trạng thái: Đã hết hạn & Đã tự hủy</span>
                 </span>
-              ) : isVietQr ? (
+              ) : isCod ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 text-xs font-semibold border border-amber-200">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                    <span>Trạng thái: Chờ thanh toán tiền cọc ({orderDepositPercent}%)</span>
+                  </span>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-medium border border-slate-200">
+                    <span>Lưu giữ 1 giờ</span>
+                  </span>
+                </>
+              ) : (
                 <>
                   <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold border border-slate-200">
                     <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
@@ -1076,11 +1108,6 @@ export default function CheckoutPage() {
                     <span>Lưu giữ 1 giờ</span>
                   </span>
                 </>
-              ) : (
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-900 text-white text-xs font-semibold shadow-xs">
-                  <Truck className="w-3.5 h-3.5" />
-                  <span>Trạng thái: Chờ vận chuyển (COD)</span>
-                </span>
               )}
             </div>
           </div>
@@ -1137,18 +1164,18 @@ export default function CheckoutPage() {
                     className={`w-6 h-6 mx-auto rounded-full text-[11px] flex items-center justify-center font-bold transition-all ${
                       isPaid
                         ? 'bg-slate-900 text-white'
-                        : isVietQr
-                        ? 'bg-slate-900 text-white ring-2 ring-slate-300'
-                        : 'bg-slate-200 text-slate-700'
+                        : 'bg-slate-900 text-white ring-2 ring-slate-300'
                     }`}
                   >
-                    {isPaid ? '✓' : isVietQr ? '2' : 'COD'}
+                    {isPaid ? '✓' : '2'}
                   </div>
                   <div className="text-[11px] font-bold text-slate-900">
-                    {isVietQr ? (isPaid ? '2. Thanh toán' : '2. Chờ CK') : '2. Thu COD'}
+                    {isCod ? '2. Đặt cọc' : (isVietQr ? (isPaid ? '2. Thanh toán' : '2. Chờ CK') : '2. Đặt cọc')}
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    {isVietQr ? (isPaid ? 'Thành công' : 'Quét PayOS') : 'Khi nhận'}
+                    {isCod
+                      ? (isPaid ? `Đã cọc ${orderDepositPercent}%` : `Cọc ${orderDepositPercent}%`)
+                      : (isPaid ? 'Thành công' : 'Quét PayOS')}
                   </div>
                 </div>
 
@@ -1158,18 +1185,22 @@ export default function CheckoutPage() {
                     className={`w-6 h-6 mx-auto rounded-full text-[11px] flex items-center justify-center font-bold transition-all ${
                       isDelivered || isReturned
                         ? 'bg-slate-900 text-white'
-                        : isPacking
+                        : isPaid
                         ? 'bg-slate-900 text-white ring-2 ring-slate-300'
                         : 'bg-slate-100 text-slate-400 border border-slate-200'
                     }`}
                   >
-                    {isDelivered || isReturned ? '✓' : isPacking ? '3' : '○'}
+                    {isDelivered || isReturned ? '✓' : isPaid ? '3' : '○'}
                   </div>
-                  <div className={`text-[11px] font-bold ${isPacking || isDelivered || isReturned ? 'text-slate-900' : 'text-slate-400'}`}>
-                    3. Vận chuyển
+                  <div className={`text-[11px] font-bold ${isPaid || isDelivered || isReturned ? 'text-slate-900' : 'text-slate-400'}`}>
+                    {isCod ? '3. Bàn giao shipper' : '3. Bàn giao shipper'}
                   </div>
                   <div className="text-[10px] text-slate-500">
-                    {isDelivered || isReturned ? 'Đã giao tới bạn' : isPacking ? 'Chuẩn bị gói' : 'Chờ hoàn tất'}
+                    {isDelivered || isReturned
+                      ? 'Đã giao tới bạn'
+                      : isPaid
+                      ? 'Bàn giao cho shipper'
+                      : 'Chờ thanh toán cọc'}
                   </div>
                 </div>
 
@@ -1181,14 +1212,14 @@ export default function CheckoutPage() {
                         ? 'bg-amber-500 text-white ring-2 ring-amber-200'
                         : isDelivered
                         ? 'bg-emerald-600 text-white ring-2 ring-emerald-200'
-                        : isPacking
+                        : isPaid
                         ? 'bg-slate-100 text-slate-700 border border-slate-300 ring-2 ring-emerald-400/40'
                         : 'bg-slate-100 text-slate-400 border border-slate-200'
                     }`}
                   >
                     {isReturned ? '↩' : isDelivered ? '✓' : '4'}
                   </div>
-                  <div className={`text-[11px] font-bold ${isReturned ? 'text-amber-700' : isDelivered ? 'text-emerald-700' : isPacking ? 'text-slate-900' : 'text-slate-400'}`}>
+                  <div className={`text-[11px] font-bold ${isReturned ? 'text-amber-700' : isDelivered ? 'text-emerald-700' : isPaid ? 'text-slate-900' : 'text-slate-400'}`}>
                     {isReturned ? '4. Hoàn hàng' : '4. Đã nhận'}
                   </div>
                   <div className="text-[10px] text-slate-500">
@@ -1199,8 +1230,8 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* Customer Action Card: Confirm Received */}
-          {!isOrderExpired && (isPaid || !isVietQr) && (
+          {/* Customer Action Card: Confirm Received - CHỈ hiển thị sau khi ĐÃ thanh toán cọc/chuyển khoản */}
+          {!isOrderExpired && isPaid && (
             <div>
               {isReturned ? (
                 <div className="p-4 sm:p-5 bg-amber-50/90 border border-amber-200 rounded-2xl flex items-start gap-3.5 text-left shadow-2xs">
@@ -1300,8 +1331,8 @@ export default function CheckoutPage() {
             </div>
           )}
 
-          {/* Conditional View: VietQR Pending Transfer */}
-          {isVietQr && !isPaid && !isOrderExpired && (
+          {/* Conditional View: Pending Deposit / Payment */}
+          {!isPaid && !isOrderExpired && (
             <div className="border border-slate-200 rounded-xl p-5 sm:p-6 bg-slate-50/70 text-center space-y-4">
               {/* 1-Hour Expiration Live Countdown Box */}
               {secondsRemaining !== null && (
@@ -1346,10 +1377,22 @@ export default function CheckoutPage() {
                   <div className="text-left space-y-1">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 uppercase tracking-wide">
                       <CreditCard className="w-4 h-4 text-emerald-600" />
-                      <span>Thanh toán trực tuyến bảo mật qua PayOS</span>
+                      <span>
+                        {isCod
+                          ? `Thanh toán tiền cọc đơn hàng COD (${orderDepositPercent}%) qua PayOS`
+                          : 'Thanh toán trực tuyến bảo mật qua PayOS'}
+                      </span>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      Đơn hàng #{orderSuccess.order_code} đã sẵn sàng. Vui lòng bấm nút bên dưới để chuyển tiếp sang cổng thanh toán bảo mật PayOS (pay.payos.vn).
+                      {isCod ? (
+                        <>
+                          Theo quy định của DE&apos;GENT, đơn hàng thu COD yêu cầu đặt cọc trước <strong>{orderDepositPercent}% ({formatMoney(orderDepositAmount)})</strong>. Số tiền còn lại <strong>{formatMoney(orderRemainingCodAmount)}</strong> sẽ thanh toán cho shipper khi nhận hàng.
+                        </>
+                      ) : (
+                        <>
+                          Đơn hàng #{orderSuccess.order_code} đã sẵn sàng. Vui lòng bấm nút bên dưới để chuyển tiếp sang cổng thanh toán bảo mật PayOS (pay.payos.vn).
+                        </>
+                      )}
                     </p>
                   </div>
 
@@ -1368,14 +1411,18 @@ export default function CheckoutPage() {
                     ) : (
                       <>
                         <CreditCard className="w-4 h-4" />
-                        <span>Tiếp tục thanh toán qua PayOS (pay.payos.vn) →</span>
+                        <span>
+                          {isCod
+                            ? `Tiếp tục thanh toán cọc ${orderDepositPercent}% (${formatMoney(orderDepositAmount)}) qua PayOS →`
+                            : 'Tiếp tục thanh toán qua PayOS (pay.payos.vn) →'}
+                        </span>
                       </>
                     )}
                   </button>
 
                   <div className="flex items-center justify-center gap-2 py-2 px-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                    <span>Hệ thống tự động đồng bộ kết quả thanh toán ngay khi hoàn tất giao dịch</span>
+                    <span>Hệ thống tự động đồng bộ kết quả cọc/thanh toán ngay khi hoàn tất giao dịch</span>
                   </div>
 
                   {/* Optional Fallback QR Accordion */}
@@ -1385,7 +1432,11 @@ export default function CheckoutPage() {
                       onClick={() => setShowManualQr(!showManualQr)}
                       className="text-[11px] text-slate-500 hover:text-slate-800 font-medium flex items-center gap-1 cursor-pointer mx-auto py-1"
                     >
-                      <span>{showManualQr ? 'Ẩn thông tin chuyển khoản thủ công' : 'Hoặc xem mã VietQR & STK chuyển khoản thủ công'}</span>
+                      <span>
+                        {showManualQr
+                          ? 'Ẩn thông tin chuyển khoản thủ công'
+                          : `Hoặc xem mã VietQR & STK chuyển khoản cọc (${formatMoney(isCod ? orderDepositAmount : orderSuccess.total_amount)})`}
+                      </span>
                       <span className="text-[10px]">{showManualQr ? '▲' : '▼'}</span>
                     </button>
 
@@ -1396,7 +1447,7 @@ export default function CheckoutPage() {
                             src={
                               payosData?.bin && payosData?.accountNumber
                                 ? `https://img.vietqr.io/image/${payosData.bin}-${payosData.accountNumber}-compact2.png?amount=${payosData.amount}&addInfo=${encodeURIComponent(payosData.description)}&accountName=${encodeURIComponent(payosData.accountName || '')}`
-                                : getVietQrUrl(paymentSettings, orderSuccess.total_amount, orderSuccess.order_code)
+                                : getVietQrUrl(paymentSettings, isCod ? orderDepositAmount : orderSuccess.total_amount, orderSuccess.order_code)
                             }
                             alt="VietQR Code"
                             className="w-56 h-56 mx-auto object-contain"
@@ -1429,13 +1480,15 @@ export default function CheckoutPage() {
                             </button>
                           </div>
                           <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                            <span className="text-slate-500">Số tiền:</span>
+                            <span className="text-slate-500">
+                              {isCod ? `Số tiền cọc (${orderDepositPercent}%):` : 'Số tiền:'}
+                            </span>
                             <button
                               type="button"
-                              onClick={() => handleCopy(String(payosData?.amount || orderSuccess.total_amount), 'amount')}
+                              onClick={() => handleCopy(String(payosData?.amount || (isCod ? orderDepositAmount : orderSuccess.total_amount)), 'amount')}
                               className="font-bold text-slate-900 flex items-center gap-1.5 tabular-nums cursor-pointer"
                             >
-                              <span>{formatMoney(payosData?.amount || orderSuccess.total_amount)}</span>
+                              <span>{formatMoney(payosData?.amount || (isCod ? orderDepositAmount : orderSuccess.total_amount))}</span>
                               {copiedField === 'amount' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                             </button>
                           </div>
@@ -1477,7 +1530,7 @@ export default function CheckoutPage() {
                             ) : (
                               <>
                                 <Check className="w-4 h-4" />
-                                <span>Tôi đã chuyển khoản - Kiểm tra trạng thái</span>
+                                <span>{isCod ? 'Tôi đã chuyển tiền cọc - Kiểm tra trạng thái' : 'Tôi đã chuyển khoản - Kiểm tra trạng thái'}</span>
                               </>
                             )}
                           </button>
@@ -1489,7 +1542,7 @@ export default function CheckoutPage() {
                           )}
 
                           <p className="text-[11px] text-slate-500 leading-relaxed text-center">
-                            Hệ thống sẽ đối soát tự động với ngân hàng qua PayOS. Đơn hàng chỉ chuyển sang <strong>Chờ vận chuyển</strong> khi tiền đã được xác nhận thực tế.
+                            Hệ thống sẽ đối soát tự động qua PayOS. Đơn hàng chỉ phát hành hóa đơn và chuyển sang <strong>Bàn giao cho shipper</strong> khi tiền cọc đã được xác nhận thực tế.
                           </p>
                         </div>
                       </div>
@@ -1502,17 +1555,21 @@ export default function CheckoutPage() {
                   <div className="text-left space-y-1">
                     <div className="flex items-center gap-1.5 text-xs font-bold text-slate-900 uppercase tracking-wide">
                       <QrCode className="w-4 h-4 text-slate-700" />
-                      <span>Bước 1: Quét mã QR để chuyển khoản</span>
+                      <span>{isCod ? `Bước 1: Quét mã QR chuyển tiền cọc (${orderDepositPercent}%)` : 'Bước 1: Quét mã QR để chuyển khoản'}</span>
                     </div>
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      {paymentSettings.payment_instructions || 'Mở ứng dụng ngân hàng bất kỳ để quét mã QR bên dưới, hệ thống đã điền sẵn số tiền và mã đơn hàng của bạn.'}
+                      {isCod ? (
+                        <>Đơn hàng COD yêu cầu cọc trước <strong>{orderDepositPercent}% ({formatMoney(orderDepositAmount)})</strong>. Quét mã QR bên dưới để chuyển tiền cọc giữ hàng.</>
+                      ) : (
+                        paymentSettings.payment_instructions || 'Mở ứng dụng ngân hàng bất kỳ để quét mã QR bên dưới, hệ thống đã điền sẵn số tiền và mã đơn hàng của bạn.'
+                      )}
                     </p>
                   </div>
 
                   {/* VietQR Code Frame */}
                   <div className="bg-white p-3.5 border border-slate-200 rounded-xl inline-block mx-auto shadow-2xs">
                     <img
-                      src={getVietQrUrl(paymentSettings, orderSuccess.total_amount, orderSuccess.order_code)}
+                      src={getVietQrUrl(paymentSettings, isCod ? orderDepositAmount : orderSuccess.total_amount, orderSuccess.order_code)}
                       alt="VietQR Code"
                       className="w-56 h-56 mx-auto object-contain"
                     />
@@ -1544,13 +1601,15 @@ export default function CheckoutPage() {
                       </button>
                     </div>
                     <div className="flex items-center justify-between py-1 border-b border-slate-100">
-                      <span className="text-slate-500">Số tiền:</span>
+                      <span className="text-slate-500">
+                        {isCod ? `Số tiền cọc (${orderDepositPercent}%):` : 'Số tiền:'}
+                      </span>
                       <button
                         type="button"
-                        onClick={() => handleCopy(String(orderSuccess.total_amount), 'amount')}
+                        onClick={() => handleCopy(String(isCod ? orderDepositAmount : orderSuccess.total_amount), 'amount')}
                         className="font-bold text-slate-900 flex items-center gap-1.5 tabular-nums cursor-pointer"
                       >
-                        <span>{formatMoney(orderSuccess.total_amount)}</span>
+                        <span>{formatMoney(isCod ? orderDepositAmount : orderSuccess.total_amount)}</span>
                         {copiedField === 'amount' ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5 text-slate-400" />}
                       </button>
                     </div>
@@ -1590,7 +1649,7 @@ export default function CheckoutPage() {
                       ) : (
                         <>
                           <Check className="w-4 h-4" />
-                          <span>Tôi đã chuyển khoản - Kiểm tra trạng thái</span>
+                          <span>{isCod ? 'Tôi đã chuyển tiền cọc - Kiểm tra trạng thái' : 'Tôi đã chuyển khoản - Kiểm tra trạng thái'}</span>
                         </>
                       )}
                     </button>
@@ -1602,7 +1661,7 @@ export default function CheckoutPage() {
                     )}
 
                     <p className="text-[11px] text-slate-500 leading-relaxed text-center">
-                      Hệ thống đối soát tự động thông qua ngân hàng / PayOS. Đơn hàng chỉ chuyển sang <strong>Chờ vận chuyển</strong> khi tiền đã được xác nhận thực tế.
+                      Hệ thống đối soát tự động thông qua ngân hàng / PayOS. Đơn hàng chỉ chuyển sang <strong>Bàn giao cho shipper</strong> khi tiền đã được xác nhận thực tế.
                     </p>
                   </div>
                 </>
@@ -1628,7 +1687,7 @@ export default function CheckoutPage() {
                   ) : orderSuccess.tracking_code ? (
                     <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được bàn giao cho <strong>{orderSuccess.carrier === 'GHTK' ? 'GHTK' : orderSuccess.carrier === 'GHN' ? 'GHN' : 'Viettel Post'}</strong> (Mã: <strong>{orderSuccess.tracking_code}</strong>). Bưu tá đang vận chuyển giao đến bạn.</>
                   ) : (
-                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được chuyển sang trạng thái <strong>Chờ vận chuyển</strong>. DE&apos;GENT đang chuẩn bị gói hàng và chờ bàn giao với ĐVVC.</>
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được chuyển sang trạng thái <strong>Bàn giao cho shipper</strong>. DE&apos;GENT đang chuẩn bị gói hàng và bàn giao cho shipper.</>
                   )}
                 </p>
               </div>
@@ -1648,7 +1707,9 @@ export default function CheckoutPage() {
                   <span className="font-semibold text-slate-900">VietQR (Đã hoàn tất)</span>
                 </div>
                 <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Đơn vị vận chuyển:</span>
+                  <span className="text-slate-500">
+                    {orderSuccess.carrier === 'SHIPPER' ? 'Hình thức giao:' : 'Đơn vị vận chuyển:'}
+                  </span>
                   <span className="font-bold text-red-600 flex items-center gap-1.5">
                     <img
                       src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
@@ -1689,7 +1750,7 @@ export default function CheckoutPage() {
                         target="_blank"
                         rel="noreferrer"
                         className="text-[11px] text-slate-500 hover:text-slate-800 underline ml-0.5"
-                        title="Tra cứu bưu gửi trực tiếp trên ĐVVC"
+                        title="Tra cứu bưu gửi"
                       >
                         Tra cứu
                       </a>
@@ -1697,7 +1758,7 @@ export default function CheckoutPage() {
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      <span>Đang chờ bàn giao với ĐVVC</span>
+                      <span>Đang chờ bàn giao cho shipper</span>
                     </span>
                   )}
                 </div>
@@ -1713,7 +1774,7 @@ export default function CheckoutPage() {
           )}
 
           {/* Conditional View: COD */}
-          {!isVietQr && (
+          {!isVietQr && isPaid && (
             <div className="border border-slate-200 rounded-xl p-5 sm:p-6 bg-slate-50/70 text-left space-y-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-900">
@@ -1723,24 +1784,38 @@ export default function CheckoutPage() {
                     <Truck className="w-4 h-4 text-slate-800" />
                   )}
                   <span>
-                    {isDelivered ? 'Đã nhận hàng & Đã thanh toán (COD)' : 'Giao hàng nội thành TP.HCM (Thu tiền mặt COD)'}
+                    {isDelivered
+                      ? 'Đã nhận hàng & Đã thanh toán (COD)'
+                      : `Đã cọc ${orderDepositPercent}% - Bàn giao cho shipper (COD)`}
                   </span>
                 </div>
                 <p className="text-xs text-slate-600 leading-relaxed">
                   {isReturned ? (
                     <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đang trong tiến trình yêu cầu hoàn hàng / đổi size.</>
                   ) : isDelivered ? (
-                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã hoàn thành. Quý khách đã nhận hàng và thanh toán tiền mặt thành công.</>
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã hoàn thành. Quý khách đã nhận hàng và thanh toán đủ tiền thành công.</>
                   ) : (
-                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được tiếp nhận và chuyển sang trạng thái <strong>Chờ vận chuyển</strong>. Shipper riêng của DE&apos;GENT sẽ liên hệ trước khi giao.</>
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã hoàn tất đặt cọc <strong>{orderDepositPercent}% ({formatMoney(orderDepositAmount)})</strong> và được chuyển sang tiến trình <strong>Bàn giao cho shipper</strong>. Shipper riêng của DE&apos;GENT sẽ liên hệ giao hàng tận nơi. Quý khách thanh toán số tiền còn lại <strong>{formatMoney(orderRemainingCodAmount)}</strong> cho shipper khi nhận.</>
                   )}
                 </p>
               </div>
 
               <div className="p-3.5 bg-white rounded-lg border border-slate-200 text-xs space-y-2 text-slate-600">
                 <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Tổng tiền cần thanh toán cho Shipper:</span>
+                  <span className="text-slate-500">Tổng giá trị đơn hàng:</span>
                   <span className="font-bold text-slate-900 tabular-nums">{formatMoney(orderSuccess.total_amount)}</span>
+                </div>
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Tiền cọc đã thanh toán ({orderDepositPercent}%):</span>
+                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 tabular-nums">
+                    {formatMoney(orderDepositAmount)} (Đã cọc)
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                  <span className="text-slate-500">Số tiền cần thanh toán cho Shipper khi nhận:</span>
+                  <span className="font-bold text-rose-600 text-sm tabular-nums">
+                    {formatMoney(orderRemainingCodAmount)}
+                  </span>
                 </div>
                 <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
                   <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
@@ -1751,19 +1826,14 @@ export default function CheckoutPage() {
                   <span className="font-semibold text-slate-900">{orderSuccess.customer_name} ({orderSuccess.customer_phone})</span>
                 </div>
                 <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
-                  <span className="text-slate-500">Đơn vị vận chuyển:</span>
-                  <span className="font-bold text-red-600 flex items-center gap-1.5">
-                    <img
-                      src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
-                      alt="Viettel Post"
-                      className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
-                    />
-                    {orderSuccess.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : orderSuccess.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : orderSuccess.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                  <span className="text-slate-500">Hình thức giao:</span>
+                  <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-slate-800" />
+                    <span>Shipper riêng DE&apos;GENT (Bàn giao trực tiếp)</span>
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Mã vận chuyển:</span>
+                  <span className="text-slate-500">Trạng thái bàn giao:</span>
                   {orderSuccess.tracking_code ? (
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono font-bold text-slate-900 tracking-wider bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
@@ -1781,26 +1851,11 @@ export default function CheckoutPage() {
                       >
                         {copiedTracking ? '✓ Đã chép' : 'Sao chép'}
                       </button>
-                      <a
-                        href={
-                          orderSuccess.carrier === 'GHTK'
-                            ? `https://i.ghtk.vn/${orderSuccess.tracking_code}`
-                            : orderSuccess.carrier === 'GHN'
-                            ? `https://tracking.ghn.vn/?order_code=${orderSuccess.tracking_code}`
-                            : `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${orderSuccess.tracking_code}`
-                        }
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-[11px] text-slate-500 hover:text-slate-800 underline ml-0.5"
-                        title="Tra cứu bưu gửi trực tiếp trên ĐVVC"
-                      >
-                        Tra cứu
-                      </a>
                     </div>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
                       <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      <span>Đang chờ bàn giao với ĐVVC</span>
+                      <span>Đang chuẩn bị gói hàng và bàn giao cho shipper</span>
                     </span>
                   )}
                 </div>
@@ -2773,6 +2828,79 @@ export default function CheckoutPage() {
                             ? (paymentSettings.cod_note || "Đơn hàng được giao bởi shipper riêng của DE'GENT. Quý khách thanh toán tiền mặt trực tiếp cho shipper khi nhận hàng.")
                             : 'Chỉ hỗ trợ COD cho đơn nội thành TP.HCM (Trước sáp nhập) do có shipper riêng của shop đi giao. Các khu vực khác mặc định thanh toán Chuyển khoản QR.'}
                         </p>
+
+                        {/* COD Deposit Selection (Bắt buộc cọc 50% hoặc 100%) */}
+                        {paymentMethod === 'cod' && isHcmInnerCity && (
+                          <div className="mt-3.5 pt-3.5 border-t border-slate-200/80 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                <span>Quy định đặt cọc (Bắt buộc):</span>
+                              </span>
+                              <span className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full font-semibold">
+                                Cọc trước 50% hoặc 100%
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                              {/* Option 50% */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setCodDepositPercent(50);
+                                }}
+                                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                                  codDepositPercent === 50
+                                    ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold">Cọc 50%</span>
+                                  {codDepositPercent === 50 && <Check className="w-3.5 h-3.5 text-white" />}
+                                </div>
+                                <div className={`text-xs font-bold mt-1.5 ${codDepositPercent === 50 ? 'text-amber-300' : 'text-slate-900'}`}>
+                                  {formatMoney(Math.round(finalTotal * 0.5))}
+                                </div>
+                                <div className={`text-[10px] mt-0.5 ${codDepositPercent === 50 ? 'text-slate-300' : 'text-slate-500'}`}>
+                                  Shipper thu khi nhận: {formatMoney(finalTotal - Math.round(finalTotal * 0.5))}
+                                </div>
+                              </button>
+
+                              {/* Option 100% */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  setCodDepositPercent(100);
+                                }}
+                                className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
+                                  codDepositPercent === 100
+                                    ? 'border-slate-900 bg-slate-900 text-white shadow-xs'
+                                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-bold">Cọc 100%</span>
+                                  {codDepositPercent === 100 && <Check className="w-3.5 h-3.5 text-white" />}
+                                </div>
+                                <div className={`text-xs font-bold mt-1.5 ${codDepositPercent === 100 ? 'text-amber-300' : 'text-slate-900'}`}>
+                                  {formatMoney(finalTotal)}
+                                </div>
+                                <div className={`text-[10px] mt-0.5 ${codDepositPercent === 100 ? 'text-slate-300' : 'text-slate-500'}`}>
+                                  Shipper giao tận tay (0₫ khi nhận)
+                                </div>
+                              </button>
+                            </div>
+
+                            <p className="text-[11px] text-slate-500 leading-relaxed italic">
+                              * Quý khách sẽ thanh toán tiền cọc qua PayOS / VietQR. Sau khi cọc thành công, hóa đơn được xác nhận và đơn hàng sẽ được <strong>bàn giao cho shipper</strong>.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </label>
                   )}
@@ -2789,11 +2917,24 @@ export default function CheckoutPage() {
                   <>
                     <Loader2 className="w-4 h-4 animate-spin" />
                     <span>
-                      {paymentMethod === 'vietqr' && paymentSettings.is_payos_enabled
+                      {paymentSettings.is_payos_enabled
                         ? 'Đang kết nối cổng thanh toán PayOS...'
                         : 'Đang xử lý đơn hàng...'}
                     </span>
                   </>
+                ) : paymentMethod === 'cod' ? (
+                  paymentSettings.is_payos_enabled ? (
+                    <>
+                      <span>
+                        Chuyển cọc {codDepositPercent}% qua PayOS ({formatMoney(codDepositPercent === 100 ? finalTotal : Math.round(finalTotal * 0.5))})
+                      </span>
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  ) : (
+                    <span>
+                      Xác nhận & Chuyển cọc {codDepositPercent}% ({formatMoney(codDepositPercent === 100 ? finalTotal : Math.round(finalTotal * 0.5))})
+                    </span>
+                  )
                 ) : paymentMethod === 'vietqr' && paymentSettings.is_payos_enabled ? (
                   <>
                     <span>Chuyển sang thanh toán PayOS ({formatMoney(finalTotal)})</span>

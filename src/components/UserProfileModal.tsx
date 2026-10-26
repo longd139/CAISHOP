@@ -974,7 +974,7 @@ export function UserProfileModal({
                             <div className="flex items-center gap-2">
                               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
                               <span className="text-slate-600">Trạng thái vận chuyển:</span>
-                              <span className="font-bold text-amber-950">Đang chờ bàn giao với ĐVVC</span>
+                              <span className="font-bold text-amber-950">Đang chờ bàn giao cho shipper</span>
                             </div>
                             <span className="text-[11px] text-amber-700 font-medium">DE&apos;GENT đang chuẩn bị gói hàng</span>
                           </div>
