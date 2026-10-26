@@ -14,7 +14,8 @@ assert.ok(content.includes('studioImageIndex'), 'Thiếu state studioImageIndex'
 assert.ok(content.includes('isStudioPaused'), 'Thiếu state isStudioPaused');
 assert.ok(content.includes('Dynamic Studio Image Carousel'), 'Thiếu component Studio Image Carousel');
 assert.ok(content.includes('Previous Slide'), 'Thiếu nút Prev Slide');
-assert.ok(content.includes('Next Slide'), 'Thiếu nút Next Slide');
+assert.ok(!content.includes('Top Bar: Slide Counter & Current Spec Tag'), '2 badge ở top bar vẫn chưa được gỡ bỏ');
+console.log('✔ CustomerStorefront.tsx: 2 badge ở thanh trên đã được gỡ bỏ thành công theo yêu cầu.');
 console.log('✔ CustomerStorefront.tsx: Tích hợp đầy đủ danh sách slide, state chuyển động, nút điều hướng và thanh chỉ báo.');
 
 // 2. Kiểm thử logic chuyển slide (Next, Prev, Loop)

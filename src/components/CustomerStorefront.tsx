@@ -1074,15 +1074,6 @@ export default function CustomerStorefront() {
                     </div>
                   ))}
 
-                  {/* Top Bar: Slide Counter & Current Spec Tag */}
-                  <div className="absolute top-3.5 left-4 right-4 z-20 flex items-center justify-between text-[9px] font-mono tracking-mono text-white/80">
-                    <span className="px-2 py-0.5 bg-black/60 backdrop-blur-md border hairline-dark uppercase">
-                      {STUDIO_SLIDES[studioImageIndex].tag}
-                    </span>
-                    <span className="px-2 py-0.5 bg-black/60 backdrop-blur-md border hairline-dark">
-                      0{studioImageIndex + 1} / 0{STUDIO_SLIDES.length}
-                    </span>
-                  </div>
 
                   {/* Bottom Bar: Slide Description + Manual Controls */}
                   <div className="absolute bottom-3 left-4 right-4 z-20 flex items-end justify-between gap-3">
