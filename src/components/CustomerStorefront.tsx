@@ -1123,21 +1123,28 @@ export default function CustomerStorefront() {
         </div>
       </section>
 
-      {/* ================= 6. CENTERED MANIFESTO ================= */}
-      <section id="manifesto" className="reveal max-w-[1100px] mx-auto text-center py-28 md:py-36 px-6 md:px-10">
-        <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block mb-6">
-          {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI CÁI SHOP'}
-        </span>
-        <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight">
-          "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
-        </blockquote>
-        <div className="mt-8 text-[11px] tracking-mono uppercase text-[#0a0a0a]/50">
-          {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
-        </div>
-      </section>
+      {/* ================= 6. STICKY PIN MANIFESTO (Curtain Reveal Pattern) ================= */}
+      <div className="relative min-h-[150dvh] md:min-h-[170dvh] bg-white">
+        <section
+          id="manifesto"
+          className="sticky top-0 h-[100dvh] w-full flex items-center justify-center text-center px-6 md:px-10 z-10 bg-white select-none overflow-hidden"
+        >
+          <div className="max-w-[1100px] mx-auto space-y-6 pt-12 md:pt-16">
+            <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
+              {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI CÁI SHOP'}
+            </span>
+            <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight text-[#0a0a0a]">
+              "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
+            </blockquote>
+            <div className="text-[11px] tracking-mono uppercase text-[#0a0a0a]/50 font-mono pt-2">
+              {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
+            </div>
+          </div>
+        </section>
+      </div>
 
-      {/* ================= 7. DARK FULL-BLEED CTA ================= */}
-      <section className="reveal w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark">
+      {/* ================= 7. DARK FULL-BLEED CTA (Overlays Sticky Manifesto like a curtain) ================= */}
+      <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark shadow-[0_-25px_60px_rgba(0,0,0,0.5)]">
         <div className="max-w-[1000px] mx-auto space-y-8">
           <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/50 block">
             {siteContent?.home?.cta_badge || 'SỐ LƯỢNG MỖI MẪU CÓ HẠN'}
@@ -1168,7 +1175,7 @@ export default function CustomerStorefront() {
       </section>
 
       {/* ================= 8. DARK EDITORIAL FOOTER ================= */}
-      <footer className="w-full bg-[#0a0a0a] text-white border-t hairline-dark px-6 md:px-10 py-16">
+      <footer className="relative z-20 w-full bg-[#0a0a0a] text-white border-t hairline-dark px-6 md:px-10 py-16">
         <div className="max-w-[1760px] mx-auto space-y-12">
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
