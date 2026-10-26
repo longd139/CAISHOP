@@ -9,12 +9,25 @@ const storefrontPath = path.resolve(process.cwd(), 'src/components/CustomerStore
 assert.ok(fs.existsSync(storefrontPath), 'CustomerStorefront.tsx không tồn tại');
 const content = fs.readFileSync(storefrontPath, 'utf-8');
 
-assert.ok(content.includes('STICKY PIN MANIFESTO (Stationary while next section slides over)'), 'Thiếu ghi chú sticky pin manifesto');
-assert.ok(content.includes('sticky top-0 h-[100dvh]'), 'Thiếu class sticky top-0 h-[100dvh] để ngưng lại');
-assert.ok(content.includes('h-[40vh] md:h-[60vh]'), 'Thiếu spacer khoảng dừng đọc dwell');
+const hasManifesto = content.includes('STICKY PIN MANIFESTO (Stationary while next section slides over)');
+const hasCollectionBanner = content.includes('COLLECTION BANNER SLIDER');
+
+assert.ok(
+  hasManifesto || hasCollectionBanner,
+  'Khu vực section 6 phải chứa hoặc Sticky Pin Manifesto hoặc Collection Banner Slider thay thế'
+);
+
+if (hasManifesto) {
+  assert.ok(content.includes('sticky top-0 h-[100dvh]'), 'Thiếu class sticky top-0 h-[100dvh] để ngưng lại');
+  assert.ok(content.includes('h-[40vh] md:h-[60vh]'), 'Thiếu spacer khoảng dừng đọc dwell');
+  console.log('✔ CustomerStorefront.tsx: Cấu trúc sticky pin cố định và khối dưới đè lên được thiết lập chuẩn xác.');
+} else {
+  assert.ok(content.includes('id="collections-banner"'), 'Thiếu id="collections-banner"');
+  console.log('✔ CustomerStorefront.tsx: Khối Manifesto đã được thay thế thành công bằng Collection Banner Slider theo yêu cầu.');
+}
+
 assert.ok(content.includes('relative z-20 w-full bg-[#0a0a0a]'), 'Thiếu class z-20 trên section CTA kế tiếp để đè lên');
 assert.ok(content.includes('shadow-[0_-30px_70px_rgba(0,0,0,0.6)]'), 'Thiếu bóng đổ viền trên để tạo chiều sâu đè lên');
-console.log('✔ CustomerStorefront.tsx: Cấu trúc sticky pin cố định và khối dưới đè lên được thiết lập chuẩn xác.');
 
 // 2. Kiểm thử toán học mô phỏng hành vi cuộn (Scroll Simulation)
 // Giả sử viewportHeight = 800px.

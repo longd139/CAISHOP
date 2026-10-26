@@ -57,6 +57,41 @@ const STUDIO_SLIDES = [
   }
 ];
 
+const COLLECTION_BANNER_SLIDES = [
+  {
+    tag: 'LOOKBOOK THU ĐÔNG 2026',
+    title: 'MÙA THU ĐÔNG MẶC GÌ? • LAYER & COAT COLLECTION',
+    desc: 'Bản phối layer hoàn hảo giữa áo khoác dạ ấm áp, áo polo dệt kim tổ ong và quần tây phom đứng tôn dáng chuẩn phong thái quý ông.',
+    buttonText: 'Khám phá ngay',
+    href: '#product',
+    imageUrl: 'https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=1600&auto=format&fit=crop&q=80',
+  },
+  {
+    tag: 'EXCLUSIVE SARTORIAL',
+    title: 'PHONG CÁCH TỐI GIẢN • BẢN LĨNH PHÁI MẠNH',
+    desc: 'Tập trung vào đường cắt may tỉ mỉ, chất liệu len pha thượng hạng cùng bảng màu trung tính trường tồn theo năm tháng.',
+    buttonText: 'Khám phá ngay',
+    href: '#product',
+    imageUrl: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=1600&auto=format&fit=crop&q=80',
+  },
+  {
+    tag: 'STREETWEAR & URBAN ESSENTIALS',
+    title: 'BỘ SƯU TẬP PHỐ THỊ • TỰ DO & PHÓNG KHOÁNG',
+    desc: 'Áo thun Pima cotton 250gsm, sơ mi Oxford chống nhăn cùng quần jean denim 12oz bền bỉ tự tin qua từng góc phố.',
+    buttonText: 'Khám phá ngay',
+    href: '#product',
+    imageUrl: 'https://images.unsplash.com/photo-1490114538077-0a7f8cb49891?w=1600&auto=format&fit=crop&q=80',
+  },
+  {
+    tag: 'CONTEMPORARY SMART CASUAL',
+    title: 'THANH LỊCH CÔNG SỞ • BIẾN TẤU ĐA PHONG CÁCH',
+    desc: 'Chuyển giao mượt mà từ bàn làm việc đến những buổi gặp gỡ tối với áo blazer và sơ mi phom chuẩn may đo cao cấp.',
+    buttonText: 'Khám phá ngay',
+    href: '#product',
+    imageUrl: 'https://images.unsplash.com/photo-1488161628813-04466f872be2?w=1600&auto=format&fit=crop&q=80',
+  },
+];
+
 export default function CustomerStorefront() {
   const { items: headerNavItems } = useHeaderNav();
   const { content: siteContent } = useSiteContent();
@@ -114,6 +149,8 @@ export default function CustomerStorefront() {
   const [heroProgress, setHeroProgress] = useState(0);
   const [studioImageIndex, setStudioImageIndex] = useState(0);
   const [isStudioPaused, setIsStudioPaused] = useState(false);
+  const [collectionSlideIndex, setCollectionSlideIndex] = useState(0);
+  const [isCollectionPaused, setIsCollectionPaused] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBagOpen, setIsBagOpen] = useState(false);
 
@@ -206,6 +243,15 @@ export default function CustomerStorefront() {
     }, 3600);
     return () => clearInterval(timer);
   }, [isStudioPaused]);
+
+  // Auto-play Collection Banner Carousel (pause on hover)
+  useEffect(() => {
+    if (isCollectionPaused) return;
+    const timer = setInterval(() => {
+      setCollectionSlideIndex((prev) => (prev + 1) % COLLECTION_BANNER_SLIDES.length);
+    }, 4500);
+    return () => clearInterval(timer);
+  }, [isCollectionPaused]);
 
   // IntersectionObserver for .reveal elements on scroll
   useEffect(() => {
@@ -1135,26 +1181,112 @@ export default function CustomerStorefront() {
         </div>
       </section>
 
-      {/* ================= 6. STICKY PIN MANIFESTO (Stationary while next section slides over) ================= */}
+      {/* ================= 6. COLLECTION BANNER SLIDER (Full-bleed Horizontal Carousel) ================= */}
       <section
-        id="manifesto"
-        className="sticky top-0 h-[100dvh] w-full flex items-center justify-center text-center px-6 md:px-10 z-0 bg-white select-none overflow-hidden"
+        id="collections-banner"
+        className="relative z-10 w-full h-[520px] md:h-[620px] lg:h-[700px] bg-black overflow-hidden select-none border-y hairline-dark"
+        onMouseEnter={() => setIsCollectionPaused(true)}
+        onMouseLeave={() => setIsCollectionPaused(false)}
       >
-        <div className="max-w-[1100px] mx-auto space-y-6 pt-12 md:pt-16">
-          <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-            {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI DE\'GENT'}
-          </span>
-          <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight text-[#0a0a0a]">
-            "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
-          </blockquote>
-          <div className="text-[11px] tracking-mono uppercase text-[#0a0a0a]/50 font-mono pt-2">
-            {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'DE\'GENT / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
+        {COLLECTION_BANNER_SLIDES.map((slide, idx) => (
+          <div
+            key={slide.tag}
+            className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${
+              idx === collectionSlideIndex ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
+            }`}
+          >
+            {/* Background Image with smooth scale */}
+            <div
+              className={`absolute inset-0 bg-cover bg-center transition-transform duration-[6000ms] ease-out ${
+                idx === collectionSlideIndex ? 'scale-105' : 'scale-100'
+              }`}
+              style={{ backgroundImage: `url(${slide.imageUrl})` }}
+            />
+
+            {/* Gradient Overlays for contrast and cinematic look */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-black/30" />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/45 to-transparent" />
+
+            {/* Content Container */}
+            <div className="relative z-20 h-full max-w-[1760px] mx-auto px-6 md:px-12 flex flex-col justify-end pb-16 md:pb-20 space-y-4">
+              <div className="inline-flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span className="text-[10px] md:text-xs font-mono font-bold tracking-mono uppercase text-amber-300">
+                  {slide.tag}
+                </span>
+                <span className="text-[10px] font-mono text-white/40">
+                  • 0{idx + 1} / 0{COLLECTION_BANNER_SLIDES.length}
+                </span>
+              </div>
+
+              <h2 className="font-wide uppercase text-2xl sm:text-4xl md:text-5xl lg:text-6xl text-white tracking-tight leading-[1.05] max-w-4xl drop-shadow-md">
+                {slide.title}
+              </h2>
+
+              <p className="text-xs sm:text-sm md:text-base text-white/80 max-w-2xl font-light leading-relaxed drop-shadow">
+                {slide.desc}
+              </p>
+
+              <div className="pt-2 flex items-center gap-4 flex-wrap">
+                <a
+                  href={slide.href}
+                  className="group inline-flex items-center gap-3 px-8 py-3.5 bg-white text-black text-xs font-mono font-bold uppercase tracking-wide-2 hover:bg-amber-400 transition-all duration-300 shadow-2xl active:scale-95 cursor-pointer"
+                >
+                  <span>{slide.buttonText}</span>
+                  <span className="transform transition-transform duration-300 group-hover:translate-x-1">→</span>
+                </a>
+              </div>
+            </div>
           </div>
+        ))}
+
+        {/* Navigation Controls: Arrows */}
+        <div className="absolute top-1/2 -translate-y-1/2 right-6 md:right-12 z-30 flex flex-col gap-2">
+          <button
+            type="button"
+            onClick={() => setCollectionSlideIndex((prev) => (prev - 1 + COLLECTION_BANNER_SLIDES.length) % COLLECTION_BANNER_SLIDES.length)}
+            className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/60 hover:bg-white hover:text-black text-white border border-white/20 backdrop-blur-sm transition-all cursor-pointer text-sm font-mono active:scale-95 shadow-lg"
+            aria-label="Previous Collection Slide"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            onClick={() => setCollectionSlideIndex((prev) => (prev + 1) % COLLECTION_BANNER_SLIDES.length)}
+            className="w-10 h-10 md:w-12 md:h-12 flex items-center justify-center bg-black/60 hover:bg-white hover:text-black text-white border border-white/20 backdrop-blur-sm transition-all cursor-pointer text-sm font-mono active:scale-95 shadow-lg"
+            aria-label="Next Collection Slide"
+          >
+            →
+          </button>
+        </div>
+
+        {/* Bottom Progress Indicators Bar */}
+        <div className="absolute bottom-0 inset-x-0 z-30 grid grid-cols-4 border-t hairline-dark bg-black/60 backdrop-blur-xs">
+          {COLLECTION_BANNER_SLIDES.map((slide, idx) => (
+            <button
+              key={slide.tag}
+              type="button"
+              onClick={() => setCollectionSlideIndex(idx)}
+              className="group py-2.5 px-3 md:px-6 text-left cursor-pointer transition-colors relative"
+              aria-label={`Go to slide ${idx + 1}: ${slide.tag}`}
+            >
+              {/* Active Indicator Line */}
+              <div
+                className={`h-1 w-full transition-all duration-300 mb-1.5 ${
+                  idx === collectionSlideIndex ? 'bg-amber-400' : 'bg-white/20 group-hover:bg-white/40'
+                }`}
+              />
+              <span
+                className={`hidden md:block text-[10px] font-mono tracking-mono uppercase truncate ${
+                  idx === collectionSlideIndex ? 'text-white font-bold' : 'text-white/40 group-hover:text-white/70'
+                }`}
+              >
+                0{idx + 1} • {slide.tag.split(' ')[0]}
+              </span>
+            </button>
+          ))}
         </div>
       </section>
-
-      {/* Spacer tạo khoảng dừng đọc để Manifesto đứng yên trước khi Section dưới kéo lên đè */}
-      <div className="h-[40vh] md:h-[60vh] pointer-events-none" aria-hidden="true" />
 
       {/* ================= 7. DARK FULL-BLEED CTA (Overlays Stationary Manifesto like a curtain) ================= */}
       <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark shadow-[0_-30px_70px_rgba(0,0,0,0.6)]">
