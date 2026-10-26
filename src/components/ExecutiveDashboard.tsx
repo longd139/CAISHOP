@@ -3648,17 +3648,17 @@ export default function ExecutiveDashboard() {
 
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-600">
+                <table className="w-full text-left text-sm min-w-[1050px]">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-600 whitespace-nowrap">
                     <tr>
-                      <th className="py-2.5 px-4">Mã đơn</th>
-                      <th className="py-2.5 px-4">Khách hàng</th>
-                      <th className="py-2.5 px-4">Số điện thoại</th>
-                      <th className="py-2.5 px-4">Địa chỉ giao hàng</th>
-                      <th className="py-2.5 px-4 text-center">Thanh toán</th>
-                      <th className="py-2.5 px-4 text-center">Trạng thái</th>
-                      <th className="py-2.5 px-4 text-right">Tổng thanh toán</th>
-                      <th className="py-2.5 px-4 text-center">Thao tác</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Mã đơn</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Khách hàng</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Số điện thoại</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Địa chỉ giao hàng</th>
+                      <th className="py-2.5 px-4 text-center whitespace-nowrap">Thanh toán</th>
+                      <th className="py-2.5 px-4 text-center whitespace-nowrap">Trạng thái</th>
+                      <th className="py-2.5 px-4 text-right whitespace-nowrap">Tổng thanh toán</th>
+                      <th className="py-2.5 px-4 text-center whitespace-nowrap">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
@@ -3704,7 +3704,7 @@ export default function ExecutiveDashboard() {
                                 : 'hover:bg-slate-50/60 transition-colors'
                             }
                           >
-                            <td className="py-2.5 px-4 font-mono font-medium">
+                            <td className="py-2.5 px-4 font-mono font-medium whitespace-nowrap">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <button
                                   type="button"
@@ -3742,11 +3742,11 @@ export default function ExecutiveDashboard() {
                               </div>
                             </td>
 
-                            <td className="py-2.5 px-4 max-w-[200px]">
+                            <td className="py-2.5 px-4 whitespace-nowrap min-w-[140px]">
                               <div className="font-semibold text-slate-900 whitespace-pre-line">{ord.customer_name}</div>
                             </td>
 
-                            <td className="py-2.5 px-4 whitespace-nowrap">
+                            <td className="py-2.5 px-4 whitespace-nowrap min-w-[140px]">
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono text-xs font-semibold text-slate-800">
                                   {ord.customer_phone || '—'}
@@ -3766,8 +3766,10 @@ export default function ExecutiveDashboard() {
                               </div>
                             </td>
 
-                            <td className="py-2.5 px-4 text-slate-600 max-w-xs truncate">{ord.shipping_address}</td>
-                            <td className="py-2.5 px-4 text-center">
+                            <td className="py-2.5 px-4 text-slate-600 min-w-[200px] max-w-xs truncate" title={ord.shipping_address}>
+                              {ord.shipping_address}
+                            </td>
+                            <td className="py-2.5 px-4 text-center whitespace-nowrap">
                               <div className="flex flex-col items-center gap-1">
                                 <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium ${ord.payment_status === 'PAID'
                                   ? 'bg-emerald-50 text-emerald-700'
