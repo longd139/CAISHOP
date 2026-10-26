@@ -1649,6 +1649,44 @@ export default function CheckoutPage() {
                     <p className="text-[11px] text-slate-500 leading-relaxed text-center">
                       Hệ thống đối soát tự động thông qua ngân hàng / PayOS. Đơn hàng chỉ chuyển sang <strong>Bàn giao cho shipper</strong> khi tiền đã được xác nhận thực tế.
                     </p>
+
+                    {process.env.NEXT_PUBLIC_ENABLE_MOCK_PAYMENT === 'true' && (
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            if (!orderSuccess?.id) return;
+                            try {
+                              const res = await fetch('/api/orders', {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  order_id: orderSuccess.id,
+                                  action: 'CONFIRM_PAYMENT'
+                                })
+                              });
+                              const d = await res.json();
+                              if (d.success) {
+                                setOrderSuccess((prev: any) => ({
+                                  ...prev,
+                                  payment_status: 'PAID',
+                                  fulfillment_status: 'PACKING'
+                                }));
+                                setSearchPaid(true);
+                                setSearchCancelled(false);
+                              } else {
+                                setConfirmError(d.message || 'Lỗi giả lập thanh toán');
+                              }
+                            } catch (err: any) {
+                              setConfirmError(err.message || 'Lỗi kết nối test mock');
+                            }
+                          }}
+                          className="w-full py-2.5 px-4 bg-neutral-100 hover:bg-neutral-200 border border-neutral-300 text-neutral-800 text-xs font-mono font-bold rounded-xl transition-colors flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                          <span>🧪 Giả lập thanh toán thành công (Mock Dev Test)</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

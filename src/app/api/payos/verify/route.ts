@@ -39,7 +39,18 @@ export async function POST(request: Request) {
       ...(raw || {})
     };
 
+    const isMockEnabled = process.env.ENABLE_MOCK_PAYMENT === 'true' || process.env.NEXT_PUBLIC_ENABLE_MOCK_PAYMENT === 'true';
+
     if (!settings.is_payos_enabled || !settings.payos_client_id || !settings.payos_api_key) {
+      if (isMockEnabled) {
+        await confirmOrderPayment(order.id);
+        return NextResponse.json({
+          success: true,
+          payment_status: 'PAID',
+          fulfillment_status: 'PACKING',
+          message: 'Xác thực thanh toán thành công (Chế độ Mock Test)!'
+        });
+      }
       return NextResponse.json({
         success: false,
         payment_status: 'PENDING',
