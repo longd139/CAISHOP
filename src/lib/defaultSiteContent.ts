@@ -71,8 +71,8 @@ export const defaultSiteContent = {
     footer_copyright: '© 2026 DE\'GENT. ĐỒNG HÀNH CÙNG CÁ SẤU, XI-KÊ, TÔ-MÌ VÀ LÊ-VY.'
   },
   products: {
-    badge: 'BỘ SƯU TẬP 01 • DANH MỤC TUYỂN CHỌN',
-    title: 'KHO LƯU TRỮ SẢN PHẨM',
+    badge: 'DANH MỤC',
+    title: 'BỘ SƯU TẬP',
     subhead: 'Tuyển tập trang phục tối giản, chất liệu cao cấp chuẩn hãng. Đồng bộ tồn kho thời gian thực.',
     fulfillment_tag: 'WH-HN-01 (KHO HÀ NỘI)',
     empty_state_text: 'Không tìm thấy sản phẩm phù hợp với bộ lọc.'

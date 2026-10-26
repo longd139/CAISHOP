@@ -2927,10 +2927,10 @@ export default function ExecutiveDashboard() {
                           {/* Header Title Section */}
                           <div className="space-y-1.5 border-b border-neutral-100 pb-3">
                             <span className="text-[10px] tracking-wider uppercase text-neutral-500 font-mono block">
-                              {cmsContent?.products?.badge || 'BỘ SƯU TẬP 01 • DANH MỤC TUYỂN CHỌN'}
+                              {cmsContent?.products?.badge || 'DANH MỤC'}
                             </span>
                             <h2 className="text-xl md:text-2xl font-bold tracking-tight text-neutral-900 uppercase">
-                              {cmsContent?.products?.title || 'KHO LƯU TRỮ SẢN PHẨM'}
+                              {cmsContent?.products?.title || 'BỘ SƯU TẬP'}
                             </h2>
                             <div className="flex items-center justify-between text-[10px] font-mono text-neutral-500 pt-1">
                               <div>INVENTORY: <span className="text-emerald-600 font-semibold">SYNCHRONIZED</span></div>

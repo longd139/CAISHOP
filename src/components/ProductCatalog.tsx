@@ -802,10 +802,10 @@ export default function ProductCatalog() {
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <div className="space-y-2">
               <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-                {siteContent?.products?.badge || 'BỘ SƯU TẬP 01 • DANH MỤC TUYỂN CHỌN'}
+                {siteContent?.products?.badge || 'DANH MỤC'}
               </span>
               <h1 className="font-wide uppercase text-3xl md:text-5xl lg:text-6xl tracking-tight text-[#0a0a0a]">
-                {siteContent?.products?.title || 'KHO LƯU TRỮ SẢN PHẨM'}
+                {siteContent?.products?.title || 'BỘ SƯU TẬP'}
               </h1>
             </div>
           </div>
