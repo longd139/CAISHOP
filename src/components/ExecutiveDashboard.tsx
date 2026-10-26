@@ -3865,10 +3865,10 @@ export default function ExecutiveDashboard() {
                                     type="button"
                                     onClick={() => handleOpenDispatchModal(ord)}
                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                    title="Lên đơn và gửi mã vận chuyển của ĐVVC vào đơn hàng cho khách"
+                                    title="Gửi mã vận chuyển của ĐVVC vào đơn hàng cho khách"
                                   >
                                     <Truck className="w-3.5 h-3.5 shrink-0" />
-                                    <span>Lên đơn & Gửi mã ĐVVC</span>
+                                    <span>Gửi mã ĐVVC</span>
                                   </button>
                                 );
                               })()}
