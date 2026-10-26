@@ -1240,7 +1240,7 @@ export default function CustomerStorefront() {
               <div className="pt-2 flex items-center gap-4 flex-wrap">
                 <a
                   href={slide.href}
-                  className="group inline-flex items-center gap-3 px-8 py-3.5 bg-white text-black text-xs font-mono font-bold uppercase tracking-wide-2 hover:bg-amber-400 transition-all duration-300 shadow-2xl active:scale-95 cursor-pointer"
+                  className="group inline-flex items-center gap-3 px-8 py-3.5 bg-white text-black text-xs font-mono font-bold uppercase tracking-wide-2 hover:bg-black hover:text-white transition-all duration-300 shadow-2xl active:scale-95 cursor-pointer"
                 >
                   <span>{slide.buttonText}</span>
                   <span className="transform transition-transform duration-300 group-hover:translate-x-1">→</span>
