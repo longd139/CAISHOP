@@ -889,12 +889,12 @@ export default function ProductCatalog() {
       <main className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-8 md:py-12">
 
         {/* Mobile Filter & Collection Drawer Trigger */}
-        <div className="lg:hidden mb-6 flex items-center justify-between border hairline p-3 bg-[#0a0a0a]/[0.02]">
+        <div className="lg:hidden mb-6 flex items-center justify-between border hairline p-3.5 bg-[#0a0a0a]/[0.02] shadow-2xs">
           <button
             onClick={() => setIsSidebarOpenMobile(true)}
-            className="flex items-center gap-2 text-xs font-mono uppercase font-semibold text-black cursor-pointer"
+            className="flex items-center gap-2.5 text-[13px] sm:text-sm font-mono uppercase font-bold text-black cursor-pointer"
           >
-            <FolderTree className="w-4 h-4" />
+            <FolderTree className="w-4.5 h-4.5 text-black" />
             <span>Bộ sưu tập & Danh mục ({collections.length} Thương hiệu)</span>
           </button>
           {hasActiveCollectionFilter && (
@@ -904,7 +904,7 @@ export default function ProductCatalog() {
                 setSelectedGroupId('ALL');
                 setSelectedSubId('ALL');
               }}
-              className="text-[10px] font-mono uppercase underline text-black/60 cursor-pointer"
+              className="text-[11px] sm:text-xs font-mono uppercase underline text-black/70 hover:text-black font-semibold cursor-pointer"
             >
               Đặt lại
             </button>
@@ -1295,16 +1295,17 @@ export default function ProductCatalog() {
       {/* ================= MOBILE SIDEBAR DRAWER ================= */}
       {isSidebarOpenMobile && (
         <div className="fixed inset-0 z-50 flex bg-black/60 backdrop-blur-xs lg:hidden">
-          <div className="bg-white w-4/5 max-w-sm h-full flex flex-col justify-between p-6 animate-in slide-in-from-left duration-300">
-            <div className="space-y-4 overflow-y-auto">
-              <div className="flex items-center justify-between pb-3 border-b hairline">
-                <span className="font-wide text-sm uppercase font-bold flex items-center gap-2">
-                  <FolderTree className="w-4 h-4" />
+          <div className="bg-white w-[88%] max-w-sm h-full flex flex-col justify-between p-5 sm:p-6 animate-in slide-in-from-left duration-300 shadow-2xl">
+            <div className="space-y-4 overflow-y-auto pr-1">
+              <div className="flex items-center justify-between pb-3.5 border-b hairline">
+                <span className="font-wide text-base uppercase font-bold flex items-center gap-2 text-black tracking-wide">
+                  <FolderTree className="w-5 h-5 text-black" />
                   Bộ sưu tập & Danh mục
                 </span>
                 <button
                   onClick={() => setIsSidebarOpenMobile(false)}
-                  className="p-1 text-black/60 hover:text-black cursor-pointer"
+                  className="p-1.5 text-black/60 hover:text-black cursor-pointer rounded-xs hover:bg-black/5 transition-colors"
+                  aria-label="Đóng"
                 >
                   <X className="w-5 h-5" />
                 </button>
@@ -1318,17 +1319,17 @@ export default function ProductCatalog() {
                   setSelectedSubId('ALL');
                   setIsSidebarOpenMobile(false);
                 }}
-                className={`w-full flex items-center justify-between px-3 py-2 text-xs font-mono uppercase border hairline ${!hasActiveCollectionFilter ? 'bg-black text-white' : 'bg-white text-black'
+                className={`w-full flex items-center justify-between px-4 py-3 text-[13px] sm:text-sm font-mono uppercase font-bold tracking-wider border hairline transition-all cursor-pointer ${!hasActiveCollectionFilter ? 'bg-black text-white shadow-xs' : 'bg-white text-black hover:bg-black/5'
                   }`}
               >
                 <span>Tất cả sản phẩm</span>
-                <span>({products.length})</span>
+                <span className="font-semibold text-xs">({products.length})</span>
               </button>
 
               {/* Brands List Mobile */}
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {collections.map((col) => (
-                  <div key={col.id} className="border hairline p-2.5 space-y-1 bg-white">
+                  <div key={col.id} className="border hairline p-3 space-y-1.5 bg-white rounded-xs">
                     <div
                       onClick={() => {
                         setSelectedBrandId(col.id);
@@ -1336,15 +1337,15 @@ export default function ProductCatalog() {
                         setSelectedSubId('ALL');
                         setIsSidebarOpenMobile(false);
                       }}
-                      className="font-wide uppercase text-xs font-bold py-1 flex justify-between cursor-pointer"
+                      className="font-wide uppercase text-[13px] sm:text-sm font-bold py-1.5 flex justify-between cursor-pointer text-black hover:text-black/80 tracking-wide"
                     >
                       <span>{col.brand}</span>
                     </div>
 
                     {col.groups && (
-                      <div className="pl-3 space-y-1">
+                      <div className="pl-3.5 space-y-1.5 border-l-2 border-black/10">
                         {col.groups.map((grp) => (
-                          <div key={grp.id} className="space-y-0.5">
+                          <div key={grp.id} className="space-y-1">
                             <div
                               onClick={() => {
                                 setSelectedBrandId(col.id);
@@ -1352,11 +1353,11 @@ export default function ProductCatalog() {
                                 setSelectedSubId('ALL');
                                 setIsSidebarOpenMobile(false);
                               }}
-                              className="text-xs font-mono text-black/80 py-0.5 cursor-pointer font-semibold"
+                              className="text-[13px] sm:text-sm font-mono text-black/90 py-1 cursor-pointer font-bold flex items-center gap-1.5 hover:text-black"
                             >
-                              ▸ {grp.name}
+                              <span>▸ {grp.name}</span>
                             </div>
-                            <div className="pl-3 space-y-0.5">
+                            <div className="pl-3.5 space-y-0.5 border-l hairline">
                               {grp.items.map((sub) => (
                                 <div
                                   key={sub.id}
@@ -1366,7 +1367,7 @@ export default function ProductCatalog() {
                                     setSelectedSubId(sub.id);
                                     setIsSidebarOpenMobile(false);
                                   }}
-                                  className="text-[11px] font-mono text-black/60 py-0.5 cursor-pointer hover:text-black"
+                                  className="text-[13px] sm:text-[13.5px] font-mono text-black/70 py-1.5 px-1 cursor-pointer hover:text-black hover:font-semibold active:text-black transition-colors"
                                 >
                                   - {sub.name}
                                 </div>
@@ -1383,7 +1384,7 @@ export default function ProductCatalog() {
 
             <button
               onClick={() => setIsSidebarOpenMobile(false)}
-              className="w-full py-3 bg-black text-white text-xs font-mono uppercase mt-4 cursor-pointer"
+              className="w-full py-3.5 bg-black text-white text-sm font-mono uppercase font-bold tracking-wider mt-4 cursor-pointer hover:bg-black/90 active:scale-[0.99] transition-all shadow-md"
             >
               Đóng bộ lọc
             </button>
