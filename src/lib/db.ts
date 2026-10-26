@@ -85,6 +85,9 @@ async function getLocalNodeDb() {
         try {
           localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN carrier TEXT DEFAULT 'VIETTEL_POST';`);
         } catch {}
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE products ADD COLUMN size_specs TEXT;`);
+        } catch {}
       } catch {}
     } catch (e) {
       console.error('Failed to initialize local node:sqlite database:', e);
@@ -233,6 +236,7 @@ export interface Product {
   category: string;
   description: string | null;
   image_url: string | null;
+  size_specs?: string | null;
   is_active: number;
   created_at: string;
   updated_at: string;

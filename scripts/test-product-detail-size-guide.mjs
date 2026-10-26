@@ -24,10 +24,10 @@ assert.ok(content.includes('Phù hợp 1m75 - 1m85 • 75 - 85 kg'), 'Phải có
 console.log('✓ PASS [3/5]: Khối gợi ý size nhanh phản hồi linh hoạt theo kích cỡ khách đang chọn');
 
 // 4. Kiểm tra Modal Bảng size phù hợp
-assert.ok(content.includes('Bảng Size Phù Hợp • DE&apos;GENT'), 'Modal phải có tiêu đề Bảng Size Phù Hợp • DE&apos;GENT');
-assert.ok(content.includes('Gợi ý size nhanh theo số đo cơ thể'), 'Modal phải có tính năng nhập số đo cơ thể để gợi ý size');
-assert.ok(content.includes('Bảng quy đổi theo Chiều cao & Cân nặng'), 'Có Bảng quy đổi Chiều cao & Cân nặng');
-assert.ok(content.includes('Bảng thông số đo chi tiết thành phẩm'), 'Có Bảng thông số đo chi tiết thành phẩm');
+assert.ok(content.includes('HƯỚNG DẪN CHỌN KÍCH CỠ • DE&apos;GENT'), 'Modal phải có nhãn HƯỚNG DẪN CHỌN KÍCH CỠ • DE&apos;GENT');
+assert.ok(content.includes('Bảng Size Phù Hợp'), 'Modal phải có tiêu đề Bảng Size Phù Hợp');
+assert.ok(content.includes('Bảng quy đổi Chiều cao & Cân nặng'), 'Có Bảng quy đổi Chiều cao & Cân nặng');
+assert.ok(content.includes('Bảng thông số đo xưởng may (cm)'), 'Có Bảng thông số đo xưởng may chi tiết');
 console.log('✓ PASS [4/5]: Modal Bảng size bao gồm bộ tính tự động, bảng quy đổi thể hình và thông số đo thành phẩm');
 
 // 5. Kiểm tra logic gợi ý size tự động
