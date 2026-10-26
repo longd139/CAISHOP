@@ -14,7 +14,7 @@ export const defaultSiteContent = {
     hero_description: 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.',
     hero_cta_1: 'Săn đồ hiệu ngay',
     hero_cta_2: 'Bảng chọn size chuẩn',
-    hero_image_url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863859/degent/hero-atelier-wide.jpg',
+    hero_image_url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png',
     
     // Dải 4 Khung Quy trình dưới Hero (4-Plate Process Strip)
     hero_plate1_num: '001',

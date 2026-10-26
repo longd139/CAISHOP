@@ -695,7 +695,7 @@ export default function CustomerStorefront() {
           }}
         >
           <img
-            src={siteContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863859/degent/hero-atelier-wide.jpg'}
+            src={siteContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png'}
             alt="Hero Background"
             className="w-full h-full object-cover object-center contrast-105 brightness-[0.75]"
           />

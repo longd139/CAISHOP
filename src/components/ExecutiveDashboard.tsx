@@ -1561,7 +1561,7 @@ export default function ExecutiveDashboard() {
                                 <div className="flex gap-2">
                                   <input
                                     type="text"
-                                    value={cmsContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'}
+                                    value={cmsContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png'}
                                     placeholder="https://res.cloudinary.com/... hoặc https://..."
                                     onChange={(e) => setCmsContent({
                                       ...cmsContent,
@@ -1584,6 +1584,7 @@ export default function ExecutiveDashboard() {
                                 <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                                   <span className="text-[10px] text-slate-400">Gợi ý ảnh đẹp:</span>
                                   {[
+                                    { label: 'Bước chân phố đêm (Mới)', url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png' },
                                     { label: 'Atelier Model (Gốc)', url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg' },
                                     { label: 'Áo măng tô Đen', url: 'https://images.unsplash.com/photo-1509631179647-0177331693ae?auto=format&fit=crop&w=1200&q=85' },
                                     { label: 'Minimal Tailoring', url: 'https://images.unsplash.com/photo-1539109136881-3be0616acf4b?auto=format&fit=crop&w=1200&q=85' },
@@ -2540,10 +2541,10 @@ export default function ExecutiveDashboard() {
                             {/* Background Image Layer */}
                             <div className="absolute inset-0 z-0 pointer-events-none select-none">
                               <img
-                                src={cmsContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'}
+                                src={cmsContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png'}
                                 alt="Hero Background"
                                 className="w-full h-full object-cover object-center contrast-105 brightness-[0.7]"
-                                onError={(e: any) => { e.target.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863862/degent/hero-atelier.jpg'; }}
+                                onError={(e: any) => { e.target.src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png'; }}
                               />
                               <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-black/30" />
                               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/40" />
