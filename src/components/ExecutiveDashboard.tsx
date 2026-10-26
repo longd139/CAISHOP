@@ -3652,7 +3652,8 @@ export default function ExecutiveDashboard() {
                   <thead className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-600">
                     <tr>
                       <th className="py-2.5 px-4">Mã đơn</th>
-                      <th className="py-2.5 px-4">Khách hàng & Liên hệ</th>
+                      <th className="py-2.5 px-4">Khách hàng</th>
+                      <th className="py-2.5 px-4">Số điện thoại</th>
                       <th className="py-2.5 px-4">Địa chỉ giao hàng</th>
                       <th className="py-2.5 px-4 text-center">Thanh toán</th>
                       <th className="py-2.5 px-4 text-center">Trạng thái</th>
@@ -3673,7 +3674,7 @@ export default function ExecutiveDashboard() {
                       if (displayedOrders.length === 0) {
                         return (
                           <tr>
-                            <td colSpan={7} className="py-8 text-center text-slate-500">
+                            <td colSpan={8} className="py-8 text-center text-slate-500">
                               Không có đơn hàng nào phù hợp với bộ lọc hiện tại.
                             </td>
                           </tr>
@@ -3741,11 +3742,14 @@ export default function ExecutiveDashboard() {
                               </div>
                             </td>
 
-                            <td className="py-2.5 px-4 max-w-xs">
-                              <div className="font-semibold text-slate-900">{ord.customer_name}</div>
-                              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <td className="py-2.5 px-4 max-w-[200px]">
+                              <div className="font-semibold text-slate-900 whitespace-pre-line">{ord.customer_name}</div>
+                            </td>
+
+                            <td className="py-2.5 px-4 whitespace-nowrap">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="font-mono text-xs font-semibold text-slate-800">
-                                  {ord.customer_phone}
+                                  {ord.customer_phone || '—'}
                                 </span>
                                 {cleanPhone && (
                                   <a
