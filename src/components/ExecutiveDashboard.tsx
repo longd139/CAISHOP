@@ -2785,12 +2785,9 @@ export default function ExecutiveDashboard() {
                             <h3 className="text-lg md:text-xl font-bold uppercase tracking-tight text-white">
                               {cmsContent?.home?.cta_title || 'Begin your first fitting.'}
                             </h3>
-                            <div className="flex justify-center gap-3 pt-1">
-                              <span className="px-4 py-1.5 bg-white text-[#0a0a0a] text-[10px] uppercase font-semibold rounded">
-                                {cmsContent?.home?.cta_button_text || 'Start shopping'}
-                              </span>
-                              <span className="px-4 py-1.5 border border-white/30 text-white text-[10px] uppercase font-semibold rounded">
-                                Executive Dashboard
+                            <div className="flex justify-center pt-1">
+                              <span className="px-5 py-2 bg-white text-[#0a0a0a] text-[10px] uppercase font-bold rounded">
+                                {cmsContent?.home?.cta_button_text || 'CHỐT ĐƠN NGAY'}
                               </span>
                             </div>
                             <p className="text-[9px] font-mono text-white/40 pt-1">

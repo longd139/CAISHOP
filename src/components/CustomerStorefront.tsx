@@ -1166,19 +1166,13 @@ export default function CustomerStorefront() {
             {siteContent?.home?.cta_title || 'SỞ HỮU ITEM ĐỒ HIỆU ƯA THÍCH'}
           </h2>
 
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+          <div className="flex items-center justify-center pt-4">
             <a
               href="#product"
-              className="w-full sm:w-auto px-8 py-3.5 bg-white text-[#0a0a0a] text-[11px] tracking-wide-2 uppercase font-medium hover:bg-white/90 transition-colors"
+              className="w-full sm:w-auto px-10 py-3.5 bg-white text-[#0a0a0a] text-[11px] tracking-wide-2 uppercase font-bold hover:bg-white/90 transition-all shadow-lg active:scale-95"
             >
               {siteContent?.home?.cta_button_text || 'CHỐT ĐƠN NGAY'}
             </a>
-            <Link
-              href="/admin"
-              className="w-full sm:w-auto px-8 py-3.5 border hairline-dark text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-white/10 transition-colors"
-            >
-              Executive Dashboard
-            </Link>
           </div>
 
           <p className="text-[11px] font-mono text-white/40 pt-4">
