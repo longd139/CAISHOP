@@ -1089,25 +1089,13 @@ export default function CheckoutPage() {
                   <span>Trạng thái: Đã hết hạn & Đã tự hủy</span>
                 </span>
               ) : isCod ? (
-                <>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 text-amber-900 text-xs font-semibold border border-amber-200">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                    <span>Trạng thái: Chờ thanh toán tiền cọc ({orderDepositPercent}%)</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 text-xs font-medium border border-slate-200">
-                    <span>Lưu giữ 1 giờ</span>
-                  </span>
-                </>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold border border-slate-200">
+                  <span>Trạng thái: Chờ thanh toán tiền cọc ({orderDepositPercent}%)</span>
+                </span>
               ) : (
-                <>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold border border-slate-200">
-                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                    <span>Trạng thái: Chờ chuyển khoản</span>
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-800 text-xs font-medium border border-amber-200">
-                    <span>Lưu giữ 1 giờ</span>
-                  </span>
-                </>
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold border border-slate-200">
+                  <span>Trạng thái: Chờ chuyển khoản</span>
+                </span>
               )}
             </div>
           </div>
