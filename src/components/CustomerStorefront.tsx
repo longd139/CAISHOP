@@ -92,6 +92,27 @@ const COLLECTION_BANNER_SLIDES = [
   },
 ];
 
+const CTA_GRID_IMAGES = [
+  'https://images.unsplash.com/photo-1516257984-b1b4d707412e?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1490114538077-0a7f8cb49891?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1488161628813-04466f872be2?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1596755094514-f87e34085b2c?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1586363104862-3a5e2ab60d99?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1617137984095-74e4e5e3613f?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1520975954732-35dd22299614?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1550246140-5119ae4790b8?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=70',
+  'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=400&auto=format&fit=crop&q=70',
+];
+
+// Pre-computed 80 grid tiles (4 rows x 20 columns)
+const CTA_GRID_TILES = Array.from({ length: 80 }, (_, i) => CTA_GRID_IMAGES[i % CTA_GRID_IMAGES.length]);
+
 export default function CustomerStorefront() {
   const { items: headerNavItems } = useHeaderNav();
   const { content: siteContent } = useSiteContent();
@@ -1232,26 +1253,47 @@ export default function CustomerStorefront() {
 
       </section>
 
-      {/* ================= 7. DARK FULL-BLEED CTA (Overlays Stationary Manifesto like a curtain) ================= */}
-      <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-24 md:py-32 px-6 md:px-10 text-center border-t hairline-dark shadow-[0_-30px_70px_rgba(0,0,0,0.6)]">
-        <div className="max-w-[1000px] mx-auto space-y-8">
-          <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/50 block">
+      {/* ================= 7. DARK FULL-BLEED CTA WITH INTERACTIVE HOVER REVEAL IMAGE GRID ================= */}
+      <section className="relative z-20 w-full bg-[#0a0a0a] text-white py-28 md:py-36 px-6 md:px-10 text-center border-t hairline-dark overflow-hidden shadow-[0_-30px_70px_rgba(0,0,0,0.6)]">
+        {/* Interactive Hover Reveal Grid: 4 rows x 20 columns (no borders, completely seamless) */}
+        <div className="absolute inset-0 grid grid-rows-4 grid-cols-10 sm:grid-cols-16 lg:grid-cols-20 gap-0 overflow-hidden select-none pointer-events-auto">
+          {CTA_GRID_TILES.map((imgUrl, idx) => (
+            <div
+              key={idx}
+              className="group relative w-full h-full bg-[#0a0a0a] overflow-hidden border-0 outline-none p-0 m-0"
+            >
+              <img
+                src={imgUrl}
+                alt=""
+                loading="lazy"
+                className="w-full h-full object-cover opacity-0 group-hover:opacity-100 scale-95 group-hover:scale-105 transition-all duration-700 ease-out group-hover:duration-75 pointer-events-none"
+              />
+            </div>
+          ))}
+        </div>
+
+        {/* Subtle Dark Vignette Overlay for Typography Legibility */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0a]/75 via-[#0a0a0a]/35 to-[#0a0a0a]/75 pointer-events-none" />
+
+        {/* Foreground Content */}
+        <div className="relative z-20 max-w-[1000px] mx-auto space-y-8 pointer-events-none">
+          <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/70 block drop-shadow">
             {siteContent?.home?.cta_badge || 'SỐ LƯỢNG MỖI MẪU CÓ HẠN'}
           </span>
-          <h2 className="font-wide uppercase text-[11vw] md:text-[7vw] leading-[0.9] tracking-tight">
+          <h2 className="font-wide uppercase text-[11vw] md:text-[7vw] leading-[0.9] tracking-tight drop-shadow-[0_4px_24px_rgba(0,0,0,0.9)]">
             {siteContent?.home?.cta_title || 'SỞ HỮU ITEM ĐỒ HIỆU ƯA THÍCH'}
           </h2>
 
           <div className="flex items-center justify-center pt-4">
             <a
               href="#product"
-              className="w-full sm:w-auto px-10 py-3.5 bg-white text-[#0a0a0a] text-[11px] tracking-wide-2 uppercase font-bold hover:bg-white/90 transition-all shadow-lg active:scale-95"
+              className="pointer-events-auto w-full sm:w-auto px-10 py-3.5 bg-white text-[#0a0a0a] text-[11px] tracking-wide-2 uppercase font-bold hover:bg-white/90 transition-all shadow-2xl active:scale-95 cursor-pointer"
             >
               {siteContent?.home?.cta_button_text || 'CHỐT ĐƠN NGAY'}
             </a>
           </div>
 
-          <p className="text-[11px] font-mono text-white/40 pt-4">
+          <p className="text-[11px] font-mono text-white/60 pt-4 drop-shadow">
             {siteContent?.home?.cta_note || 'Quét mã VietQR tự động xác nhận đơn • Bao kiểm tra chất vải khi nhận hàng'}
           </p>
         </div>
