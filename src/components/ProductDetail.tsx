@@ -126,17 +126,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
     { size: 'XXL', height: '1m80 - 1m92', weight: '85 - 95 kg', chest: '126 cm', length: '80 cm', shoulder: '56 cm', fit: 'Rộng rãi (Big size)' },
   ];
 
-  // Gợi ý size thông minh theo chiều cao và cân nặng
-  const suggestedSize = useMemo(() => {
-    const h = parseFloat(customHeight);
-    const w = parseFloat(customWeight);
-    if (!h || !w || h < 100 || w < 30) return null;
-    if (w >= 85 || h >= 183) return 'XXL';
-    if (w >= 75 || h >= 177) return 'XL';
-    if (w >= 65 || h >= 170) return 'L';
-    if (w >= 54 || h >= 163) return 'M';
-    return 'S';
-  }, [customHeight, customWeight]);
 
   // Lock body scroll when bag drawer is open
   useEffect(() => {
@@ -1759,55 +1748,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
             {/* TAB 1: BẢNG SỐ ĐO CHUẨN */}
             {sizeModalTab === 'standard' && (
               <div className="space-y-6">
-                {/* Smart Quick Calc */}
-                <div className="bg-slate-50 border border-slate-200 p-4 rounded-sm space-y-3">
-                  <h4 className="text-xs font-bold font-mono uppercase text-slate-900">
-                    Gợi ý size nhanh theo chiều cao & cân nặng
-                  </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-[11px] font-mono text-slate-500 block mb-1">
-                        Chiều cao (cm):
-                      </label>
-                      <input
-                        type="number"
-                        value={customHeight}
-                        onChange={(e) => setCustomHeight(e.target.value)}
-                        placeholder="Ví dụ: 172"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 focus:border-black outline-none bg-white font-mono"
-                      />
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-mono text-slate-500 block mb-1">
-                        Cân nặng (kg):
-                      </label>
-                      <input
-                        type="number"
-                        value={customWeight}
-                        onChange={(e) => setCustomWeight(e.target.value)}
-                        placeholder="Ví dụ: 65"
-                        className="w-full px-3 py-2 text-xs border border-slate-300 focus:border-black outline-none bg-white font-mono"
-                      />
-                    </div>
-                  </div>
-                  {suggestedSize && (
-                    <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-sm flex items-center justify-between flex-wrap gap-2">
-                      <div className="text-xs text-emerald-900">
-                        Size phù hợp nhất: <strong className="text-sm font-bold font-mono">Size {suggestedSize}</strong>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedSize(suggestedSize);
-                          setIsSizeGuideOpen(false);
-                        }}
-                        className="px-3 py-1 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-sm transition-all cursor-pointer"
-                      >
-                        Chọn Size {suggestedSize} ngay
-                      </button>
-                    </div>
-                  )}
-                </div>
 
                 {/* Table 1: Chiều cao & Cân nặng */}
                 <div className="space-y-2">
