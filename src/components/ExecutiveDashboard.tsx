@@ -3899,8 +3899,7 @@ export default function ExecutiveDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3.5 space-y-1.5 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-amber-600" />
+                    <span className="text-xs font-bold text-amber-900">
                       Hội Viên Đồng
                     </span>
                     <span className="text-[10px] font-mono bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-semibold">
@@ -3913,8 +3912,7 @@ export default function ExecutiveDashboard() {
 
                 <div className="rounded-lg border border-slate-300 bg-slate-50/80 p-3.5 space-y-1.5 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-slate-500" />
+                    <span className="text-xs font-bold text-slate-800">
                       Hội Viên Bạc
                     </span>
                     <span className="text-[10px] font-mono bg-slate-200 text-slate-800 px-1.5 py-0.5 rounded font-semibold">
@@ -3927,8 +3925,7 @@ export default function ExecutiveDashboard() {
 
                 <div className="rounded-lg border border-yellow-300 bg-yellow-50/60 p-3.5 space-y-1.5 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-yellow-900 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-yellow-500" />
+                    <span className="text-xs font-bold text-yellow-900">
                       Hội Viên Vàng
                     </span>
                     <span className="text-[10px] font-mono bg-yellow-200 text-yellow-900 px-1.5 py-0.5 rounded font-semibold">
@@ -3941,8 +3938,7 @@ export default function ExecutiveDashboard() {
 
                 <div className="rounded-lg border border-indigo-200 bg-indigo-50/60 p-3.5 space-y-1.5 shadow-2xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full bg-indigo-600" />
+                    <span className="text-xs font-bold text-indigo-900">
                       Kim Cương / CTV VIP
                     </span>
                     <span className="text-[10px] font-mono bg-indigo-100 text-indigo-800 px-1.5 py-0.5 rounded font-semibold">
@@ -3995,8 +3991,7 @@ export default function ExecutiveDashboard() {
                               {c.phone}
                             </td>
                             <td className="py-2.5 px-4 text-center">
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${c.badge_class}`}>
-                                <span className={`w-1.5 h-1.5 rounded-full ${c.dot_color}`} />
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold border ${c.badge_class}`}>
                                 {c.tier}
                               </span>
                             </td>
