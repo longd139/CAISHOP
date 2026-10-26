@@ -3658,7 +3658,7 @@ export default function ExecutiveDashboard() {
                       <th className="py-2.5 px-4 text-center whitespace-nowrap">Thanh toán</th>
                       <th className="py-2.5 px-4 text-center whitespace-nowrap">Trạng thái</th>
                       <th className="py-2.5 px-4 text-right whitespace-nowrap">Tổng thanh toán</th>
-                      <th className="py-2.5 px-4 text-center whitespace-nowrap">Thao tác</th>
+                      <th className="py-2.5 px-4 text-center whitespace-nowrap sticky right-0 z-20 bg-slate-50 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)]">Thao tác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
@@ -3696,13 +3696,13 @@ export default function ExecutiveDashboard() {
                         return (
                           <tr
                             key={ord.id}
-                            className={
+                            className={`group transition-colors ${
                               isExchange
-                                ? 'bg-blue-50/40 hover:bg-blue-50/70 border-l-4 border-l-blue-600 transition-colors'
+                                ? 'bg-blue-50/40 hover:bg-blue-50/70 border-l-4 border-l-blue-600'
                                 : isRefund
-                                ? 'bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-l-amber-500 transition-colors'
-                                : 'hover:bg-slate-50/60 transition-colors'
-                            }
+                                ? 'bg-amber-50/40 hover:bg-amber-50/70 border-l-4 border-l-amber-500'
+                                : 'hover:bg-slate-50/60'
+                            }`}
                           >
                             <td className="py-2.5 px-4 font-mono font-medium whitespace-nowrap">
                               <div className="flex items-center gap-1.5 flex-wrap">
@@ -3823,7 +3823,15 @@ export default function ExecutiveDashboard() {
                             <td className="py-2.5 px-4 text-right font-mono font-semibold text-slate-900 whitespace-nowrap">
                               {formatMoney(ord.total_amount)}
                             </td>
-                            <td className="py-2.5 px-4 text-center">
+                            <td
+                              className={`py-2.5 px-4 text-center whitespace-nowrap sticky right-0 z-10 border-l border-slate-200 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.05)] transition-colors ${
+                                isExchange
+                                  ? 'bg-[#f0f6ff] group-hover:bg-[#e4efff]'
+                                  : isRefund
+                                  ? 'bg-[#fffaf0] group-hover:bg-[#fef3c7]'
+                                  : 'bg-white group-hover:bg-slate-50'
+                              }`}
+                            >
                               {(() => {
                                 const isDispatched = ord.fulfillment_status === 'DISPATCHED';
 
