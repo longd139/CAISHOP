@@ -732,7 +732,7 @@ export default function CustomerStorefront() {
 
             <div className="max-w-xl space-y-4 pt-0.5">
               <p className="text-[13px] sm:text-[14px] md:text-[15px] leading-relaxed text-white/90 font-light drop-shadow-sm">
-                {siteContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
+                {siteContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại DE\'GENT: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
               </p>
 
               <div className="flex flex-wrap items-center gap-3 sm:gap-4 text-[10px] sm:text-[11px] tracking-wide-2 uppercase font-medium pt-1">
@@ -906,11 +906,11 @@ export default function CustomerStorefront() {
         <div className="marquee-track">
           {/* Group 1 */}
           <div className="flex items-center text-[11px] md:text-[12px] tracking-mono uppercase text-[#0a0a0a]/70">
-            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
+            <span className="px-8">{siteContent?.home?.marquee_text || 'DE\'GENT • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
           </div>
           {/* Group 2 (Duplicate for infinite seamless loop) */}
           <div aria-hidden="true" className="flex items-center text-[11px] md:text-[12px] tracking-mono uppercase text-[#0a0a0a]/70">
-            <span className="px-8">{siteContent?.home?.marquee_text || 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
+            <span className="px-8">{siteContent?.home?.marquee_text || 'DE\'GENT • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •'}</span>
           </div>
         </div>
       </section>
@@ -1130,13 +1130,13 @@ export default function CustomerStorefront() {
       >
         <div className="max-w-[1100px] mx-auto space-y-6 pt-12 md:pt-16">
           <span className="text-[10px] md:text-[11px] tracking-mono uppercase text-[#0a0a0a]/60 block font-mono">
-            {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI CÁI SHOP'}
+            {siteContent?.home?.manifesto_badge || siteContent?.about?.badge || 'CAM KẾT TẠI DE\'GENT'}
           </span>
           <blockquote className="font-wide uppercase text-[5.5vw] md:text-[34px] lg:text-[40px] leading-[1.2] tracking-tight text-[#0a0a0a]">
             "{siteContent?.home?.manifesto_quote || siteContent?.about?.body_text || 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.'}"
           </blockquote>
           <div className="text-[11px] tracking-mono uppercase text-[#0a0a0a]/50 font-mono pt-2">
-            {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
+            {siteContent?.home?.manifesto_signature || siteContent?.about?.signature || 'DE\'GENT / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}
           </div>
         </div>
       </section>
@@ -1181,7 +1181,7 @@ export default function CustomerStorefront() {
 
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
             <div className="md:col-span-6 space-y-2">
-              <div className="font-wide text-2xl uppercase tracking-mono">{siteContent?.home?.footer_brand || 'CÁI SHOP - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN'}</div>
+              <div className="font-wide text-2xl uppercase tracking-mono">{siteContent?.home?.footer_brand || 'DE\'GENT - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN'}</div>
               <p className="text-xs text-white/50 max-w-sm font-light">
                 {siteContent?.home?.footer_address || 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận toàn quốc'}
               </p>
@@ -1218,7 +1218,7 @@ export default function CustomerStorefront() {
           </div>
 
           <div className="pt-8 border-t hairline-dark flex flex-col sm:flex-row items-center justify-between text-[11px] font-mono text-white/40 gap-4">
-            <div>{siteContent?.home?.footer_copyright || "© 2026 DE'GENT. ALL RIGHTS RESERVED."}</div>
+            <div>{siteContent?.home?.footer_copyright || "© 2026 DE'GENT. ĐỒNG HÀNH CÙNG CÁ SẤU, XI-KÊ, TÔ-MÌ VÀ LÊ-VY."}</div>
             <div>MONOCHROME HIGH-FASHION EDITORIAL ENGINE</div>
           </div>
 
@@ -1841,7 +1841,7 @@ export default function CustomerStorefront() {
                     BẢNG CHỌN SIZE CHUẨN ĐỒ HIỆU
                   </h3>
                   <p className="text-[11px] font-mono text-white/50 tracking-wider">
-                    Áp dụng cho 4 dòng hàng tại Cái Shop: Cá Sấu, Xi-Kê, Tô-Mì, Lê-Vy
+                    Áp dụng cho 4 dòng hàng tại DE'GENT: Cá Sấu, Xi-Kê, Tô-Mì, Lê-Vy
                   </p>
                 </div>
               </div>
@@ -2107,13 +2107,13 @@ export default function CustomerStorefront() {
               <div className="p-3.5 bg-white/5 border border-white/10 text-[11px] leading-relaxed text-white/70 space-y-1">
                 <div className="font-semibold text-white flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Kinh nghiệm chọn size thực tế từ Cái Shop:</span>
+                  <span>Kinh nghiệm chọn size thực tế từ DE'GENT:</span>
                 </div>
                 <p>
                   Nếu số đo cân nặng hoặc chiều cao của bạn nằm ở ranh giới giữa 2 size:
                   thích mặc ôm gọn người (fitted) hãy chọn <strong>size nhỏ hơn</strong>;
                   thích thoải mái dễ cử động hãy chọn <strong>size lớn hơn</strong>.
-                  Cái Shop hỗ trợ đổi size miễn phí trong 48 giờ nếu chưa vừa vặn.
+                  DE'GENT hỗ trợ đổi size miễn phí trong 48 giờ nếu chưa vừa vặn.
                 </p>
               </div>
             </div>

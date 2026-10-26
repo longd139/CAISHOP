@@ -11,7 +11,7 @@ export const defaultSiteContent = {
     // Khối 1: Hero Banner
     hero_badge: 'TUYỂN TẬP ĐỒ HIỆU ĐƯƠNG ĐẠI / CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY',
     hero_title: 'ĐỒ HIỆU CHẤT LƯỢNG. ĐỊNH HÌNH PHONG CÁCH.',
-    hero_description: 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.',
+    hero_description: 'Bộ tứ kinh điển hội tụ tại DE\'GENT: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.',
     hero_cta_1: 'Săn đồ hiệu ngay',
     hero_cta_2: 'Bảng chọn size chuẩn',
     hero_image_url: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1793010652/degent/hero/wciimhf9kopgdhvpmjtv.png',
@@ -38,7 +38,7 @@ export const defaultSiteContent = {
     hero_plate4_logo: 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/levis.png',
     
     // Khối 2: Marquee
-    marquee_text: 'CÁI SHOP • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •',
+    marquee_text: 'DE\'GENT • TUYỂN TẬP ĐỒ HIỆU KINH ĐIỂN • POLO CÁ SẤU CHẤT VẢI PIQUE • TEE & DENIM XI-KÊ TỐI GIẢN • SƠ MI TÔ-MÌ ĐỎ TRẮNG XANH • JEANS BÒ LÊ-VY ĐINH TÁN • ĐỒNG BỘ TỒN KHO THỜI GIAN THỰC • CHECK SIZE TỨC THÌ •',
     
     // Khối 3: Bộ sưu tập
     collection_badge: 'LOOKBOOK 4 HÃNG NỔI TIẾNG',
@@ -55,9 +55,9 @@ export const defaultSiteContent = {
     studio_ledger: 'Hệ thống kho vận toàn quốc (Hà Nội & TP.HCM)',
     
     // Khối 5: Tuyên ngôn
-    manifesto_badge: 'CAM KẾT TẠI CÁI SHOP',
+    manifesto_badge: 'CAM KẾT TẠI DE\'GENT',
     manifesto_quote: 'Chúng tôi không bán hàng trôi nổi. Từ thớ vải dệt tổ ong dày dặn của dòng Cá Sấu đến từng đường may chỉ vàng đinh tán đồng nhà Lê-Vy: tên gọi biến tấu cho vui vẻ gần gũi, nhưng chất lượng vải và độ bền luôn phải đạt điểm mười.',
-    manifesto_signature: 'CÁI SHOP / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY',
+    manifesto_signature: 'DE\'GENT / BỘ TỨ CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY',
     
     // Khối 6: Kêu gọi hành động CTA
     cta_badge: 'SỐ LƯỢNG MỖI MẪU CÓ HẠN',
@@ -66,9 +66,9 @@ export const defaultSiteContent = {
     cta_note: 'Quét mã VietQR tự động xác nhận đơn • Bao kiểm tra chất vải khi nhận hàng',
     
     // Khối 7: Chân trang Storefront
-    footer_brand: 'CÁI SHOP - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN',
+    footer_brand: 'DE\'GENT - HỘI TỤ ĐỒ HIỆU TUYỂN CHỌN',
     footer_address: 'Hà Nội • TP. Hồ Chí Minh • Hệ thống kho vận toàn quốc',
-    footer_copyright: '© 2026 CÁI SHOP. ĐỒNG HÀNH CÙNG CÁ SẤU, XI-KÊ, TÔ-MÌ VÀ LÊ-VY.'
+    footer_copyright: '© 2026 DE\'GENT. ĐỒNG HÀNH CÙNG CÁ SẤU, XI-KÊ, TÔ-MÌ VÀ LÊ-VY.'
   },
   products: {
     badge: 'COLLECTION 01 • EDITIONS CATALOGUE',
@@ -89,6 +89,6 @@ export const defaultSiteContent = {
     badge: 'Tuyên Ngôn Thương Hiệu',
     headline: 'KHÔNG THỎA HIỆP VỚI CHẤT LƯỢNG.',
     body_text: 'Chúng tôi tuyển chọn từng sản phẩm thời trang với tiêu chuẩn khắt khe: chất liệu nguyên bản, đường kim mũi chỉ chuẩn mực và minh bạch về nguồn gốc xuất xứ.',
-    signature: 'CÁI SHOP • 2026'
+    signature: 'DE\'GENT • 2026'
   }
 };

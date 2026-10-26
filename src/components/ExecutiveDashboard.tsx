@@ -2561,7 +2561,7 @@ export default function ExecutiveDashboard() {
                                 {cmsContent?.home?.hero_title || 'ĐỒ HIỆU CHẤT LƯỢNG. ĐỊNH HÌNH PHONG CÁCH.'}
                               </h2>
                               <p className="text-[11px] leading-relaxed text-white/85 font-light line-clamp-3">
-                                {cmsContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại Cái Shop: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
+                                {cmsContent?.home?.hero_description || 'Bộ tứ kinh điển hội tụ tại DE\'GENT: từ chất vải pique dệt kim trứ danh nhà Cá Sấu, đường nét denim tối giản phong trần của Xi-Kê, năng động chất Mỹ cùng Tô-Mì đến những mẫu quần bò đinh tán bất hủ của Lê-Vy. Hàng có sẵn kho, cập nhật số lượng thời gian thực.'}
                               </p>
                               <div className="flex items-center gap-3 text-[9px] font-medium tracking-wider uppercase pt-1 text-white">
                                 <span className="px-3 py-1 bg-white text-black font-semibold rounded-xs shadow-xs cursor-pointer">
@@ -2808,7 +2808,7 @@ export default function ExecutiveDashboard() {
                               <span>{cmsContent?.home?.footer_address || 'Hanoi Flagship Studio • Edge Cloud Delivery'}</span>
                             </div>
                             <div className="text-[9px] font-mono text-neutral-500 pt-1 border-t border-neutral-800 flex justify-between">
-                              <span>{cmsContent?.home?.footer_copyright || "© 2026 CÁI SHOP. ALL RIGHTS RESERVED."}</span>
+                              <span>{cmsContent?.home?.footer_copyright || "© 2026 DE'GENT. ĐỒNG HÀNH CÙNG CÁ SẤU, XI-KÊ, TÔ-MÌ VÀ LÊ-VY."}</span>
                               <span>LIVE INVENTORY</span>
                             </div>
                           </div>
