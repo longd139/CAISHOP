@@ -87,6 +87,8 @@ export default function CustomerStorefront() {
   }, [products, hotProductIds, hotMode]);
 
   const [scrolled, setScrolled] = useState(false);
+  const [scrollProgress, setScrollProgress] = useState(0);
+  const [heroProgress, setHeroProgress] = useState(0);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isBagOpen, setIsBagOpen] = useState(false);
 
@@ -141,12 +143,33 @@ export default function CustomerStorefront() {
     }
   }, []);
 
-  // Scroll listener for sticky header hairline shadow
+  // Scroll listener for sticky header hairline shadow & scroll-craft dimensional timeline
   useEffect(() => {
+    let ticking = false;
     const handleScroll = () => {
-      setScrolled(window.scrollY > 8);
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const sy = window.scrollY;
+          setScrolled(sy > 8);
+
+          // Hero scroll progress: 0 to 1 across hero viewport
+          const vh = window.innerHeight || 800;
+          const heroP = Math.min(Math.max(sy / vh, 0), 1);
+          setHeroProgress(heroP);
+
+          // Full page scroll percentage for timeline scrubber
+          const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+          const totalP = docHeight > 0 ? (sy / docHeight) * 100 : 0;
+          setScrollProgress(Math.min(Math.max(totalP, 0), 100));
+
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
+
     window.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -616,6 +639,13 @@ export default function CustomerStorefront() {
             </ul>
           </div>
         </nav>
+        {/* scroll-craft Timeline Scrubber Bar */}
+        <div className="h-[2px] bg-black/10 dark:bg-white/10 w-full overflow-hidden" aria-hidden="true">
+          <div
+            className="h-full bg-[#0a0a0a] dark:bg-white transition-all duration-75 ease-out"
+            style={{ width: `${scrollProgress}%` }}
+          />
+        </div>
       </header>
 
       {/* ================= 2. EDITORIAL DISPLAY HERO (FULL VIEWPORT MINUS HEADER) ================= */}
@@ -623,8 +653,13 @@ export default function CustomerStorefront() {
         id="hero"
         className="relative w-full border-b hairline overflow-hidden bg-[#0a0a0a] text-white flex flex-col justify-between min-h-[calc(100dvh-68px)] md:min-h-[calc(100dvh-88px)]"
       >
-        {/* Full-Bleed Background Image */}
-        <div className="absolute inset-0 z-0 select-none pointer-events-none">
+        {/* Layer 1: Background Parallax Layer */}
+        <div
+          className="absolute inset-0 z-0 select-none pointer-events-none will-change-transform transition-transform duration-100 ease-out"
+          style={{
+            transform: `translate3d(0, ${(heroProgress * 70).toFixed(1)}px, 0) scale(${(1 + heroProgress * 0.08).toFixed(3)})`,
+          }}
+        >
           <img
             src={siteContent?.home?.hero_image_url || 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863859/degent/hero-atelier-wide.jpg'}
             alt="Hero Background"
@@ -635,8 +670,23 @@ export default function CustomerStorefront() {
           <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-transparent to-black/60" />
         </div>
 
-        {/* Content Container (Centered in available viewport space, flexible on scaled screens) */}
-        <div className="relative z-10 flex-1 flex flex-col justify-center max-w-[1760px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 md:py-10">
+        {/* Layer 2: Dimensional Atmospheric Light Glow */}
+        <div
+          className="absolute inset-0 z-[1] pointer-events-none opacity-40 mix-blend-screen transition-transform duration-150 ease-out"
+          style={{
+            background: 'radial-gradient(circle at 65% 35%, rgba(255,255,255,0.14) 0%, transparent 60%)',
+            transform: `translate3d(0, ${(heroProgress * -35).toFixed(1)}px, 0)`,
+          }}
+        />
+
+        {/* Layer 3: Typography & Content Plane (Counter-Parallax + Natural Exit Fade) */}
+        <div
+          className="relative z-10 flex-1 flex flex-col justify-center max-w-[1760px] w-full mx-auto px-4 sm:px-6 lg:px-8 xl:px-10 py-6 sm:py-8 md:py-10 will-change-transform transition-all duration-100 ease-out"
+          style={{
+            transform: `translate3d(0, ${(heroProgress * -45).toFixed(1)}px, 0)`,
+            opacity: Math.max(1 - heroProgress * 1.25, 0),
+          }}
+        >
           <div className="space-y-3 sm:space-y-4 md:space-y-5 max-w-3xl">
             <div className="text-[10px] md:text-[11px] tracking-mono uppercase text-white/90 flex items-center gap-2.5 font-medium">
               <span>{siteContent?.home?.hero_badge || 'TUYỂN TẬP ĐỒ HIỆU ĐƯƠNG ĐẠI / CÁ SẤU • XI-KÊ • TÔ-MÌ • LÊ-VY'}</span>
@@ -685,6 +735,13 @@ export default function CustomerStorefront() {
                     <span>{siteContent?.home?.hero_cta_2 || 'Bảng chọn size chuẩn'}</span>
                   </span>
                 </button>
+              </div>
+
+              {/* scroll-craft Discovery Indicator */}
+              <div className="pt-4 hidden sm:flex items-center gap-3 text-[10px] font-mono tracking-mono text-white/50 uppercase select-none">
+                <span className="w-5 h-[1px] bg-white/30" />
+                <span>Cuộn để khám phá bộ sưu tập</span>
+                <span className="inline-block animate-bounce text-white/70">↓</span>
               </div>
             </div>
           </div>
