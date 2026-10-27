@@ -3678,7 +3678,6 @@ export default function ExecutiveDashboard() {
                 badgeColor: 'bg-slate-100 text-slate-700',
                 icon: ShoppingCart,
                 iconBg: 'bg-slate-100 text-slate-700',
-                activeClass: 'ring-2 ring-slate-900 border-slate-900 bg-slate-50/60 shadow-xs',
               },
               {
                 id: 'PACKING' as const,
@@ -3689,7 +3688,6 @@ export default function ExecutiveDashboard() {
                 badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200/60',
                 icon: Truck,
                 iconBg: 'bg-blue-50 text-blue-700 border border-blue-200/60',
-                activeClass: 'ring-2 ring-blue-600 border-blue-600 bg-blue-50/40 shadow-xs',
               },
               {
                 id: 'DELIVERED' as const,
@@ -3700,7 +3698,6 @@ export default function ExecutiveDashboard() {
                 badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
                 icon: CheckCircle2,
                 iconBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
-                activeClass: 'ring-2 ring-emerald-600 border-emerald-600 bg-emerald-50/40 shadow-xs',
               },
               {
                 id: 'RETURNED' as const,
@@ -3711,7 +3708,6 @@ export default function ExecutiveDashboard() {
                 badgeColor: returnedOrders.length > 0 ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-500',
                 icon: RotateCcw,
                 iconBg: 'bg-amber-50 text-amber-700 border border-amber-200/60',
-                activeClass: 'ring-2 ring-amber-600 border-amber-600 bg-amber-50/40 shadow-xs',
               },
               {
                 id: 'UNFULFILLED' as const,
@@ -3722,7 +3718,6 @@ export default function ExecutiveDashboard() {
                 badgeColor: 'bg-slate-100 text-slate-600',
                 icon: Clock,
                 iconBg: 'bg-slate-100 text-slate-600 border border-slate-200/60',
-                activeClass: 'ring-2 ring-slate-800 border-slate-800 bg-slate-50/50 shadow-xs',
               },
             ];
 
@@ -3738,36 +3733,73 @@ export default function ExecutiveDashboard() {
                         key={card.id}
                         type="button"
                         onClick={() => setOrderStatusFilter(card.id)}
-                        className={`group text-left p-4 sm:p-4.5 rounded-xl border transition-all cursor-pointer bg-white relative flex flex-col justify-between hover:shadow-xs ${
+                        className={`group text-left p-4 sm:p-4.5 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
                           isActive
-                            ? card.activeClass
-                            : 'border-slate-200 hover:border-slate-300'
+                            ? 'bg-slate-950 text-white border-slate-950 shadow-md ring-2 ring-slate-950'
+                            : 'bg-white text-slate-900 border-slate-200 hover:border-slate-300 hover:shadow-xs'
                         }`}
                         title={`Lọc theo: ${card.label}`}
                       >
                         <div className="flex items-center justify-between gap-2 mb-2.5">
-                          <span className="text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+                          <span
+                            className={`text-xs font-bold uppercase tracking-wider truncate transition-colors ${
+                              isActive ? 'text-zinc-400' : 'text-slate-500'
+                            }`}
+                          >
                             {card.label}
                           </span>
-                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${card.iconBg}`}>
+                          <div
+                            className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
+                              isActive
+                                ? 'bg-white/15 text-white border border-white/20'
+                                : card.iconBg
+                            }`}
+                          >
                             <IconComp className="w-4 h-4" />
                           </div>
                         </div>
 
                         <div>
                           <div className="flex items-baseline gap-1.5 my-1">
-                            <span className="text-3xl sm:text-4xl font-black font-mono text-slate-900 tracking-tight leading-none">
+                            <span
+                              className={`text-3xl sm:text-4xl font-black font-mono tracking-tight leading-none transition-colors ${
+                                isActive ? 'text-white' : 'text-slate-900'
+                              }`}
+                            >
                               {card.count}
                             </span>
-                            <span className="text-xs sm:text-sm font-bold text-slate-500">đơn</span>
+                            <span
+                              className={`text-xs sm:text-sm font-bold transition-colors ${
+                                isActive ? 'text-zinc-400' : 'text-slate-500'
+                              }`}
+                            >
+                              đơn
+                            </span>
                           </div>
 
-                          <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5 text-xs text-slate-600 font-medium">
-                            <span className="truncate font-mono font-bold text-slate-800" title={card.subtext}>
+                          <div
+                            className={`mt-2 pt-2 border-t flex items-center justify-between gap-1.5 text-xs font-medium transition-colors ${
+                              isActive
+                                ? 'border-white/15 text-zinc-300'
+                                : 'border-slate-100 text-slate-600'
+                            }`}
+                          >
+                            <span
+                              className={`truncate font-mono font-bold transition-colors ${
+                                isActive ? 'text-white' : 'text-slate-800'
+                              }`}
+                              title={card.subtext}
+                            >
                               {card.subtext}
                             </span>
                             {card.badge && (
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 ${card.badgeColor}`}>
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 transition-colors ${
+                                  isActive
+                                    ? 'bg-white/20 text-white border border-white/30 backdrop-blur-xs'
+                                    : card.badgeColor
+                                }`}
+                              >
                                 {card.badge}
                               </span>
                             )}
@@ -3775,7 +3807,7 @@ export default function ExecutiveDashboard() {
                         </div>
 
                         {isActive && (
-                          <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-slate-900" />
+                          <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-white shadow-xs" />
                         )}
                       </button>
                     );
