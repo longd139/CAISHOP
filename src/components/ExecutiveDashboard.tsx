@@ -506,6 +506,42 @@ function PhoneZaloContact({ phone, className = '' }: PhoneZaloContactProps) {
   );
 }
 
+function TrackingCodeBadge({ code, onEdit }: { code: string; onEdit: () => void }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="inline-flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={onEdit}
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 font-mono text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] shadow-2xs whitespace-nowrap"
+        title="Bấm để xem hoặc cập nhật mã vận đơn"
+      >
+        <Truck className="w-3 h-3 text-sky-600 shrink-0" />
+        <span>{code}</span>
+      </button>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className={`p-1 rounded transition-colors cursor-pointer ${
+          copied ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+        }`}
+        title={copied ? 'Đã sao chép mã!' : 'Sao chép mã vận đơn'}
+      >
+        {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+      </button>
+    </div>
+  );
+}
+
 export default function ExecutiveDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [contentSubTab, setContentSubTab] = useState<ContentSubTab>('header');
@@ -3969,13 +4005,14 @@ export default function ExecutiveDashboard() {
 
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm min-w-[1050px]">
+                <table className="w-full text-left text-sm min-w-[1080px]">
                   <thead className="bg-slate-50 border-b border-slate-200 text-xs font-medium text-slate-600 whitespace-nowrap">
                     <tr>
                       <th className="py-2.5 px-4 whitespace-nowrap">Mã đơn</th>
                       <th className="py-2.5 px-4 whitespace-nowrap">Khách hàng</th>
                       <th className="py-2.5 px-4 whitespace-nowrap">Số điện thoại</th>
-                      <th className="py-2.5 px-4 whitespace-nowrap">Địa chỉ giao hàng</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap max-w-[140px]">Địa chỉ giao hàng</th>
+                      <th className="py-2.5 px-4 whitespace-nowrap">Mã đơn ĐVVC</th>
                       <th className="py-2.5 px-4 text-center whitespace-nowrap">Thanh toán</th>
                       <th className="py-2.5 px-4 text-center whitespace-nowrap">Trạng thái</th>
                       <th className="py-2.5 px-4 text-right whitespace-nowrap">Tổng thanh toán</th>
@@ -3995,7 +4032,7 @@ export default function ExecutiveDashboard() {
                       if (displayedOrders.length === 0) {
                         return (
                           <tr>
-                            <td colSpan={8} className="py-8 text-center text-slate-500">
+                            <td colSpan={9} className="py-8 text-center text-slate-500">
                               Không có đơn hàng nào phù hợp với bộ lọc hiện tại.
                             </td>
                           </tr>
@@ -4071,8 +4108,19 @@ export default function ExecutiveDashboard() {
                               <PhoneZaloContact phone={ord.customer_phone} />
                             </td>
 
-                            <td className="py-2.5 px-4 text-slate-600 min-w-[200px] max-w-xs truncate" title={ord.shipping_address}>
+                            <td className="py-2.5 px-4 text-slate-600 max-w-[140px] truncate" title={ord.shipping_address}>
                               {ord.shipping_address}
+                            </td>
+
+                            <td className="py-2.5 px-4 whitespace-nowrap min-w-[130px]">
+                              {ord.tracking_code ? (
+                                <TrackingCodeBadge
+                                  code={ord.tracking_code}
+                                  onEdit={() => handleOpenDispatchModal(ord)}
+                                />
+                              ) : (
+                                <span className="font-mono text-xs text-slate-400">—</span>
+                              )}
                             </td>
                             <td className="py-2.5 px-4 text-center whitespace-nowrap">
                               <div className="flex flex-col items-center gap-1">
@@ -4145,11 +4193,11 @@ export default function ExecutiveDashboard() {
                                     <button
                                       type="button"
                                       onClick={() => handleOpenDispatchModal(ord)}
-                                      className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
+                                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 transition-all cursor-pointer shadow-2xs whitespace-nowrap active:scale-95"
                                       title="Bấm để xem hoặc chỉnh sửa mã vận đơn"
                                     >
-                                      <Truck className="w-3.5 h-3.5 text-sky-600 shrink-0" />
-                                      <span className="font-mono font-bold">{ord.tracking_code || 'Sửa mã ĐVVC'}</span>
+                                      <Truck className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                                      <span>Sửa mã ĐVVC</span>
                                     </button>
                                   );
                                 }
