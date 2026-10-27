@@ -40,11 +40,12 @@ export async function POST(request: Request) {
     };
     const token = await signJwt(authUser);
 
-    // Trả về kèm HTTP-Only Cookie an toàn
+    // Trả về kèm HTTP-Only Cookie an toàn cho Web & Token trong JSON cho Mobile App
     const response = NextResponse.json({
       success: true,
       message: 'Đăng nhập thành công!',
       user: authUser,
+      token,
     });
 
     response.cookies.set({
