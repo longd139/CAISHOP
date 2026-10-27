@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import {
   TrendingUp,
@@ -51,7 +51,6 @@ import {
   RotateCcw,
   Zap,
   Sparkles,
-  MessageCircle,
   Clock,
   Copy,
   Download,
@@ -293,6 +292,98 @@ export function parseOrderAddressDetails(rawAddress: string | null | undefined):
     dealTag,
     codInfo,
   };
+}
+
+function ZaloIcon({ className = "w-3.5 h-3.5" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M12 2C6.477 2 2 6.477 2 12c0 2.22.724 4.27 1.95 5.935L2.55 21.432a.6.6 0 00.77.77l3.51-1.394A9.955 9.955 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z"
+        fill="white"
+      />
+      <path
+        d="M13.8 15h-4.3a.7.7 0 01-.56-1.12l2.6-3.48H9.3a.7.7 0 010-1.4h4.3a.7.7 0 01.56 1.12l-2.6 3.48h2.24a.7.7 0 110 1.4z"
+        fill="#0068FF"
+      />
+    </svg>
+  );
+}
+
+interface PhoneZaloContactProps {
+  phone?: string | null;
+  className?: string;
+  badgeSize?: 'sm' | 'md';
+}
+
+function PhoneZaloContact({ phone, className = '', badgeSize = 'sm' }: PhoneZaloContactProps) {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const cleanPhone = (phone || '').replace(/\D/g, '');
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen]);
+
+  if (!phone || !cleanPhone) {
+    return <span className="font-mono text-xs text-slate-400">—</span>;
+  }
+
+  return (
+    <div ref={containerRef} className={`relative inline-flex items-center gap-1.5 ${className}`}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsOpen((prev) => !prev);
+        }}
+        className={`font-mono text-xs font-semibold px-1.5 py-0.5 -mx-1 rounded transition-all cursor-pointer inline-flex items-center gap-1 select-none ${
+          isOpen
+            ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-400 font-bold shadow-2xs'
+            : 'text-slate-800 hover:text-blue-600 hover:bg-blue-50/80 active:scale-95'
+        }`}
+        title={isOpen ? 'Nhấn để đóng Zalo' : 'Nhấn vào số điện thoại để mở Zalo'}
+      >
+        <span>{phone}</span>
+      </button>
+
+      {isOpen && (
+        <a
+          href={`https://zalo.me/${cleanPhone}`}
+          target="_blank"
+          rel="noreferrer"
+          onClick={(e) => {
+            e.stopPropagation();
+          }}
+          className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#0068FF] to-[#0084FF] hover:from-[#005bdc] hover:to-[#0074e0] text-white font-bold shadow-md shadow-blue-500/35 ring-2 ring-white dark:ring-slate-800 transition-all transform animate-zalo-pop cursor-pointer hover:scale-105 hover:shadow-blue-500/50 active:scale-95 whitespace-nowrap ${
+            badgeSize === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
+          }`}
+          title={`Nhấn để mở Zalo chat với số ${phone}`}
+        >
+          <ZaloIcon className="w-3.5 h-3.5 shrink-0" />
+          <span>Zalo</span>
+          <ExternalLink className="w-2.5 h-2.5 opacity-80 shrink-0" />
+        </a>
+      )}
+    </div>
+  );
 }
 
 export default function ExecutiveDashboard() {
@@ -3825,23 +3916,7 @@ export default function ExecutiveDashboard() {
                             </td>
 
                             <td className="py-2.5 px-4 whitespace-nowrap min-w-[140px]">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className="font-mono text-xs font-semibold text-slate-800">
-                                  {ord.customer_phone || '—'}
-                                </span>
-                                {cleanPhone && (
-                                  <a
-                                    href={`https://zalo.me/${cleanPhone}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    title="Nhắn tin qua Zalo cho khách"
-                                    className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-semibold shadow-2xs transition-colors"
-                                  >
-                                    <MessageCircle className="w-2.5 h-2.5" />
-                                    <span>Zalo</span>
-                                  </a>
-                                )}
-                              </div>
+                              <PhoneZaloContact phone={ord.customer_phone} />
                             </td>
 
                             <td className="py-2.5 px-4 text-slate-600 min-w-[200px] max-w-xs truncate" title={ord.shipping_address}>
@@ -4611,20 +4686,7 @@ export default function ExecutiveDashboard() {
                     {selectedOrderForDetail.customer_name}
                   </div>
                   <div className="flex items-center gap-2 pt-0.5 flex-wrap">
-                    <span className="font-mono font-medium text-slate-700">
-                      {selectedOrderForDetail.customer_phone}
-                    </span>
-                    {selectedOrderForDetail.customer_phone && (
-                      <a
-                        href={`https://zalo.me/${selectedOrderForDetail.customer_phone.replace(/\D/g, '')}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-2 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-semibold inline-flex items-center gap-1 shadow-2xs"
-                      >
-                        <MessageCircle className="w-2.5 h-2.5" />
-                        <span>Zalo</span>
-                      </a>
-                    )}
+                    <PhoneZaloContact phone={selectedOrderForDetail.customer_phone} badgeSize="md" />
                   </div>
                   {selectedOrderForDetail.customer_email && (
                     <div className="text-slate-500 text-[11px] truncate">

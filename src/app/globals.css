@@ -416,4 +416,24 @@ html {
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7), 0 8px 10px -6px rgba(0, 0, 0, 0.7) !important;
 }
 
+/* Zalo Pop Animation */
+@keyframes zaloPop {
+  0% {
+    opacity: 0;
+    transform: scale(0.6) translateY(4px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.1) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-zalo-pop {
+  animation: zaloPop 0.28s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
 
