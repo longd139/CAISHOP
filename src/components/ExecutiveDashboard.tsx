@@ -506,42 +506,6 @@ function PhoneZaloContact({ phone, className = '' }: PhoneZaloContactProps) {
   );
 }
 
-function TrackingCodeBadge({ code, onEdit }: { code: string; onEdit: () => void }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(code);
-    }
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  return (
-    <div className="inline-flex items-center gap-1.5">
-      <button
-        type="button"
-        onClick={onEdit}
-        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/80 font-mono text-xs font-semibold cursor-pointer transition-all hover:scale-[1.02] shadow-2xs whitespace-nowrap"
-        title="Bấm để xem hoặc cập nhật mã vận đơn"
-      >
-        <Truck className="w-3 h-3 text-sky-600 shrink-0" />
-        <span>{code}</span>
-      </button>
-      <button
-        type="button"
-        onClick={handleCopy}
-        className={`p-1 rounded transition-colors cursor-pointer ${
-          copied ? 'text-emerald-600 bg-emerald-50' : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
-        }`}
-        title={copied ? 'Đã sao chép mã!' : 'Sao chép mã vận đơn'}
-      >
-        {copied ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
-      </button>
-    </div>
-  );
-}
-
 export default function ExecutiveDashboard() {
   const [activeTab, setActiveTab] = useState<AdminTab>('overview');
   const [contentSubTab, setContentSubTab] = useState<ContentSubTab>('header');
@@ -4114,10 +4078,9 @@ export default function ExecutiveDashboard() {
 
                             <td className="py-2.5 px-4 whitespace-nowrap min-w-[130px]">
                               {ord.tracking_code ? (
-                                <TrackingCodeBadge
-                                  code={ord.tracking_code}
-                                  onEdit={() => handleOpenDispatchModal(ord)}
-                                />
+                                <span className="font-mono text-xs font-semibold text-slate-800">
+                                  {ord.tracking_code}
+                                </span>
                               ) : (
                                 <span className="font-mono text-xs text-slate-400">—</span>
                               )}
