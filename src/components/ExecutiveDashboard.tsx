@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
 import {
   TrendingUp,
@@ -315,17 +316,55 @@ interface PhoneZaloContactProps {
   badgeSize?: 'sm' | 'md';
 }
 
-function PhoneZaloContact({ phone, className = '', badgeSize = 'sm' }: PhoneZaloContactProps) {
+function PhoneZaloContact({ phone, className = '' }: PhoneZaloContactProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [copied, setCopied] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [coords, setCoords] = useState<{ top: number; left: number; openUp: boolean; arrowLeft: number }>({
+    top: 0,
+    left: 0,
+    openUp: true,
+    arrowLeft: 110,
+  });
+
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
 
   const cleanPhone = (phone || '').replace(/\D/g, '');
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const updatePosition = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const popoverWidth = 230;
+    const popoverHeight = 44;
+
+    const openUp = rect.top >= popoverHeight + 12;
+    const top = openUp ? rect.top - popoverHeight - 8 : rect.bottom + 8;
+
+    const centerLeft = rect.left + rect.width / 2 - popoverWidth / 2;
+    const left = Math.max(12, Math.min(window.innerWidth - popoverWidth - 12, centerLeft));
+    const arrowLeft = rect.left + rect.width / 2 - left;
+
+    setCoords({ top, left, openUp, arrowLeft });
+  };
+
+  useEffect(() => {
     if (!isOpen) return;
 
+    updatePosition();
+    const rafId = requestAnimationFrame(updatePosition);
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        triggerRef.current &&
+        !triggerRef.current.contains(target) &&
+        (!popoverRef.current || !popoverRef.current.contains(target))
+      ) {
         setIsOpen(false);
       }
     };
@@ -334,53 +373,134 @@ function PhoneZaloContact({ phone, className = '', badgeSize = 'sm' }: PhoneZalo
       if (e.key === 'Escape') setIsOpen(false);
     };
 
+    window.addEventListener('scroll', updatePosition, true);
+    window.addEventListener('resize', updatePosition);
     document.addEventListener('mousedown', handleClickOutside);
     document.addEventListener('keydown', handleKeyDown);
+
     return () => {
+      cancelAnimationFrame(rafId);
+      window.removeEventListener('scroll', updatePosition, true);
+      window.removeEventListener('resize', updatePosition);
       document.removeEventListener('mousedown', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(cleanPhone || phone || '');
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   if (!phone || !cleanPhone) {
     return <span className="font-mono text-xs text-slate-400">—</span>;
   }
 
   return (
-    <div ref={containerRef} className={`relative inline-flex items-center gap-1.5 ${className}`}>
+    <div className={`relative inline-flex items-center ${className}`}>
       <button
+        ref={triggerRef}
         type="button"
         onClick={(e) => {
           e.stopPropagation();
           setIsOpen((prev) => !prev);
         }}
-        className={`font-mono text-xs font-semibold px-1.5 py-0.5 -mx-1 rounded transition-all cursor-pointer inline-flex items-center gap-1 select-none ${
+        className={`font-mono text-xs font-semibold px-2 py-0.5 rounded-md transition-all cursor-pointer inline-flex items-center gap-1 select-none ${
           isOpen
-            ? 'bg-blue-100 text-blue-700 ring-1 ring-blue-400 font-bold shadow-2xs'
+            ? 'bg-blue-100 text-blue-700 ring-2 ring-blue-500 font-bold shadow-xs'
             : 'text-slate-800 hover:text-blue-600 hover:bg-blue-50/80 active:scale-95'
         }`}
-        title={isOpen ? 'Nhấn để đóng Zalo' : 'Nhấn vào số điện thoại để mở Zalo'}
+        title={isOpen ? 'Nhấn để đóng thao tác' : 'Nhấn để mở liên hệ Zalo & sao chép'}
       >
         <span>{phone}</span>
       </button>
 
-      {isOpen && (
-        <a
-          href={`https://zalo.me/${cleanPhone}`}
-          target="_blank"
-          rel="noreferrer"
-          onClick={(e) => {
-            e.stopPropagation();
+      {isOpen && mounted && createPortal(
+        <div
+          ref={popoverRef}
+          style={{
+            position: 'fixed',
+            top: `${coords.top}px`,
+            left: `${coords.left}px`,
+            zIndex: 9999,
           }}
-          className={`inline-flex items-center gap-1 rounded-full bg-gradient-to-r from-[#0068FF] to-[#0084FF] hover:from-[#005bdc] hover:to-[#0074e0] text-white font-bold shadow-md shadow-blue-500/35 ring-2 ring-white dark:ring-slate-800 transition-all transform animate-zalo-pop cursor-pointer hover:scale-105 hover:shadow-blue-500/50 active:scale-95 whitespace-nowrap ${
-            badgeSize === 'sm' ? 'px-2 py-0.5 text-[10px]' : 'px-2.5 py-1 text-xs'
-          }`}
-          title={`Nhấn để mở Zalo chat với số ${phone}`}
+          className="animate-zalo-pop pointer-events-auto"
         >
-          <ZaloIcon className="w-3.5 h-3.5 shrink-0" />
-          <span>Zalo</span>
-          <ExternalLink className="w-2.5 h-2.5 opacity-80 shrink-0" />
-        </a>
+          <div className="relative bg-slate-900/95 text-white backdrop-blur-md px-2.5 py-1.5 rounded-xl shadow-2xl border border-slate-700/80 flex items-center gap-1.5 select-none text-xs">
+            {/* Zalo Button */}
+            <a
+              href={`https://zalo.me/${cleanPhone}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#0068FF] hover:bg-[#0054d1] text-white font-bold shadow-xs transition-all hover:scale-105 active:scale-95 cursor-pointer whitespace-nowrap"
+              title={`Mở Zalo chat với số ${phone}`}
+            >
+              <ZaloIcon className="w-3.5 h-3.5 shrink-0" />
+              <span>Zalo</span>
+              <ExternalLink className="w-2.5 h-2.5 opacity-80 shrink-0" />
+            </a>
+
+            {/* Divider */}
+            <div className="w-px h-4 bg-slate-700 shrink-0" />
+
+            {/* Copy Button */}
+            <button
+              type="button"
+              onClick={handleCopy}
+              className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg font-medium transition-all active:scale-95 cursor-pointer whitespace-nowrap ${
+                copied
+                  ? 'bg-emerald-500/25 text-emerald-400 font-bold'
+                  : 'hover:bg-slate-800 text-slate-300 hover:text-white'
+              }`}
+              title="Sao chép số điện thoại"
+            >
+              {copied ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                  <span>Đã sao chép!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-3.5 h-3.5 shrink-0" />
+                  <span>Sao chép</span>
+                </>
+              )}
+            </button>
+
+            {/* Divider */}
+            <div className="w-px h-4 bg-slate-700 shrink-0" />
+
+            {/* Call Button */}
+            <a
+              href={`tel:${cleanPhone}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-slate-800 text-slate-300 hover:text-white font-medium transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+              title={`Gọi điện đến số ${phone}`}
+            >
+              <Phone className="w-3.5 h-3.5 shrink-0" />
+              <span>Gọi</span>
+            </a>
+
+            {/* Arrow pointing at the phone button */}
+            {coords.openUp ? (
+              <div
+                style={{ left: `${Math.max(12, Math.min(coords.arrowLeft, 218))}px` }}
+                className="absolute top-full -translate-x-1/2 -mt-[1px] border-4 border-transparent border-t-slate-900"
+              />
+            ) : (
+              <div
+                style={{ left: `${Math.max(12, Math.min(coords.arrowLeft, 218))}px` }}
+                className="absolute bottom-full -translate-x-1/2 -mb-[1px] border-4 border-transparent border-b-slate-900"
+              />
+            )}
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );
