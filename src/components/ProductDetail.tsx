@@ -1032,7 +1032,7 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 {/* Gợi ý size trực quan theo size đang chọn */}
                 <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-sm text-[11px] font-mono text-slate-600 flex items-center justify-between">
                   <span>
-                    💡 <strong>Size {selectedSize}</strong>:{' '}
+                    <strong>Size {selectedSize}</strong>:{' '}
                     {selectedSize === 'S' && 'Phù hợp 1m55 - 1m65 • 48 - 55 kg (Vừa vặn)'}
                     {selectedSize === 'M' && 'Phù hợp 1m65 - 1m72 • 55 - 65 kg (Vừa vặn)'}
                     {selectedSize === 'L' && 'Phù hợp 1m70 - 1m78 • 65 - 75 kg (Thoải mái)'}
