@@ -5,7 +5,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const product = await getProductByIdOrSlug(id);
   if (!product) {
-    return { title: 'Product Not Found — ATELIER' };
+    return { title: "Product Not Found — DE'GENT" };
   }
   return {
     title: `${product.name} — DE'GENT`,

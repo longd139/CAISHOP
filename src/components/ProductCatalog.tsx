@@ -11,6 +11,7 @@ import { CustomSelect } from '@/components/CustomSelect';
 import { useAuth } from '@/lib/useAuth';
 import { UserProfileModal } from '@/components/UserProfileModal';
 import { useCart, CartItem, AVAILABLE_DEALS } from '@/lib/useCart';
+import { ProductMegaMenu, MobileCollectionsAccordion, QUICK_CATEGORIES } from '@/components/ProductMegaMenu';
 
 interface ProductVariant {
   id: string;
@@ -148,6 +149,7 @@ export default function ProductCatalog() {
 
   // Collection / Taxonomy states (Brand -> Nhóm -> Danh mục con)
   const [collections, setCollections] = useState<BrandCollection[]>([]);
+  const [selectedCategorySlug, setSelectedCategorySlug] = useState<string>('ALL');
   const [selectedBrandId, setSelectedBrandId] = useState<string>('ALL');
   const [selectedGroupId, setSelectedGroupId] = useState<string>('ALL');
   const [selectedSubId, setSelectedSubId] = useState<string>('ALL');
@@ -179,22 +181,80 @@ export default function ProductCatalog() {
     }
   }, [user, customerName, customerPhone]);
 
-  // Open cart drawer or apply brand filter from URL params
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      if (params.get('openCart') === 'true') {
-        setIsBagOpen(true);
-        const url = new URL(window.location.href);
-        url.searchParams.delete('openCart');
-        window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
-      }
-      const brandParam = params.get('brand');
-      if (brandParam) {
-        setSelectedBrandId(brandParam);
-        setExpandedBrands((prev) => ({ ...prev, [brandParam]: true }));
-      }
+  // Mega-menu hover & mobile state for Cấu trúc cây phân cấp ở bộ sưu tập
+  const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
+  const [isMobileProductTreeOpen, setIsMobileProductTreeOpen] = useState(false);
+  const productMenuTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleProductMenuEnter = () => {
+    if (productMenuTimerRef.current) clearTimeout(productMenuTimerRef.current);
+    setIsProductMenuOpen(true);
+  };
+
+  const handleProductMenuLeave = () => {
+    productMenuTimerRef.current = setTimeout(() => {
+      setIsProductMenuOpen(false);
+    }, 180);
+  };
+
+  // Apply query params for brand, group, sub
+  const applyTaxonomyUrlParams = (searchStr?: string) => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(searchStr ?? window.location.search);
+    if (params.get('openCart') === 'true') {
+      setIsBagOpen(true);
+      const url = new URL(window.location.href);
+      url.searchParams.delete('openCart');
+      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
     }
+
+    const brandParam = params.get('brand');
+    const groupParam = params.get('group');
+    const subParam = params.get('sub');
+    const categoryParam = params.get('category') || params.get('cat');
+
+    if (categoryParam) {
+      setSelectedCategorySlug(categoryParam.toLowerCase());
+      if (!brandParam) setSelectedBrandId('ALL');
+      if (!groupParam) setSelectedGroupId('ALL');
+      if (!subParam) setSelectedSubId('ALL');
+    } else if (brandParam || groupParam || subParam) {
+      setSelectedCategorySlug('ALL');
+    }
+
+    if (brandParam) {
+      setSelectedBrandId(brandParam);
+      setExpandedBrands((prev) => ({ ...prev, [brandParam]: true }));
+    }
+    if (groupParam) {
+      setSelectedGroupId(groupParam);
+      setExpandedGroups((prev) => ({ ...prev, [groupParam]: true }));
+    }
+    if (subParam) {
+      setSelectedSubId(subParam);
+    }
+  };
+
+  // Open cart drawer or apply brand/group/sub filter from URL params & handle navigation events
+  useEffect(() => {
+    applyTaxonomyUrlParams();
+
+    const handlePopState = () => applyTaxonomyUrlParams();
+    const handleCatalogNav = (e: any) => {
+      if (e.detail) {
+        const url = new URL(e.detail, window.location.origin);
+        applyTaxonomyUrlParams(url.search);
+      } else {
+        applyTaxonomyUrlParams();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('catalog-navigate', handleCatalogNav);
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('catalog-navigate', handleCatalogNav);
+    };
   }, []);
 
   // Scroll listener for sticky header
@@ -223,14 +283,7 @@ export default function ProductCatalog() {
       .then((data) => {
         if (data.success && data.data) {
           setCollections(data.data);
-          const urlParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-          const brandParam = urlParams?.get('brand');
-          if (brandParam) {
-            setSelectedBrandId(brandParam);
-            setExpandedBrands({ [brandParam]: true });
-          } else if (data.data.length > 0) {
-            setExpandedBrands({ [data.data[0].id]: true });
-          }
+          applyTaxonomyUrlParams();
         }
       })
       .catch((err) => console.error('Error loading collections:', err));
@@ -238,6 +291,15 @@ export default function ProductCatalog() {
 
   const formatMoney = (amount: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+  };
+
+  const getOriginalPrice = (sellingPrice: number) => {
+    if (!sellingPrice || sellingPrice <= 0) return 0;
+    if (sellingPrice === 249000) return 350000;
+    if (sellingPrice === 380000) return 520000;
+    if (sellingPrice === 480000) return 650000;
+    if (sellingPrice === 650000) return 890000;
+    return Math.ceil((sellingPrice * 1.32) / 10000) * 10000;
   };
 
   // Filtered and sorted products
@@ -296,6 +358,59 @@ export default function ProductCatalog() {
           }
         }
 
+        // Quick Category Filter (Áo, Quần, Giày, Phụ kiện, Áo khoác)
+        if (selectedCategorySlug !== 'ALL') {
+          const cat = selectedCategorySlug.toLowerCase();
+          const matchingProductIds = new Set<string>();
+          collections.forEach((col) => {
+            col.groups.forEach((grp) => {
+              const gSlug = grp.slug.toLowerCase();
+              const gName = grp.name.toLowerCase();
+              const isMatch =
+                (cat === 'ao' && (gSlug === 'ao' || gName === 'áo')) ||
+                (cat === 'quan' && (gSlug === 'quan' || gName === 'quần')) ||
+                (cat === 'ao-khoac' && (gSlug.includes('khoac') || gName.includes('khoác'))) ||
+                (cat === 'giay' && (gSlug.includes('giay') || gName.includes('giày'))) ||
+                (cat === 'phu-kien' && (gSlug.includes('phu-kien') || gName.includes('phụ kiện')));
+
+              if (isMatch) {
+                grp.items.forEach((it) => {
+                  it.product_ids?.forEach((pid) => matchingProductIds.add(pid));
+                });
+              }
+            });
+          });
+
+          const matchText = (p.name + ' ' + (p.category || '') + ' ' + (p.description || '')).toLowerCase();
+          let matches = false;
+
+          if (matchingProductIds.size > 0 && matchingProductIds.has(p.id)) {
+            matches = true;
+          } else if (cat === 'ao') {
+            matches =
+              ['áo', 'shirt', 'tee', 'polo', 't-shirt', 'top'].some((k) => matchText.includes(k)) &&
+              !['khoác', 'jacket', 'bomber', 'blazer'].some((k) => matchText.includes(k));
+          } else if (cat === 'quan') {
+            matches = ['quần', 'jean', 'pants', 'trouser', 'shorts', 'denim', 'khaki', 'chino'].some((k) =>
+              matchText.includes(k)
+            );
+          } else if (cat === 'ao-khoac') {
+            matches = ['khoác', 'jacket', 'bomber', 'blazer', 'hoodie', 'cardigan', 'coat', 'suit'].some((k) =>
+              matchText.includes(k)
+            );
+          } else if (cat === 'giay') {
+            matches = ['giày', 'shoe', 'sneaker', 'loafer', 'boot', 'sandal'].some((k) =>
+              matchText.includes(k)
+            );
+          } else if (cat === 'phu-kien') {
+            matches = ['phụ kiện', 'accessory', 'thắt lưng', 'belt', 'ví', 'wallet', 'nón', 'mũ', 'kính', 'đồng hồ'].some((k) =>
+              matchText.includes(k)
+            );
+          }
+
+          if (!matches) return false;
+        }
+
         // Search query
         if (searchQuery.trim() !== '') {
           const q = searchQuery.toLowerCase();
@@ -316,12 +431,14 @@ export default function ProductCatalog() {
         if (sortBy === 'name-asc') return a.name.localeCompare(b.name);
         return 0;
       });
-  }, [products, selectedFit, selectedBrandId, selectedGroupId, selectedSubId, collections, searchQuery, sortBy]);
+  }, [products, selectedFit, selectedCategorySlug, selectedBrandId, selectedGroupId, selectedSubId, collections, searchQuery, sortBy]);
 
-  // Active collection label helpers
+  // Active collection & quick category label helpers
   const activeBrandObj = collections.find((c) => c.id === selectedBrandId);
   const activeGroupObj = activeBrandObj?.groups.find((g) => g.id === selectedGroupId);
   const activeSubObj = activeGroupObj?.items.find((s) => s.id === selectedSubId);
+  const activeQuickCategory = QUICK_CATEGORIES.find((c) => c.slug === selectedCategorySlug);
+  const hasActiveCategoryFilter = selectedCategorySlug !== 'ALL';
   const hasActiveCollectionFilter = selectedBrandId !== 'ALL' || selectedGroupId !== 'ALL' || selectedSubId !== 'ALL';
 
   // Quick view handler & Search Duration Tracking
@@ -590,14 +707,36 @@ export default function ProductCatalog() {
               <ul className="hidden lg:flex items-center gap-10 xl:gap-12 text-[11px] tracking-wide-2 font-medium uppercase">
                 {headerNavItems.map((item) => {
                   const isCurrent = item.href === '/products' || item.href === '/product';
+                  const isProducts =
+                    item.href === '/products' ||
+                    item.href === '/product' ||
+                    item.label.toUpperCase().includes('SẢN PHẨM');
+
                   return (
-                    <li key={item.id}>
+                    <li
+                      key={item.id}
+                      className={isProducts ? 'relative' : ''}
+                      onMouseEnter={isProducts ? handleProductMenuEnter : undefined}
+                      onMouseLeave={isProducts ? handleProductMenuLeave : undefined}
+                    >
                       <Link
                         href={item.href}
-                        className={`nav-link text-[#0a0a0a] ${isCurrent ? 'active' : ''}`}
+                        className={`nav-link text-[#0a0a0a] flex items-center gap-1.5 py-2 cursor-pointer ${
+                          isCurrent ? 'active' : ''
+                        }`}
                       >
-                        {item.label}
+                        <span>{item.label}</span>
                       </Link>
+
+                      {isProducts && (
+                        <ProductMegaMenu
+                          isOpen={isProductMenuOpen}
+                          onClose={() => setIsProductMenuOpen(false)}
+                          onMouseEnter={handleProductMenuEnter}
+                          onMouseLeave={handleProductMenuLeave}
+                          initialCollections={collections}
+                        />
+                      )}
                     </li>
                   );
                 })}
@@ -756,22 +895,51 @@ export default function ProductCatalog() {
           {/* Mobile Drawer (Overlay dropdown đè lên nội dung) */}
           <div
             className={`lg:hidden absolute top-full left-0 right-0 w-full bg-white/95 backdrop-blur-md border-b hairline shadow-2xl transition-all duration-300 ease-out overflow-hidden z-50 ${
-              isMenuOpen ? 'max-h-[500px] opacity-100 visible' : 'max-h-0 opacity-0 invisible pointer-events-none'
+              isMenuOpen ? 'max-h-[85vh] overflow-y-auto opacity-100 visible' : 'max-h-0 opacity-0 invisible pointer-events-none'
             }`}
           >
             <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
               <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
                 {headerNavItems.map((item) => {
                   const isCurrent = item.href === '/products' || item.href === '/product';
+                  const isProducts =
+                    item.href === '/products' ||
+                    item.href === '/product' ||
+                    item.label.toUpperCase().includes('SẢN PHẨM');
+
                   return (
                     <li key={item.id}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={`block text-[#0a0a0a] ${isCurrent ? 'font-bold underline' : ''}`}
-                      >
-                        {item.label}
-                      </Link>
+                      <div className="flex items-center justify-between">
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMenuOpen(false)}
+                          className={`block text-[#0a0a0a] ${isCurrent ? 'font-bold underline' : ''}`}
+                        >
+                          {item.label}
+                        </Link>
+                        {isProducts && (
+                          <button
+                            type="button"
+                            onClick={() => setIsMobileProductTreeOpen(!isMobileProductTreeOpen)}
+                            className="p-1 text-slate-500 hover:text-black cursor-pointer"
+                            aria-label="Xem cây phân cấp bộ sưu tập"
+                          >
+                            <ChevronDown
+                              className={`w-4 h-4 transition-transform duration-200 ${
+                                isMobileProductTreeOpen ? 'rotate-180 text-black' : ''
+                              }`}
+                            />
+                          </button>
+                        )}
+                      </div>
+                      {isProducts && isMobileProductTreeOpen && (
+                        <div className="pt-2">
+                          <MobileCollectionsAccordion
+                            collections={collections}
+                            onNavigate={() => setIsMenuOpen(false)}
+                          />
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -949,12 +1117,22 @@ export default function ProductCatalog() {
             <FolderTree className="w-4.5 h-4.5 text-black" />
             <span>Bộ sưu tập & Danh mục ({collections.length} Thương hiệu)</span>
           </button>
-          {hasActiveCollectionFilter && (
+          {(hasActiveCollectionFilter || hasActiveCategoryFilter) && (
             <button
               onClick={() => {
+                setSelectedCategorySlug('ALL');
                 setSelectedBrandId('ALL');
                 setSelectedGroupId('ALL');
                 setSelectedSubId('ALL');
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('category');
+                  url.searchParams.delete('cat');
+                  url.searchParams.delete('brand');
+                  url.searchParams.delete('group');
+                  url.searchParams.delete('sub');
+                  window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+                }
               }}
               className="text-[11px] sm:text-xs font-mono uppercase underline text-black/70 hover:text-black font-semibold cursor-pointer"
             >
@@ -972,11 +1150,21 @@ export default function ProductCatalog() {
             {/* All Editions Button */}
             <button
               onClick={() => {
+                setSelectedCategorySlug('ALL');
                 setSelectedBrandId('ALL');
                 setSelectedGroupId('ALL');
                 setSelectedSubId('ALL');
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('category');
+                  url.searchParams.delete('cat');
+                  url.searchParams.delete('brand');
+                  url.searchParams.delete('group');
+                  url.searchParams.delete('sub');
+                  window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+                }
               }}
-              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-mono uppercase transition-colors cursor-pointer border hairline ${!hasActiveCollectionFilter
+              className={`w-full flex items-center justify-between px-3 py-2 text-xs font-mono uppercase transition-colors cursor-pointer border hairline ${!hasActiveCollectionFilter && !hasActiveCategoryFilter
                 ? 'bg-black text-white border-black font-semibold'
                 : 'bg-white text-black/70 border-black/10 hover:border-black hover:text-black'
                 }`}
@@ -985,7 +1173,7 @@ export default function ProductCatalog() {
                 <Layers className="w-3.5 h-3.5" />
                 <span>Tất cả sản phẩm</span>
               </div>
-              <span className={`text-[10px] ${!hasActiveCollectionFilter ? 'text-white/80' : 'text-black/50'}`}>
+              <span className={`text-[10px] ${!hasActiveCollectionFilter && !hasActiveCategoryFilter ? 'text-white/80' : 'text-black/50'}`}>
                 ({products.length})
               </span>
             </button>
@@ -1161,44 +1349,64 @@ export default function ProductCatalog() {
           {/* ================= RIGHT COLUMN: PRODUCTS ARCHIVE ================= */}
           <section className="lg:col-span-9 space-y-6">
 
-            {/* Active Collection Breadcrumb Badge Bar */}
-            {hasActiveCollectionFilter && (
+            {/* Active Collection or Category Breadcrumb Badge Bar */}
+            {(hasActiveCollectionFilter || hasActiveCategoryFilter) && (
               <div className="p-3 border hairline bg-[#0a0a0a]/[0.02] flex flex-wrap items-center justify-between gap-3 text-xs font-mono animate-in fade-in">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] uppercase text-black/50">ĐANG LỌC BỘ SƯU TẬP:</span>
-                  <div className="flex items-center gap-1.5 font-bold uppercase text-black">
-                    <span className="bg-black text-white px-2 py-0.5 text-[11px]">
-                      {activeBrandObj?.brand}
-                    </span>
-                    {activeGroupObj && (
-                      <>
-                        <span>/</span>
-                        <span className="bg-black/10 px-2 py-0.5 text-[11px]">
-                          {activeGroupObj.name}
-                        </span>
-                      </>
-                    )}
-                    {activeSubObj && (
-                      <>
-                        <span>/</span>
-                        <span className="bg-black/10 px-2 py-0.5 text-[11px] underline">
-                          {activeSubObj.name}
-                        </span>
-                      </>
-                    )}
-                  </div>
+                  {hasActiveCategoryFilter && (
+                    <div className="flex items-center gap-1.5 font-bold uppercase text-black">
+                      <span className="text-[10px] uppercase text-black/50">DANH MỤC:</span>
+                      <span className="bg-black text-white px-2 py-0.5 text-[11px]">
+                        {activeQuickCategory?.label || selectedCategorySlug}
+                      </span>
+                    </div>
+                  )}
+                  {hasActiveCollectionFilter && (
+                    <div className="flex items-center gap-1.5 font-bold uppercase text-black">
+                      <span className="text-[10px] uppercase text-black/50">BỘ SƯU TẬP:</span>
+                      <span className="bg-black text-white px-2 py-0.5 text-[11px]">
+                        {activeBrandObj?.brand}
+                      </span>
+                      {activeGroupObj && (
+                        <>
+                          <span>/</span>
+                          <span className="bg-black/10 px-2 py-0.5 text-[11px]">
+                            {activeGroupObj.name}
+                          </span>
+                        </>
+                      )}
+                      {activeSubObj && (
+                        <>
+                          <span>/</span>
+                          <span className="bg-black/10 px-2 py-0.5 text-[11px] underline">
+                            {activeSubObj.name}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <button
                   onClick={() => {
+                    setSelectedCategorySlug('ALL');
                     setSelectedBrandId('ALL');
                     setSelectedGroupId('ALL');
                     setSelectedSubId('ALL');
+                    if (typeof window !== 'undefined') {
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete('category');
+                      url.searchParams.delete('cat');
+                      url.searchParams.delete('brand');
+                      url.searchParams.delete('group');
+                      url.searchParams.delete('sub');
+                      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+                    }
                   }}
                   className="flex items-center gap-1 text-[11px] uppercase font-mono underline hover:text-black/60 cursor-pointer"
                 >
                   <X className="w-3.5 h-3.5" />
-                  <span>Xóa lọc bộ sưu tập</span>
+                  <span>Xóa lọc</span>
                 </button>
               </div>
             )}
@@ -1208,15 +1416,25 @@ export default function ProductCatalog() {
               <div>
                 Hiển thị <strong>{filteredProducts.length}</strong> / {products.length} sản phẩm
               </div>
-              {(selectedFit !== 'ALL' || searchQuery || inStockOnly || hasActiveCollectionFilter) && (
+              {(selectedFit !== 'ALL' || searchQuery || inStockOnly || hasActiveCollectionFilter || hasActiveCategoryFilter) && (
                 <button
                   onClick={() => {
                     setSelectedFit('ALL');
+                    setSelectedCategorySlug('ALL');
                     setSelectedBrandId('ALL');
                     setSelectedGroupId('ALL');
                     setSelectedSubId('ALL');
                     setSearchQuery('');
                     setInStockOnly(false);
+                    if (typeof window !== 'undefined') {
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete('category');
+                      url.searchParams.delete('cat');
+                      url.searchParams.delete('brand');
+                      url.searchParams.delete('group');
+                      url.searchParams.delete('sub');
+                      window.history.replaceState({}, '', url.pathname + (url.search ? url.search : ''));
+                    }
                   }}
                   className="text-black underline underline-offset-4 hover:opacity-60 cursor-pointer"
                 >
@@ -1302,11 +1520,19 @@ export default function ProductCatalog() {
                             {product.name}
                           </Link>
 
-                          {/* Price - perfectly aligned horizontally */}
-                          <div className="text-base md:text-lg font-mono font-bold tracking-tight text-slate-950 pt-1">
-                            {minPrice === maxPrice
-                              ? formatMoney(minPrice)
-                              : `${formatMoney(minPrice)} — ${formatMoney(maxPrice)}`}
+                          {/* Price with sale effect (Strikethrough original price + sale discount badge) */}
+                          <div className="flex items-baseline flex-wrap gap-2 pt-1 min-h-[28px]">
+                            <span className="text-base md:text-lg font-mono font-bold tracking-tight text-slate-950">
+                              {minPrice === maxPrice
+                                ? formatMoney(minPrice)
+                                : `${formatMoney(minPrice)} — ${formatMoney(maxPrice)}`}
+                            </span>
+                            <span className="text-base md:text-lg font-mono text-slate-400 line-through decoration-slate-400 font-normal">
+                              {formatMoney(getOriginalPrice(minPrice))}
+                            </span>
+                            <span className="text-base md:text-lg font-mono font-bold text-rose-600">
+                              -{Math.round(((getOriginalPrice(minPrice) - minPrice) / getOriginalPrice(minPrice)) * 100)}%
+                            </span>
                           </div>
 
                           {/* Sizes Preview */}

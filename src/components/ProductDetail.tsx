@@ -3,12 +3,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { useHeaderNav } from '@/lib/useSiteContent';
-import { ChevronLeft, ChevronRight, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag, Trash2, Ruler, Bot, Loader2, Check } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ChevronDown, Maximize2, X, Eye, Sparkles, Award, Crown, TrendingUp, User, Tag, Trash2, Ruler, Bot, Loader2, Check } from 'lucide-react';
 import { getProductGallery, getPrimaryImageUrl, ProductImagePlate } from '@/lib/productImages';
 import { calculateTier, getNextTierInfo } from '@/lib/membership';
 import { useAuth } from '@/lib/useAuth';
 import { UserProfileModal } from '@/components/UserProfileModal';
 import { useCart, CartItem, AVAILABLE_DEALS } from '@/lib/useCart';
+import { ProductMegaMenu, MobileCollectionsAccordion } from '@/components/ProductMegaMenu';
 
 interface ProductVariant {
   id: string;
@@ -50,6 +51,22 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
   const [profileActiveTab, setProfileActiveTab] = useState<'profile' | 'orders'>('profile');
   const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
   const userDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Mega-menu hover & mobile state for Cấu trúc cây phân cấp ở bộ sưu tập
+  const [isProductMenuOpen, setIsProductMenuOpen] = useState(false);
+  const [isMobileProductTreeOpen, setIsMobileProductTreeOpen] = useState(false);
+  const productMenuTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleProductMenuEnter = () => {
+    if (productMenuTimerRef.current) clearTimeout(productMenuTimerRef.current);
+    setIsProductMenuOpen(true);
+  };
+
+  const handleProductMenuLeave = () => {
+    productMenuTimerRef.current = setTimeout(() => {
+      setIsProductMenuOpen(false);
+    }, 180);
+  };
 
   // Close user dropdown when clicking outside
   useEffect(() => {
@@ -309,6 +326,15 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
   };
 
+  const getOriginalPrice = (sellingPrice: number) => {
+    if (!sellingPrice || sellingPrice <= 0) return 0;
+    if (sellingPrice === 249000) return 350000;
+    if (sellingPrice === 380000) return 520000;
+    if (sellingPrice === 480000) return 650000;
+    if (sellingPrice === 650000) return 890000;
+    return Math.ceil((sellingPrice * 1.32) / 10000) * 10000;
+  };
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -478,14 +504,35 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
               <ul className="hidden lg:flex items-center gap-10 xl:gap-12 text-[11px] tracking-wide-2 font-medium uppercase">
                 {headerNavItems.map((item) => {
                   const isCurrent = item.href === '/products' || item.href === '/product';
+                  const isProducts =
+                    item.href === '/products' ||
+                    item.href === '/product' ||
+                    item.label.toUpperCase().includes('SẢN PHẨM');
+
                   return (
-                    <li key={item.id}>
+                    <li
+                      key={item.id}
+                      className={isProducts ? 'relative' : ''}
+                      onMouseEnter={isProducts ? handleProductMenuEnter : undefined}
+                      onMouseLeave={isProducts ? handleProductMenuLeave : undefined}
+                    >
                       <Link
                         href={item.href}
-                        className={`nav-link text-[#0a0a0a] ${isCurrent ? 'active' : ''}`}
+                        className={`nav-link text-[#0a0a0a] flex items-center gap-1.5 py-2 cursor-pointer ${
+                          isCurrent ? 'active' : ''
+                        }`}
                       >
-                        {item.label}
+                        <span>{item.label}</span>
                       </Link>
+
+                      {isProducts && (
+                        <ProductMegaMenu
+                          isOpen={isProductMenuOpen}
+                          onClose={() => setIsProductMenuOpen(false)}
+                          onMouseEnter={handleProductMenuEnter}
+                          onMouseLeave={handleProductMenuLeave}
+                        />
+                      )}
                     </li>
                   );
                 })}
@@ -644,22 +691,48 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
           {/* Mobile Drawer (Overlay dropdown đè lên nội dung) */}
           <div
             className={`lg:hidden absolute top-full left-0 right-0 w-full bg-white/95 backdrop-blur-md border-b hairline shadow-2xl transition-all duration-300 ease-out overflow-hidden z-50 ${
-              isMenuOpen ? 'max-h-[500px] opacity-100 visible' : 'max-h-0 opacity-0 invisible pointer-events-none'
+              isMenuOpen ? 'max-h-[85vh] overflow-y-auto opacity-100 visible' : 'max-h-0 opacity-0 invisible pointer-events-none'
             }`}
           >
             <div className="max-w-[1760px] mx-auto px-4 sm:px-6 lg:px-8 xl:px-10">
               <ul className="py-5 space-y-4 text-[12px] tracking-wide-2 font-medium uppercase">
                 {headerNavItems.map((item) => {
                   const isCurrent = item.href === '/products' || item.href === '/product';
+                  const isProducts =
+                    item.href === '/products' ||
+                    item.href === '/product' ||
+                    item.label.toUpperCase().includes('SẢN PHẨM');
+
                   return (
                     <li key={item.id}>
-                      <Link
-                        href={item.href}
-                        onClick={() => setIsMenuOpen(false)}
-                        className={`block text-[#0a0a0a] ${isCurrent ? 'font-bold' : ''}`}
-                      >
-                        {item.label}
-                      </Link>
+                      <div className="flex items-center justify-between">
+                        <Link
+                          href={item.href}
+                          onClick={() => setIsMenuOpen(false)}
+                          className={`block text-[#0a0a0a] ${isCurrent ? 'font-bold' : ''}`}
+                        >
+                          {item.label}
+                        </Link>
+                        {isProducts && (
+                          <button
+                            type="button"
+                            onClick={() => setIsMobileProductTreeOpen(!isMobileProductTreeOpen)}
+                            className="p-1 text-slate-500 hover:text-black cursor-pointer"
+                            aria-label="Xem cây phân cấp bộ sưu tập"
+                          >
+                            <ChevronDown
+                              className={`w-4 h-4 transition-transform duration-200 ${
+                                isMobileProductTreeOpen ? 'rotate-180 text-black' : ''
+                              }`}
+                            />
+                          </button>
+                        )}
+                      </div>
+                      {isProducts && isMobileProductTreeOpen && (
+                        <div className="pt-2">
+                          <MobileCollectionsAccordion onNavigate={() => setIsMenuOpen(false)} />
+                        </div>
+                      )}
                     </li>
                   );
                 })}
@@ -863,11 +936,21 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                   {product.name}
                 </h1>
 
-                {/* Price Display */}
-                <div className="flex items-baseline gap-4 pt-1">
-                  <div className="text-2xl font-bold font-mono tracking-tight text-[#0a0a0a]">
+                {/* Price Display with Sale Effect */}
+                <div className="flex items-baseline flex-wrap gap-3 pt-1">
+                  <div className="text-2xl md:text-3xl font-bold font-mono tracking-tight text-[#0a0a0a]">
                     {activeVariant ? formatMoney(activeVariant.selling_price) : '—'}
                   </div>
+                  {activeVariant && (
+                    <>
+                      <div className="text-2xl md:text-3xl font-mono text-slate-400 line-through decoration-slate-400 font-normal">
+                        {formatMoney(getOriginalPrice(activeVariant.selling_price))}
+                      </div>
+                      <span className="text-2xl md:text-3xl font-mono font-bold text-rose-600">
+                        -{Math.round(((getOriginalPrice(activeVariant.selling_price) - activeVariant.selling_price) / getOriginalPrice(activeVariant.selling_price)) * 100)}%
+                      </span>
+                    </>
+                  )}
                   <div className="text-[11px] font-mono text-[#0a0a0a]/60">
                     Đã bao gồm thuế GTGT
                   </div>
@@ -1091,8 +1174,13 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                         <h4 className="font-wide uppercase text-sm group-hover:underline truncate mt-1">
                           {rel.name}
                         </h4>
-                        <div className="text-xs font-semibold font-mono mt-1">
-                          {formatMoney(minPrice)}
+                        <div className="flex items-baseline flex-wrap gap-2 mt-1">
+                          <span className="text-xs font-bold font-mono text-slate-950">
+                            {formatMoney(minPrice)}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400 line-through">
+                            {formatMoney(getOriginalPrice(minPrice))}
+                          </span>
                         </div>
                       </div>
                     </Link>

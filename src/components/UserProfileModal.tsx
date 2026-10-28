@@ -20,9 +20,15 @@ import {
   AlertCircle,
   RotateCcw,
   Truck,
+  MapPin,
+  Tag,
+  Copy,
+  FileText,
 } from 'lucide-react';
 import { useCart, AVAILABLE_DEALS } from '@/lib/useCart';
 import { getPrimaryImageUrl } from '@/lib/productImages';
+import { parseOrderAddressDetails } from '@/components/ExecutiveDashboard';
+import ReturnRequestModal from '@/components/ReturnRequestModal';
 
 const formatMoney = (amount: number) => {
   return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
@@ -115,6 +121,8 @@ export function UserProfileModal({
   const [activeTab, setActiveTab] = useState<'profile' | 'orders'>('profile');
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
+  const [selectedDetailOrder, setSelectedDetailOrder] = useState<any | null>(null);
+  const [returnRequestOrder, setReturnRequestOrder] = useState<any | null>(null);
   const [redirectingOrderId, setRedirectingOrderId] = useState<string | null>(null);
   const [membershipStats, setMembershipStats] = useState<{ past_orders: number } | null>(null);
   const [selectedTierId, setSelectedTierId] = useState<string>('BRONZE');
@@ -224,6 +232,11 @@ export function UserProfileModal({
   const [confirmingOrderId, setConfirmingOrderId] = useState<string | null>(null);
 
   const handleConfirmDelivered = async (orderId: string) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (targetOrder && !targetOrder.tracking_code) {
+      alert('Đơn hàng chưa có mã vận chuyển, chưa thể xác nhận nhận hàng.');
+      return;
+    }
     setConfirmingOrderId(orderId);
     try {
       const res = await fetch('/api/orders', {
@@ -980,103 +993,6 @@ export function UserProfileModal({
                           </div>
                         </div>
 
-                        {/* Order Items Preview */}
-                        <div className="divide-y divide-slate-100">
-                          {Array.isArray(ord.items) && ord.items.map((it: any) => (
-                            <div key={it.id} className="py-2 first:pt-0 last:pb-0 flex items-center gap-3">
-                              <img
-                                src={getPrimaryImageUrl(it.product_images)}
-                                alt={it.product_name}
-                                className="w-11 h-13 object-cover rounded border border-slate-200 shrink-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-semibold text-slate-900 truncate">
-                                  {it.product_name}
-                                </div>
-                                <div className="text-[11px] text-slate-500">
-                                  {it.color} / Size {it.size} × {it.quantity}
-                                </div>
-                              </div>
-                              <div className="text-xs font-medium text-slate-800 tabular-nums">
-                                {formatMoney(it.total_price || (it.unit_price * it.quantity))}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* 🚚 Shipment / Tracking Code Info for customer */}
-                        {ord.tracking_code && (isDispatched || isDelivered) ? (
-                          <div className="p-3 bg-red-50/70 border border-red-200/90 rounded-xl space-y-2">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <div className="flex items-center gap-2">
-                                {ord.carrier === 'VIETTEL_POST' || !ord.carrier ? (
-                                  <img
-                                    src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                                    onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
-                                    alt="Viettel Post"
-                                    className="w-5 h-5 rounded object-cover shadow-2xs border border-red-200 shrink-0"
-                                  />
-                                ) : (
-                                  <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                                    <Truck className="w-3.5 h-3.5" />
-                                  </div>
-                                )}
-                                <span className="text-xs font-bold text-slate-900">
-                                  {ord.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : ord.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : ord.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
-                                </span>
-                              </div>
-                              <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
-                                {isDelivered ? 'Đã giao thành công' : 'Đang vận chuyển'}
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-red-100 flex-wrap">
-                              <div className="flex items-center gap-1.5">
-                                <span className="text-slate-500 text-[11px]">Mã vận đơn:</span>
-                                <span className="font-mono font-bold text-xs text-slate-950 bg-white px-2 py-0.5 rounded border border-slate-200 tracking-wider">
-                                  {ord.tracking_code}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(ord.tracking_code);
-                                    alert(`Đã sao chép mã vận đơn: ${ord.tracking_code}`);
-                                  }}
-                                  className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-white px-2 py-1 rounded border border-blue-200 shadow-2xs hover:bg-blue-50 transition-colors cursor-pointer"
-                                  title="Sao chép mã"
-                                >
-                                  Sao chép
-                                </button>
-                                <a
-                                  href={
-                                    ord.carrier === 'GHTK' ? `https://i.ghtk.vn/${ord.tracking_code}` :
-                                    ord.carrier === 'GHN' ? `https://tracking.ghn.vn/?order_code=${ord.tracking_code}` :
-                                    `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${ord.tracking_code}`
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-[11px] font-semibold text-red-700 hover:text-red-900 bg-white px-2 py-1 rounded border border-red-200 shadow-2xs hover:bg-red-50 transition-colors flex items-center gap-1"
-                                >
-                                  <span>Tra cứu bưu gửi</span>
-                                  <ExternalLink className="w-3 h-3 text-red-500" />
-                                </a>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (isPaid || ord.payment_method === 'cod') && !isDelivered && !isCancelled && !isReturned ? (
-                          <div className="p-2.5 bg-amber-50/70 border border-amber-200/80 rounded-xl flex items-center justify-between gap-2 flex-wrap text-xs text-amber-900">
-                            <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-                              <span className="text-slate-600">Trạng thái vận chuyển:</span>
-                              <span className="font-bold text-amber-950">Đang chờ bàn giao cho shipper</span>
-                            </div>
-                            <span className="text-[11px] text-amber-700 font-medium">DE&apos;GENT đang chuẩn bị gói hàng</span>
-                          </div>
-                        ) : null}
-
                         {/* Order Footer & Actions */}
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                           <div className="text-xs">
@@ -1087,8 +1003,8 @@ export function UserProfileModal({
                           </div>
 
                           <div className="flex items-center gap-2">
-                            {/* Quick Action: Confirm Received if active, not delivered, and not in return/exchange */}
-                            {!isDelivered && !isCancelled && !isReturned && (isPaid || ord.payment_method === 'cod') && (
+                            {/* Quick Action: Confirm Received if active, not delivered, has tracking code, and not in return/exchange */}
+                            {!isDelivered && !isCancelled && !isReturned && (isPaid || ord.payment_method === 'cod') && Boolean(ord.tracking_code) && (
                               <button
                                 type="button"
                                 disabled={confirmingOrderId === ord.id}
@@ -1130,25 +1046,14 @@ export function UserProfileModal({
                               </button>
                             )}
 
-                            {isDelivered && !isReturned && (
-                              <Link
-                                href={`/checkout?order_id=${ord.id}&open_return=1`}
-                                onClick={onClose}
-                                className="px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                              >
-                                <RotateCcw className="w-3 h-3 text-amber-700" />
-                                <span>Yêu cầu</span>
-                              </Link>
-                            )}
-
-                            <Link
-                              href={`/checkout?order_id=${ord.id}`}
-                              onClick={onClose}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1"
+                            <button
+                              type="button"
+                              onClick={() => setSelectedDetailOrder(ord)}
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1 cursor-pointer"
                             >
                               <span>Chi tiết đơn</span>
                               <ArrowRight className="w-3 h-3 text-slate-500" />
-                            </Link>
+                            </button>
                           </div>
                         </div>
                       </div>
@@ -1180,6 +1085,421 @@ export function UserProfileModal({
           )}
         </div>
       </div>
+
+      {/* Modal Popup: Chi tiết đơn hàng */}
+      {selectedDetailOrder && (() => {
+        const det = selectedDetailOrder;
+        const parsed = parseOrderAddressDetails(det.shipping_address);
+        const isPaid = det.payment_status === 'PAID';
+        const returnNotesLower = det.return_notes?.toLowerCase() || '';
+        const isReturned = det.fulfillment_status === 'RETURNED' || 
+                           det.fulfillment_status === 'RETURNING' || 
+                           det.fulfillment_status === 'RETURN_REQUESTED' || 
+                           Boolean(det.return_status);
+        const isExchange = isReturned && (
+          det.return_notes?.includes('ĐỔI HÀNG') || 
+          returnNotesLower.includes('đổi size') || 
+          returnNotesLower.includes('đổi mẫu') ||
+          returnNotesLower.includes('đổi hàng')
+        );
+        const isRefund = isReturned && !isExchange;
+        const isCancelled = det.fulfillment_status === 'CANCELLED';
+        const isDispatched = det.fulfillment_status === 'DISPATCHED';
+        const isDelivered = det.fulfillment_status === 'DELIVERED';
+        const isPacking = det.fulfillment_status === 'PACKING' || (!isDispatched && !isDelivered && !isCancelled && !isReturned && isPaid);
+
+        // Tính tạm tính tiền hàng từ danh sách items
+        const subtotal = Array.isArray(det.items)
+          ? det.items.reduce((sum: number, it: any) => sum + (it.total_price || (it.unit_price * it.quantity)), 0)
+          : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+            <div className="max-w-2xl w-full bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden max-h-[90vh] flex flex-col animate-in fade-in zoom-in-95 duration-150">
+              {/* Header */}
+              <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center shrink-0">
+                    <FileText className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 font-mono tracking-wide">
+                      Chi tiết đơn hàng #{det.order_code}
+                    </h3>
+                    <p className="text-[11px] text-slate-400 font-medium">
+                      Đặt lúc: {new Date(det.created_at).toLocaleDateString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      })}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                      isPaid
+                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : 'bg-amber-50 text-amber-800 border border-amber-200'
+                    }`}
+                  >
+                    {isPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDetailOrder(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200 transition-colors cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto space-y-4 text-xs">
+                {/* Trạng thái đơn hàng */}
+                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <span className="text-slate-500 font-medium">Tiến trình đơn:</span>
+                    <span
+                      className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
+                        isCancelled
+                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                          : isExchange
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                          : isRefund
+                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                          : isDelivered
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : isDispatched
+                          ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                          : isPacking
+                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                          : 'bg-slate-200/80 text-slate-700 border border-slate-300'
+                      }`}
+                    >
+                      {isCancelled
+                        ? 'Đã hủy'
+                        : isExchange
+                        ? 'Đang đổi hàng'
+                        : isRefund
+                        ? 'Đang trả hàng'
+                        : isDelivered
+                        ? 'Đã nhận hàng'
+                        : isDispatched
+                        ? 'Đang vận chuyển'
+                        : isPacking
+                        ? 'Chờ vận chuyển'
+                        : 'Chưa xử lý'}
+                    </span>
+                  </div>
+
+                  {!isPaid && !isCancelled && (
+                    <OrderCountdownBadge
+                      createdAt={det.created_at}
+                      orderId={det.id}
+                      onExpired={() => {
+                        fetchOrders();
+                        setSelectedDetailOrder(null);
+                      }}
+                    />
+                  )}
+                </div>
+
+                {/* 🚚 Thông tin Đơn vị vận chuyển & Mã vận đơn */}
+                <div className="p-3.5 bg-slate-50/80 border border-slate-200/90 rounded-xl space-y-2.5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      {det.carrier === 'VIETTEL_POST' || !det.carrier ? (
+                        <img
+                          src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
+                          alt="Viettel Post"
+                          className="w-5 h-5 rounded object-cover shadow-2xs border border-red-200 shrink-0"
+                        />
+                      ) : (
+                        <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                          <Truck className="w-3.5 h-3.5" />
+                        </div>
+                      )}
+                      <span className="text-xs font-bold text-slate-900">
+                        {det.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : det.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : det.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                      </span>
+                    </div>
+
+                    {det.tracking_code ? (
+                      <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded border border-emerald-200 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
+                        {isDelivered ? 'Đã giao thành công' : 'Đang vận chuyển'}
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-amber-700 italic">
+                        Chờ cập nhật mã vận chuyển
+                      </span>
+                    )}
+                  </div>
+
+                  {det.tracking_code ? (
+                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-200 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-500 text-[11px]">Mã vận đơn:</span>
+                        <span className="font-mono font-bold text-xs text-slate-950 bg-white px-2 py-0.5 rounded border border-slate-300 tracking-wider">
+                          {det.tracking_code}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(det.tracking_code);
+                            alert(`Đã sao chép mã vận đơn: ${det.tracking_code}`);
+                          }}
+                          className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 bg-white px-2 py-1 rounded border border-blue-200 shadow-2xs hover:bg-blue-50 transition-colors cursor-pointer inline-flex items-center gap-1"
+                          title="Sao chép mã"
+                        >
+                          <Copy className="w-3 h-3" />
+                          <span>Sao chép</span>
+                        </button>
+                        <a
+                          href={
+                            det.carrier === 'GHTK' ? `https://i.ghtk.vn/${det.tracking_code}` :
+                            det.carrier === 'GHN' ? `https://tracking.ghn.vn/?order_code=${det.tracking_code}` :
+                            `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${det.tracking_code}`
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-[11px] font-semibold text-red-700 hover:text-red-900 bg-white px-2 py-1 rounded border border-red-200 shadow-2xs hover:bg-red-50 transition-colors flex items-center gap-1"
+                        >
+                          <span>Tra cứu bưu gửi</span>
+                          <ExternalLink className="w-3 h-3 text-red-500" />
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-slate-500 pt-1 border-t border-slate-200">
+                      DE&apos;GENT đang chuẩn bị gói hàng và sẽ cập nhật mã vận đơn khi bàn giao cho đối tác vận chuyển.
+                    </p>
+                  )}
+                </div>
+
+                {/* 📍 Thông tin người nhận & Địa chỉ */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-slate-900">
+                    <MapPin className="w-3.5 h-3.5 text-slate-700 shrink-0" />
+                    <span>Thông tin nhận hàng</span>
+                  </div>
+                  <div className="text-slate-700 space-y-0.5 pl-5">
+                    <p className="font-semibold text-slate-900">
+                      {det.customer_name || user?.name || 'Khách hàng'} - <span className="font-mono text-slate-600">{det.customer_phone || user?.phone || 'Chưa có SĐT'}</span>
+                    </p>
+                    <p className="text-slate-600 leading-relaxed">
+                      {parsed.cleanAddress}
+                    </p>
+                    {parsed.orderNote && (
+                      <p className="text-slate-500 italic text-[11px]">
+                        Ghi chú: {parsed.orderNote}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* 🛍️ Danh sách sản phẩm */}
+                <div className="space-y-2">
+                  <span className="font-bold text-slate-900 block">
+                    Sản phẩm đã đặt ({Array.isArray(det.items) ? det.items.length : 0})
+                  </span>
+                  <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden bg-white">
+                    {Array.isArray(det.items) && det.items.map((it: any) => (
+                      <div key={it.id} className="p-3 flex items-center gap-3">
+                        <img
+                          src={getPrimaryImageUrl(it.product_images)}
+                          alt={it.product_name}
+                          className="w-12 h-14 object-cover rounded border border-slate-200 shrink-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-slate-900 truncate">
+                            {it.product_name}
+                          </div>
+                          <div className="text-[11px] text-slate-500 mt-0.5">
+                            {it.color} / Size {it.size} × {it.quantity}
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            Đơn giá: {formatMoney(it.unit_price)}
+                          </div>
+                        </div>
+                        <div className="font-bold text-slate-900 tabular-nums text-right">
+                          {formatMoney(it.total_price || (it.unit_price * it.quantity))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* 💰 Chi tiết thanh toán & Các khoản giảm trừ */}
+                <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2">
+                  <span className="font-bold text-slate-900 block pb-1 border-b border-slate-200">
+                    Chi tiết thanh toán
+                  </span>
+
+                  <div className="space-y-1.5 text-slate-600">
+                    <div className="flex justify-between">
+                      <span>Tiền hàng (Tạm tính):</span>
+                      <span className="tabular-nums font-medium text-slate-900">{formatMoney(subtotal)}</span>
+                    </div>
+
+                    {/* Các khoản trừ: Voucher, Deal, Hội viên */}
+                    {parsed.voucherCode && (
+                      <div className="flex justify-between text-emerald-700 font-medium">
+                        <span className="flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          <span>Voucher áp dụng:</span>
+                        </span>
+                        <span>{parsed.voucherCode}</span>
+                      </div>
+                    )}
+
+                    {parsed.dealTag && (
+                      <div className="flex justify-between text-emerald-700 font-medium">
+                        <span>Khuyến mãi:</span>
+                        <span>{parsed.dealTag}</span>
+                      </div>
+                    )}
+
+                    {parsed.membershipTag && (
+                      <div className="flex justify-between text-emerald-700 font-medium">
+                        <span>Ưu đãi hội viên:</span>
+                        <span>{parsed.membershipTag}</span>
+                      </div>
+                    )}
+
+                    {parsed.shippingMethod && (
+                      <div className="flex justify-between">
+                        <span>Hình thức vận chuyển:</span>
+                        <span className="font-medium text-slate-800">{parsed.shippingMethod}</span>
+                      </div>
+                    )}
+
+                    {parsed.shippingFee && (
+                      <div className="flex justify-between">
+                        <span>Phí vận chuyển:</span>
+                        <span className="tabular-nums font-medium text-slate-800">{parsed.shippingFee}</span>
+                      </div>
+                    )}
+
+                    {parsed.codInfo && (
+                      <div className="pt-1.5 border-t border-dashed border-slate-200 space-y-1">
+                        <div className="flex justify-between text-amber-800 font-medium">
+                          <span>Tiền cọc COD ({parsed.codInfo.percent || '50%'}):</span>
+                          <span>{parsed.codInfo.deposited || 'Đã cọc'}</span>
+                        </div>
+                        {parsed.codInfo.remaining && (
+                          <div className="flex justify-between text-slate-700 font-semibold">
+                            <span>Thu shipper khi nhận hàng:</span>
+                            <span className="text-slate-950">{parsed.codInfo.remaining}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-200 flex justify-between items-center text-sm font-bold text-slate-900">
+                      <span>Tổng thanh toán:</span>
+                      <span className="text-base text-slate-950 font-bold tabular-nums">
+                        {formatMoney(det.total_amount)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Actions */}
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setSelectedDetailOrder(null)}
+                  className="px-4 py-2 border border-slate-200 hover:bg-white text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Đóng
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {/* Confirm Delivered inside modal */}
+                  {!isDelivered && !isCancelled && !isReturned && (isPaid || det.payment_method === 'cod') && Boolean(det.tracking_code) && (
+                    <button
+                      type="button"
+                      disabled={confirmingOrderId === det.id}
+                      onClick={async () => {
+                        await handleConfirmDelivered(det.id);
+                        setSelectedDetailOrder((prev: any) => prev ? { ...prev, fulfillment_status: 'DELIVERED' } : null);
+                      }}
+                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                    >
+                      {confirmingOrderId === det.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Đang xử lý...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check className="w-3.5 h-3.5 stroke-[3]" />
+                          <span>Đã nhận hàng</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {/* Continue Payment inside modal */}
+                  {!isPaid && !isCancelled && !isReturned && (
+                    <button
+                      type="button"
+                      disabled={redirectingOrderId === det.id}
+                      onClick={() => handleContinuePayment(det)}
+                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                    >
+                      {redirectingOrderId === det.id ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          <span>Đang mở PayOS...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="w-3.5 h-3.5" />
+                          <span>Tiếp tục thanh toán</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+
+                  {isDelivered && !isReturned && (
+                    <button
+                      type="button"
+                      onClick={() => setReturnRequestOrder(det)}
+                      className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                      <span>Yêu cầu đổi / trả hàng</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Return Request Modal with 2-Column layout */}
+      <ReturnRequestModal
+        isOpen={Boolean(returnRequestOrder)}
+        onClose={() => setReturnRequestOrder(null)}
+        order={returnRequestOrder}
+        onSuccess={() => {
+          fetchOrders();
+          setReturnRequestOrder(null);
+          setSelectedDetailOrder(null);
+        }}
+      />
     </div>
   );
 }

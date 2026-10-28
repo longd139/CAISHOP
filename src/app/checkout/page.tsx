@@ -28,10 +28,15 @@ import {
   ExternalLink,
   ThumbsUp,
   Share2,
-  RotateCcw
+  RotateCcw,
+  Plus,
+  Trash2,
+  MapPin
 } from 'lucide-react';
 import { VietnamAddressSelector, AddressMeta } from '@/components/VietnamAddressSelector';
 import { FacebookFreeshipConfig, DEFAULT_FACEBOOK_FREESHIP_CONFIG } from '@/app/api/deals/facebook-freeship/route';
+import { parseOrderAddressDetails } from '@/components/ExecutiveDashboard';
+import ReturnRequestModal from '@/components/ReturnRequestModal';
 
 interface DeliveryTimeSlot {
   id: string;
@@ -47,6 +52,17 @@ const ALL_TIME_SLOTS: DeliveryTimeSlot[] = [
   { id: 'evening', label: '17:00 - 19:30', endHour: 19, endMinute: 30, description: 'Cuối ngày' },
   { id: 'night', label: '19:30 - 21:30', endHour: 21, endMinute: 30, description: 'Buổi tối' },
 ];
+
+export interface SavedCustomerAddress {
+  id: string;
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  shippingAddress: string;
+  addressMeta?: AddressMeta | null;
+  isDefault?: boolean;
+  lastUsedAt?: number;
+}
 
 export default function CheckoutPage() {
   const { user, isLoggedIn } = useAuth();
@@ -77,7 +93,10 @@ export default function CheckoutPage() {
       .catch((err) => console.error('Failed to load payment settings:', err));
   }, []);
 
-  // Saved delivery information states (Auto-fill from previous successful orders)
+  // Saved delivery information states (Address Book & Auto-fill from previous successful orders)
+  const [savedAddresses, setSavedAddresses] = useState<SavedCustomerAddress[]>([]);
+  const [selectedAddressId, setSelectedAddressId] = useState<string | null>(null);
+  const [isEnteringNewAddress, setIsEnteringNewAddress] = useState<boolean>(false);
   const [savedAddressMeta, setSavedAddressMeta] = useState<AddressMeta | null>(null);
   const [isAutoFilled, setIsAutoFilled] = useState<boolean>(false);
   const currentAddressMetaRef = useRef<AddressMeta | null>(null);
@@ -207,44 +226,139 @@ export default function CheckoutPage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Auto load saved delivery information from previous successful orders
+  // Auto load saved delivery information from previous orders (Address Book)
   useEffect(() => {
     try {
-      const SAVED_SHIPPING_INFO_KEY = 'caishop_saved_shipping_info';
-      const raw = localStorage.getItem(SAVED_SHIPPING_INFO_KEY);
-      if (raw) {
-        const saved = JSON.parse(raw);
-        let filled = false;
-        if (saved.customerName) {
-          setCustomerName(saved.customerName);
-          filled = true;
-        }
-        if (saved.customerPhone) {
-          setCustomerPhone(saved.customerPhone);
-          filled = true;
-        }
-        if (saved.customerEmail) {
-          setCustomerEmail(saved.customerEmail);
-        }
-        if (saved.shippingAddress) {
-          setShippingAddress(saved.shippingAddress);
-          filled = true;
-        }
-        if (saved.addressMeta) {
-          setSavedAddressMeta(saved.addressMeta);
-          currentAddressMetaRef.current = saved.addressMeta;
-          if (saved.addressMeta.isHcmInnerCity !== undefined) {
-            setIsHcmInnerCity(saved.addressMeta.isHcmInnerCity);
-          }
-        }
-        if (filled) {
-          setIsAutoFilled(true);
+      const SAVED_ADDRESS_LIST_KEY = 'caishop_saved_address_list';
+      const LEGACY_SAVED_SHIPPING_INFO_KEY = 'caishop_saved_shipping_info';
+
+      let list: SavedCustomerAddress[] = [];
+      const rawList = localStorage.getItem(SAVED_ADDRESS_LIST_KEY);
+      if (rawList) {
+        try {
+          const parsed = JSON.parse(rawList);
+          if (Array.isArray(parsed)) list = parsed;
+        } catch (_) {}
+      }
+
+      // Fallback/Migration: If no saved list yet, migrate from legacy single saved shipping info
+      if (list.length === 0) {
+        const rawLegacy = localStorage.getItem(LEGACY_SAVED_SHIPPING_INFO_KEY);
+        if (rawLegacy) {
+          try {
+            const legacy = JSON.parse(rawLegacy);
+            if (legacy && (legacy.shippingAddress || legacy.customerName)) {
+              const migratedItem: SavedCustomerAddress = {
+                id: 'addr_' + Date.now(),
+                customerName: legacy.customerName || '',
+                customerPhone: legacy.customerPhone || '',
+                customerEmail: legacy.customerEmail || '',
+                shippingAddress: legacy.shippingAddress || '',
+                addressMeta: legacy.addressMeta || null,
+                isDefault: true,
+                lastUsedAt: Date.now(),
+              };
+              list = [migratedItem];
+              localStorage.setItem(SAVED_ADDRESS_LIST_KEY, JSON.stringify(list));
+            }
+          } catch (_) {}
         }
       }
+
+      if (list.length > 0) {
+        setSavedAddresses(list);
+        // Mặc định khi đã có địa chỉ trước đó sẽ chọn địa chỉ cũ (mặc định / gần nhất)
+        const defaultAddr = list.find((a) => a.isDefault) || list[0];
+        if (defaultAddr) {
+          setSelectedAddressId(defaultAddr.id);
+          setIsEnteringNewAddress(false);
+          if (defaultAddr.customerName) setCustomerName(defaultAddr.customerName);
+          if (defaultAddr.customerPhone) setCustomerPhone(defaultAddr.customerPhone);
+          if (defaultAddr.customerEmail) setCustomerEmail(defaultAddr.customerEmail);
+          if (defaultAddr.shippingAddress) {
+            setShippingAddress(defaultAddr.shippingAddress);
+            setIsAddressValid(true);
+          }
+          if (defaultAddr.addressMeta) {
+            setSavedAddressMeta(defaultAddr.addressMeta);
+            currentAddressMetaRef.current = defaultAddr.addressMeta;
+            if (defaultAddr.addressMeta.isHcmInnerCity !== undefined) {
+              setIsHcmInnerCity(defaultAddr.addressMeta.isHcmInnerCity);
+            }
+          }
+          setIsAutoFilled(true);
+        }
+      } else {
+        setIsEnteringNewAddress(true);
+      }
     } catch (e) {
-      console.error('Lỗi khi đọc thông tin nhận hàng đã lưu:', e);
+      console.error('Lỗi khi đọc danh sách địa chỉ đã lưu:', e);
     }
   }, []);
+
+  // Handlers for Address Selection & Management
+  const handleSelectSavedAddress = (addr: SavedCustomerAddress) => {
+    setSelectedAddressId(addr.id);
+    setIsEnteringNewAddress(false);
+    if (addr.customerName) setCustomerName(addr.customerName);
+    if (addr.customerPhone) setCustomerPhone(addr.customerPhone);
+    if (addr.customerEmail) setCustomerEmail(addr.customerEmail);
+    if (addr.shippingAddress) {
+      setShippingAddress(addr.shippingAddress);
+      setIsAddressValid(true);
+    }
+    if (addr.addressMeta) {
+      setSavedAddressMeta(addr.addressMeta);
+      currentAddressMetaRef.current = addr.addressMeta;
+      if (addr.addressMeta.isHcmInnerCity !== undefined) {
+        setIsHcmInnerCity(addr.addressMeta.isHcmInnerCity);
+      }
+    }
+    if (formErrors.address) {
+      setFormErrors((prev) => ({ ...prev, address: undefined }));
+    }
+    setIsAutoFilled(true);
+  };
+
+  const handleStartNewAddress = () => {
+    setIsEnteringNewAddress(true);
+    setSelectedAddressId(null);
+    setShippingAddress('');
+    setSavedAddressMeta(null);
+    currentAddressMetaRef.current = null;
+    setIsAddressValid(false);
+    if (formErrors.address) {
+      setFormErrors((prev) => ({ ...prev, address: undefined }));
+    }
+  };
+
+  const handleBackToSavedAddresses = () => {
+    if (savedAddresses.length > 0) {
+      const target = savedAddresses.find((a) => a.id === selectedAddressId) || savedAddresses.find((a) => a.isDefault) || savedAddresses[0];
+      handleSelectSavedAddress(target);
+    } else {
+      setIsEnteringNewAddress(true);
+    }
+  };
+
+  const handleDeleteSavedAddress = (e: React.MouseEvent, addrId: string) => {
+    e.stopPropagation();
+    if (!window.confirm('Bạn có chắc muốn xoá địa chỉ này khỏi danh sách đã lưu?')) return;
+    
+    const updated = savedAddresses.filter((a) => a.id !== addrId);
+    setSavedAddresses(updated);
+    try {
+      localStorage.setItem('caishop_saved_address_list', JSON.stringify(updated));
+    } catch (_) {}
+
+    if (selectedAddressId === addrId) {
+      if (updated.length > 0) {
+        handleSelectSavedAddress(updated[0]);
+      } else {
+        handleStartNewAddress();
+      }
+    }
+  };
 
   // Sync logged in user profile into form if fields are empty
   useEffect(() => {
@@ -324,7 +438,7 @@ export default function CheckoutPage() {
               setSearchPaid(true);
               setOrderSuccess(order);
               clearCart();
-              if (params.get('open_return') === '1' && order.fulfillment_status === 'DELIVERED') {
+              if (params.get('open_return') === '1') {
                 setShowReturnModal(true);
               }
               return;
@@ -355,7 +469,7 @@ export default function CheckoutPage() {
 
             setOrderSuccess(order);
             clearCart();
-            if (params.get('open_return') === '1' && order.fulfillment_status === 'DELIVERED') {
+            if (params.get('open_return') === '1') {
               setShowReturnModal(true);
             }
           } else {
@@ -377,13 +491,24 @@ export default function CheckoutPage() {
       return;
     }
 
+    // Determine fixed expiry time
+    let createdAtMs = Date.now();
+    if (orderSuccess.created_at) {
+      if (typeof orderSuccess.created_at === 'number') {
+        createdAtMs = orderSuccess.created_at;
+      } else {
+        const createdAtStr = String(orderSuccess.created_at).trim();
+        const parsed = new Date(
+          createdAtStr.endsWith('Z') ? createdAtStr : createdAtStr.replace(' ', 'T') + 'Z'
+        ).getTime();
+        if (!isNaN(parsed)) {
+          createdAtMs = parsed;
+        }
+      }
+    }
+    const expiresAtMs = createdAtMs + 60 * 60 * 1000;
+
     const calculateRemaining = () => {
-      if (!orderSuccess.created_at) return 3600;
-      const createdAtStr = String(orderSuccess.created_at);
-      const createdAtMs = new Date(
-        createdAtStr.endsWith('Z') ? createdAtStr : createdAtStr.replace(' ', 'T') + 'Z'
-      ).getTime();
-      const expiresAtMs = createdAtMs + 60 * 60 * 1000;
       const diff = Math.floor((expiresAtMs - Date.now()) / 1000);
       return diff;
     };
@@ -412,7 +537,7 @@ export default function CheckoutPage() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [orderSuccess]);
+  }, [orderSuccess?.id, orderSuccess?.created_at, orderSuccess?.payment_status]);
 
   // Handler: Tiếp tục thanh toán qua PayOS (VietQR hoặc Cọc COD 50%/100%)
   const handleContinuePayment = async () => {
@@ -604,8 +729,14 @@ export default function CheckoutPage() {
     }
 
     // 3. Validate shipping address
-    if (!shippingAddress.trim() || !isAddressValid) {
-      errors.address = 'Vui lòng hoàn tất đầy đủ thông tin địa chỉ nhận hàng';
+    if (isEnteringNewAddress) {
+      if (!shippingAddress.trim() || !isAddressValid) {
+        errors.address = 'Vui lòng hoàn tất đầy đủ thông tin địa chỉ nhận hàng';
+      }
+    } else {
+      if (!shippingAddress.trim()) {
+        errors.address = 'Vui lòng chọn hoặc nhập địa chỉ nhận hàng';
+      }
     }
 
     setFormErrors(errors);
@@ -640,6 +771,13 @@ export default function CheckoutPage() {
           : `[VẬN CHUYỂN: Shipper riêng DE'GENT - Ship thường trong ngày (${shippingFee === 0 ? '0đ' : '40k'})]${fbTag}`
         : `[VẬN CHUYỂN: Giao hàng tiêu chuẩn (${shippingFee === 0 ? '0đ' : formatMoney(shippingFee)})]${fbTag}`;
 
+      const dealTag = appliedDeal
+        ? ` [VOUCHER: ${appliedDeal.code}${appliedDeal.discount_amount ? ` - Giảm ${formatMoney(appliedDeal.discount_amount)}` : appliedDeal.is_freeship ? ' - Miễn phí vận chuyển' : ''}]`
+        : '';
+      const membershipTag = (tierDiscountAmount > 0 && currentTier)
+        ? ` [HỘI VIÊN: ${currentTier.name} (-${tierDiscountPercent}%)]`
+        : '';
+
       const codDepositAmount = codDepositPercent === 100 ? finalTotal : Math.round(finalTotal * 0.5);
       const codRemainingAmount = Math.max(0, finalTotal - codDepositAmount);
       const codDepositTag = paymentMethod === 'cod'
@@ -650,6 +788,8 @@ export default function CheckoutPage() {
         shippingAddress.trim(),
         orderNote.trim() ? `(Ghi chú: ${orderNote.trim()})` : '',
         carrierTag,
+        dealTag,
+        membershipTag,
         codDepositTag,
       ].filter(Boolean).join(' - ');
 
@@ -677,19 +817,73 @@ export default function CheckoutPage() {
         throw new Error(data.message || data.error || 'Đặt hàng thất bại. Vui lòng thử lại.');
       }
 
-      // Lưu lại thông tin nhận hàng thành công vào localStorage để tự động fill cho các lần sau
+      // Lưu lại thông tin nhận hàng vào sổ địa chỉ (caishop_saved_address_list) để lần sau người dùng có thể chọn bất kỳ địa chỉ nào
       try {
+        const SAVED_ADDRESS_LIST_KEY = 'caishop_saved_address_list';
         const SAVED_SHIPPING_INFO_KEY = 'caishop_saved_shipping_info';
-        const infoToSave = {
+
+        const rawList = localStorage.getItem(SAVED_ADDRESS_LIST_KEY);
+        let list: SavedCustomerAddress[] = [];
+        if (rawList) {
+          try {
+            const parsed = JSON.parse(rawList);
+            if (Array.isArray(parsed)) list = parsed;
+          } catch (_) {}
+        }
+
+        const cleanShippingAddr = shippingAddress.trim();
+        const existingIdx = list.findIndex(
+          (item) => item.shippingAddress.trim().toLowerCase() === cleanShippingAddr.toLowerCase()
+        );
+
+        let currentItem: SavedCustomerAddress;
+        if (existingIdx >= 0) {
+          currentItem = {
+            ...list[existingIdx],
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            customerEmail: customerEmail.trim() || undefined,
+            shippingAddress: cleanShippingAddr,
+            addressMeta: currentAddressMetaRef.current,
+            isDefault: true,
+            lastUsedAt: Date.now(),
+          };
+          list.splice(existingIdx, 1);
+        } else {
+          currentItem = {
+            id: 'addr_' + Date.now(),
+            customerName: customerName.trim(),
+            customerPhone: customerPhone.trim(),
+            customerEmail: customerEmail.trim() || undefined,
+            shippingAddress: cleanShippingAddr,
+            addressMeta: currentAddressMetaRef.current,
+            isDefault: true,
+            lastUsedAt: Date.now(),
+          };
+        }
+
+        // Đưa địa chỉ vừa tạo/chọn lên đầu danh sách, đặt isDefault = true và các địa chỉ khác isDefault = false
+        const updatedList: SavedCustomerAddress[] = [
+          currentItem,
+          ...list.map((item) => ({ ...item, isDefault: false })),
+        ];
+
+        localStorage.setItem(SAVED_ADDRESS_LIST_KEY, JSON.stringify(updatedList));
+        setSavedAddresses(updatedList);
+        setSelectedAddressId(currentItem.id);
+        setIsEnteringNewAddress(false);
+
+        // Lưu bản ghi đơn lẻ tương thích ngược
+        const legacyToSave = {
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           customerEmail: customerEmail.trim(),
-          shippingAddress: shippingAddress.trim(),
+          shippingAddress: cleanShippingAddr,
           addressMeta: currentAddressMetaRef.current,
         };
-        localStorage.setItem(SAVED_SHIPPING_INFO_KEY, JSON.stringify(infoToSave));
+        localStorage.setItem(SAVED_SHIPPING_INFO_KEY, JSON.stringify(legacyToSave));
       } catch (saveErr) {
-        console.error('Không thể lưu thông tin nhận hàng vào localStorage:', saveErr);
+        console.error('Không thể lưu thông tin nhận hàng vào danh sách địa chỉ:', saveErr);
       }
 
       // Cổng PayOS: Chuyển khoản VietQR hoặc Đặt cọc COD (50% hoặc 100%)
@@ -730,7 +924,11 @@ export default function CheckoutPage() {
         }
       }
 
-      setOrderSuccess(data.order);
+      const orderData = data.order || {};
+      if (!orderData.created_at) {
+        orderData.created_at = new Date().toISOString();
+      }
+      setOrderSuccess(orderData);
       clearCart();
     } catch (err: any) {
       setErrorMessage(err.message || 'Lỗi kết nối máy chủ. Vui lòng thử lại.');
@@ -811,6 +1009,10 @@ export default function CheckoutPage() {
 
   const handleConfirmReceived = async () => {
     if (!orderSuccess?.id) return;
+    if (!orderSuccess.tracking_code) {
+      setDeliveryConfirmError('Đơn hàng chưa có mã vận chuyển, chưa thể xác nhận nhận hàng.');
+      return;
+    }
     setIsConfirmingDelivery(true);
     setDeliveryConfirmError('');
     try {
@@ -1272,7 +1474,7 @@ export default function CheckoutPage() {
                     </button>
                   </div>
                 </div>
-              ) : (
+              ) : orderSuccess.tracking_code ? (
                 <div className="p-4 sm:p-5 bg-gradient-to-br from-emerald-50/90 to-teal-50/50 border border-emerald-200 rounded-2xl space-y-3.5 text-left shadow-2xs">
                   <div className="flex items-start gap-3">
                     <div className="w-9 h-9 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-xs">
@@ -1315,7 +1517,7 @@ export default function CheckoutPage() {
                     )}
                   </div>
                 </div>
-              )}
+              ) : null}
             </div>
           )}
 
@@ -1722,10 +1924,50 @@ export default function CheckoutPage() {
                   <span className="text-slate-500">Người nhận:</span>
                   <span className="font-semibold text-slate-900">{orderSuccess.customer_name} ({orderSuccess.customer_phone})</span>
                 </div>
-                <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
-                  <span className="font-medium text-slate-900 text-right leading-relaxed">{orderSuccess.shipping_address}</span>
-                </div>
+                {(() => {
+                  const parsed = parseOrderAddressDetails(orderSuccess.shipping_address);
+                  return (
+                    <>
+                      <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
+                        <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
+                        <span className="font-semibold text-slate-900 text-right leading-relaxed">{parsed.cleanAddress}</span>
+                      </div>
+                      {parsed.shippingMethod && (
+                        <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Gói vận chuyển:</span>
+                          <span className="font-medium text-slate-800 text-right">
+                            {parsed.shippingMethod}
+                            {parsed.shippingFee && parsed.shippingFee !== '0đ' && !parsed.shippingMethod.includes(parsed.shippingFee) ? ` (${parsed.shippingFee})` : ''}
+                          </span>
+                        </div>
+                      )}
+                      {(parsed.voucherCode || parsed.dealTag) && (
+                        <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Voucher áp dụng:</span>
+                          <span className="font-semibold text-slate-900 text-right">
+                            {parsed.voucherCode || parsed.dealTag}
+                          </span>
+                        </div>
+                      )}
+                      {parsed.membershipTag && (
+                        <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Ưu đãi hội viên:</span>
+                          <span className="font-semibold text-slate-900 text-right">
+                            {parsed.membershipTag}
+                          </span>
+                        </div>
+                      )}
+                      {parsed.orderNote && (
+                        <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Ghi chú từ khách:</span>
+                          <span className="font-medium text-slate-800 text-right italic leading-relaxed">
+                            {parsed.orderNote}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
                   <span className="text-slate-500">Hình thức thanh toán:</span>
                   <span className="font-semibold text-slate-900">VietQR (Đã hoàn tất)</span>
@@ -1734,15 +1976,19 @@ export default function CheckoutPage() {
                   <span className="text-slate-500">
                     {orderSuccess.carrier === 'SHIPPER' ? 'Hình thức giao:' : 'Đơn vị vận chuyển:'}
                   </span>
-                  <span className="font-bold text-red-600 flex items-center gap-1.5">
-                    <img
-                      src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                      onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
-                      alt="Viettel Post"
-                      className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
-                    />
-                    {orderSuccess.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : orderSuccess.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : orderSuccess.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
-                  </span>
+                  {orderSuccess.tracking_code ? (
+                    <span className="font-bold text-red-600 flex items-center gap-1.5">
+                      <img
+                        src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
+                        alt="Viettel Post"
+                        className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
+                      />
+                      {orderSuccess.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : orderSuccess.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : orderSuccess.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400 italic font-normal">Chờ cập nhật</span>
+                  )}
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-slate-500">Mã vận chuyển:</span>
@@ -1780,10 +2026,7 @@ export default function CheckoutPage() {
                       </a>
                     </div>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      <span>Đang chờ bàn giao cho shipper</span>
-                    </span>
+                    <span className="text-slate-400 italic font-normal">Chờ cập nhật</span>
                   )}
                 </div>
               </div>
@@ -1841,10 +2084,50 @@ export default function CheckoutPage() {
                     {formatMoney(orderRemainingCodAmount)}
                   </span>
                 </div>
-                <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
-                  <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
-                  <span className="font-medium text-slate-900 text-right leading-relaxed">{orderSuccess.shipping_address}</span>
-                </div>
+                {(() => {
+                  const parsed = parseOrderAddressDetails(orderSuccess.shipping_address);
+                  return (
+                    <>
+                      <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
+                        <span className="text-slate-500 shrink-0 mr-3">Địa chỉ nhận hàng:</span>
+                        <span className="font-semibold text-slate-900 text-right leading-relaxed">{parsed.cleanAddress}</span>
+                      </div>
+                      {parsed.shippingMethod && (
+                        <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Gói vận chuyển:</span>
+                          <span className="font-medium text-slate-800 text-right">
+                            {parsed.shippingMethod}
+                            {parsed.shippingFee && parsed.shippingFee !== '0đ' && !parsed.shippingMethod.includes(parsed.shippingFee) ? ` (${parsed.shippingFee})` : ''}
+                          </span>
+                        </div>
+                      )}
+                      {(parsed.voucherCode || parsed.dealTag) && (
+                        <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Voucher áp dụng:</span>
+                          <span className="font-semibold text-slate-900 text-right">
+                            {parsed.voucherCode || parsed.dealTag}
+                          </span>
+                        </div>
+                      )}
+                      {parsed.membershipTag && (
+                        <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Ưu đãi hội viên:</span>
+                          <span className="font-semibold text-slate-900 text-right">
+                            {parsed.membershipTag}
+                          </span>
+                        </div>
+                      )}
+                      {parsed.orderNote && (
+                        <div className="flex justify-between items-start pb-1.5 border-b border-slate-100">
+                          <span className="text-slate-500 shrink-0 mr-3">Ghi chú từ khách:</span>
+                          <span className="font-medium text-slate-800 text-right italic leading-relaxed">
+                            {parsed.orderNote}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
                 <div className="flex justify-between items-center pb-1.5 border-b border-slate-100">
                   <span className="text-slate-500">Người nhận:</span>
                   <span className="font-semibold text-slate-900">{orderSuccess.customer_name} ({orderSuccess.customer_phone})</span>
@@ -1857,7 +2140,7 @@ export default function CheckoutPage() {
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-slate-500">Trạng thái bàn giao:</span>
+                  <span className="text-slate-500">Mã vận chuyển:</span>
                   {orderSuccess.tracking_code ? (
                     <div className="flex items-center gap-1.5">
                       <span className="font-mono font-bold text-slate-900 tracking-wider bg-slate-100 px-2 py-0.5 rounded text-xs border border-slate-200">
@@ -1877,10 +2160,7 @@ export default function CheckoutPage() {
                       </button>
                     </div>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-900 border border-amber-200">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
-                      <span>Đang chuẩn bị gói hàng và bàn giao cho shipper</span>
-                    </span>
+                    <span className="text-slate-400 italic font-normal">Chờ cập nhật</span>
                   )}
                 </div>
               </div>
@@ -1913,280 +2193,22 @@ export default function CheckoutPage() {
             </Link>
           </div>
 
-          {/* Modal: Yêu cầu Đổi hàng & Hoàn hàng */}
-          {showReturnModal && (
-            <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 overflow-y-auto animate-in fade-in duration-200">
-              <div className="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 text-left space-y-5 my-8">
-                <div className="flex items-start justify-between border-b border-slate-100 pb-4">
-                  <div>
-                    <h3 className="text-base font-bold text-slate-900">
-                      Yêu Cầu Đổi / Hoàn Hàng
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5">
-                      Đơn hàng #{orderSuccess.order_code} • Khách hàng {orderSuccess.customer_name}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowReturnModal(false);
-                      setConfirmReturnStep(false);
-                    }}
-                    className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
-
-                {returnSuccessMessage ? (
-                  <div className="p-5 bg-emerald-50 border border-emerald-200 rounded-xl text-center space-y-2.5 animate-in fade-in duration-200">
-                    <div className="w-10 h-10 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto">
-                      <Check className="w-5 h-5 stroke-[3]" />
-                    </div>
-                    <h4 className="text-sm font-bold text-emerald-950">Gửi Yêu Cầu Thành Công!</h4>
-                    <p className="text-xs text-emerald-800 leading-relaxed font-medium">
-                      {returnSuccessMessage}
-                    </p>
-                  </div>
-                ) : confirmReturnStep ? (
-                  <div className="p-5 bg-amber-50/90 border border-amber-200 rounded-xl space-y-4 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="space-y-2 text-center">
-                      <div className="text-sm font-semibold text-slate-900 leading-relaxed px-1">
-                        &ldquo;Chúng tôi sẽ liên hệ {refundMethod === 'EXCHANGE' ? 'đổi hàng' : 'hoàn hàng'} qua <span className="font-bold text-slate-950 underline decoration-amber-500 decoration-2">{contactPhone || orderSuccess?.customer_phone || user?.phone}</span> này nhé, bạn nhớ để ý điện thoại nhé&rdquo;
-                      </div>
-                      <p className="text-xs text-slate-600">
-                        Đội ngũ Chăm sóc khách hàng DE&apos;GENT sẽ liên hệ qua Zalo / cuộc gọi để xác nhận chi tiết và cử shipper đến nhận hàng tận nơi.
-                      </p>
-                    </div>
-
-                    {returnError && (
-                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
-                        ⚠ {returnError}
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-center gap-2.5 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setConfirmReturnStep(false)}
-                        disabled={isSubmittingReturn}
-                        className="px-4 py-2 border border-slate-300 bg-white hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 transition-colors cursor-pointer"
-                      >
-                        Chỉnh sửa lại
-                      </button>
-                      <button
-                        type="button"
-                        onClick={proceedSendReturnRequest}
-                        disabled={isSubmittingReturn}
-                        className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        {isSubmittingReturn ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            <span>Đang gửi yêu cầu...</span>
-                          </>
-                        ) : (
-                          <span>Xác nhận gửi yêu cầu</span>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <form onSubmit={handlePreSendReturnRequest} className="space-y-4">
-                    {/* 1. Chọn Đổi hàng hoặc Hoàn hàng */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        1. Bạn muốn đổi hàng hay hoàn hàng?
-                      </label>
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <button
-                          type="button"
-                          onClick={() => setRefundMethod('EXCHANGE')}
-                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                            refundMethod === 'EXCHANGE'
-                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
-                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-wide">Đổi hàng</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${refundMethod === 'EXCHANGE' ? 'bg-white/20 text-white' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'}`}>Miễn phí</span>
-                          </div>
-                          <div className={`text-[11px] mt-1 ${refundMethod === 'EXCHANGE' ? 'text-slate-300' : 'text-slate-500'}`}>
-                            Đổi size vừa vặn hoặc đổi sang mẫu khác
-                          </div>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setRefundMethod('REFUND')}
-                          className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
-                            refundMethod === 'REFUND'
-                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs ring-2 ring-slate-900/10'
-                              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold uppercase tracking-wide">Hoàn hàng</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${refundMethod === 'REFUND' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 border border-slate-200'}`}>Trả hàng</span>
-                          </div>
-                          <div className={`text-[11px] mt-1 ${refundMethod === 'REFUND' ? 'text-slate-300' : 'text-slate-500'}`}>
-                            Thu hồi sản phẩm & nhận tiền qua ngân hàng
-                          </div>
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* 2. Lý do hoàn hàng */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        2. Lý do hoàn trả:
-                      </label>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                        {[
-                          { id: 'TIGHT', label: 'Mặc bị chật / Kích size' },
-                          { id: 'LOOSE', label: 'Mặc bị rộng / Dài' },
-                          { id: 'DEFECT', label: 'Sản phẩm lỗi may / lỗi vải' },
-                          { id: 'WRONG_ITEM', label: 'Giao sai mẫu / sai size' },
-                          { id: 'OTHER', label: 'Lý do khác (không hợp...)' },
-                        ].map(r => (
-                          <label
-                            key={r.id}
-                            className={`flex items-center gap-2 p-2.5 rounded-lg border text-xs cursor-pointer transition-all ${
-                              returnReason === r.id
-                                ? 'border-slate-900 bg-slate-50 font-semibold text-slate-900'
-                                : 'border-slate-200 hover:bg-slate-50/50 text-slate-600'
-                            }`}
-                          >
-                            <input
-                              type="radio"
-                              name="return_reason"
-                              value={r.id}
-                              checked={returnReason === r.id}
-                              onChange={() => setReturnReason(r.id)}
-                              className="accent-slate-900"
-                            />
-                            <span>{r.label}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* 3. Số điện thoại liên hệ (có sử dụng Zalo) */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center justify-between">
-                        <span>3. Số điện thoại liên hệ (có Zalo):</span>
-                        <span className="text-[11px] font-normal text-emerald-600 flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-                          Số đăng ký
-                        </span>
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        placeholder="Ví dụ: 0912345678 (số có dùng Zalo)"
-                        value={contactPhone}
-                        onChange={e => setContactPhone(e.target.value)}
-                        className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-xs font-mono text-slate-900 focus:border-slate-900 focus:outline-none"
-                      />
-                      <p className="text-[11px] text-slate-500">
-                        Shop sẽ liên hệ qua Zalo hoặc gọi đến số này để xác nhận hỗ trợ đổi trả tận nơi.
-                      </p>
-                    </div>
-
-                    {/* 4. Nếu chọn Hoàn tiền: Nhập STK */}
-                    {refundMethod === 'REFUND' && (
-                      <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2.5 animate-in fade-in duration-150">
-                        <div className="text-xs font-bold text-slate-900">
-                          Thông tin nhận tiền hoàn:
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          <div>
-                            <label className="text-[11px] text-slate-500 block mb-1">Tên ngân hàng:</label>
-                            <input
-                              type="text"
-                              placeholder="Ví dụ: Vietcombank, MB..."
-                              value={bankName}
-                              onChange={e => setBankName(e.target.value)}
-                              className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded text-xs focus:border-slate-900 focus:outline-none"
-                            />
-                          </div>
-                          <div>
-                            <label className="text-[11px] text-slate-500 block mb-1">Số tài khoản:</label>
-                            <input
-                              type="text"
-                              placeholder="Số tài khoản ngân hàng"
-                              value={bankAccount}
-                              onChange={e => setBankAccount(e.target.value)}
-                              className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded text-xs font-mono focus:border-slate-900 focus:outline-none"
-                            />
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[11px] text-slate-500 block mb-1">Tên chủ tài khoản:</label>
-                          <input
-                            type="text"
-                            placeholder="NGUYEN VAN A"
-                            value={accountHolder}
-                            onChange={e => setAccountHolder(e.target.value)}
-                            className="w-full h-8 px-2.5 bg-white border border-slate-200 rounded text-xs uppercase focus:border-slate-900 focus:outline-none"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* 5. Ghi chú chi tiết */}
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold text-slate-800 uppercase tracking-wide">
-                        {refundMethod === 'REFUND' ? '5.' : '4.'} Ghi chú chi tiết (nếu có):
-                      </label>
-                      <textarea
-                        rows={2}
-                        placeholder="Ví dụ: Áo mặc bị chật vai, muốn đổi sang size XL cùng màu..."
-                        value={returnNotes}
-                        onChange={e => setReturnNotes(e.target.value)}
-                        className="w-full p-2.5 bg-white border border-slate-200 rounded-lg text-xs focus:border-slate-900 focus:outline-none leading-relaxed"
-                      />
-                    </div>
-
-                    {/* Policy note */}
-                    <div className="p-3 bg-slate-50 rounded-lg text-[11px] text-slate-500 leading-relaxed">
-                      ✓ Cam kết chính sách DE&apos;GENT: Hỗ trợ đổi trả miễn phí trong 7 ngày nếu sản phẩm chưa qua giặt tẩy, còn nguyên tem mác. Shipper sẽ liên hệ nhận hàng tận nhà.
-                    </div>
-
-                    {returnError && (
-                      <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-700">
-                        ⚠ {returnError}
-                      </div>
-                    )}
-
-                    {/* Action buttons */}
-                    <div className="pt-2 flex items-center justify-end gap-2.5">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowReturnModal(false);
-                          setConfirmReturnStep(false);
-                        }}
-                        disabled={isSubmittingReturn}
-                        className="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-xs font-medium text-slate-700 transition-colors cursor-pointer"
-                      >
-                        Hủy bỏ
-                      </button>
-                      <button
-                        type="submit"
-                        disabled={isSubmittingReturn}
-                        className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>{refundMethod === 'EXCHANGE' ? 'Gửi Yêu Cầu Đổi Hàng' : 'Gửi Yêu Cầu Hoàn Hàng'}</span>
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Modal: Yêu cầu Đổi hàng & Hoàn hàng (Khớp giao diện Thông tin nhận hàng & Tóm tắt sản phẩm) */}
+          <ReturnRequestModal
+            isOpen={showReturnModal}
+            onClose={() => setShowReturnModal(false)}
+            order={orderSuccess}
+            onSuccess={(updatedOrder) => {
+              if (updatedOrder) {
+                setOrderSuccess(updatedOrder);
+              } else {
+                setOrderSuccess((prev: any) => ({
+                  ...prev,
+                  fulfillment_status: 'RETURNED',
+                }));
+              }
+            }}
+          />
         </div>
       </div>
     );
@@ -2203,7 +2225,7 @@ export default function CheckoutPage() {
           <div className="space-y-1">
             <h2 className="text-lg font-bold text-slate-900">Giỏ hàng của bạn đang trống</h2>
             <p className="text-xs text-slate-500">
-              Hãy chọn cho mình những sản phẩm thời trang cao cấp từ Atelier.
+              Hãy chọn cho mình những sản phẩm thời trang cao cấp từ DE&apos;GENT.
             </p>
           </div>
           <Link
@@ -2235,7 +2257,7 @@ export default function CheckoutPage() {
             href="/"
             className="font-wide text-lg sm:text-xl font-medium uppercase tracking-mono text-[#0a0a0a]"
           >
-            ATELIER
+            DE&apos;GENT
           </Link>
 
           <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
@@ -2253,7 +2275,7 @@ export default function CheckoutPage() {
             <div className="flex items-center gap-2.5">
               <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse shrink-0"></span>
               <span className="text-blue-900">
-                Bạn đã có tài khoản tại ATELIER? Đăng nhập ngay để nhận ưu đãi cấp bậc và tích điểm đơn hàng.
+                Bạn đã có tài khoản tại DE&apos;GENT? Đăng nhập ngay để nhận ưu đãi cấp bậc và tích điểm đơn hàng.
               </span>
             </div>
             <Link
@@ -2282,12 +2304,22 @@ export default function CheckoutPage() {
                     <span className="w-5 h-5 rounded-full bg-slate-900 text-white text-[10px] flex items-center justify-center">1</span>
                     <span>Thông tin nhận hàng</span>
                   </h2>
-                  {isAutoFilled && (
+                  {savedAddresses.length > 0 && !isEnteringNewAddress ? (
+                    <span className="text-[11px] text-slate-700 font-medium flex items-center gap-1.5 bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-full">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>Mặc định chọn địa chỉ đơn trước</span>
+                    </span>
+                  ) : savedAddresses.length > 0 && isEnteringNewAddress ? (
+                    <span className="text-[11px] text-blue-700 font-medium flex items-center gap-1.5 bg-blue-50 border border-blue-200/80 px-2.5 py-1 rounded-full">
+                      <Plus className="w-3.5 h-3.5 text-blue-600" />
+                      <span>Đang nhập địa chỉ mới</span>
+                    </span>
+                  ) : isAutoFilled ? (
                     <span className="text-[11px] text-slate-600 font-medium flex items-center gap-1.5 bg-slate-100 border border-slate-200/80 px-2.5 py-1 rounded-full">
                       <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
                       <span>Tự động điền từ đơn trước</span>
                     </span>
-                  )}
+                  ) : null}
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -2358,34 +2390,182 @@ export default function CheckoutPage() {
                     />
                   </div>
 
-                  <div className="sm:col-span-2" ref={addressContainerRef}>
-                    <VietnamAddressSelector
-                      value={shippingAddress}
-                      onChange={(val) => {
-                        setShippingAddress(val);
-                        if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: undefined }));
-                      }}
-                      initialMeta={savedAddressMeta}
-                      onAddressMetaChange={(meta) => {
-                        currentAddressMetaRef.current = meta;
-                        setIsHcmInnerCity(meta.isHcmInnerCity);
-                      }}
-                      showErrors={hasSubmitted && Boolean(formErrors.address || !isAddressValid)}
-                      onValidationChange={(valid) => {
-                        setIsAddressValid(valid);
-                        if (valid && formErrors.address) {
-                          setFormErrors((prev) => ({ ...prev, address: undefined }));
-                        }
-                      }}
-                      required
-                    />
-                    {formErrors.address && (
-                      <p className="text-[11px] text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{formErrors.address}</span>
-                      </p>
-                    )}
-                  </div>
+                  {/* Địa chỉ nhận hàng: Sổ địa chỉ đã lưu hoặc Form nhập địa chỉ mới */}
+                  {/* Địa chỉ nhận hàng: Sổ địa chỉ đã lưu hoặc Form nhập địa chỉ mới */}
+                  {savedAddresses.length > 0 ? (
+                    <div className="sm:col-span-2 space-y-3" ref={addressContainerRef}>
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                          <MapPin className="w-3.5 h-3.5 text-slate-900" />
+                          <span>Địa chỉ nhận hàng <span className="text-rose-500">*</span></span>
+                        </label>
+                      </div>
+
+                      <div className="space-y-2.5">
+                        {/* Danh sách địa chỉ đã lưu */}
+                        {savedAddresses.map((addr) => {
+                          const isSelected = !isEnteringNewAddress && selectedAddressId === addr.id;
+                          return (
+                            <div
+                              key={addr.id}
+                              onClick={() => handleSelectSavedAddress(addr)}
+                              className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
+                                isSelected
+                                  ? 'border-black bg-black text-white shadow-md ring-1 ring-black'
+                                  : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/60 text-slate-900'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="pt-0.5">
+                                  <input
+                                    type="radio"
+                                    name="saved_address_choice"
+                                    checked={isSelected}
+                                    onChange={() => handleSelectSavedAddress(addr)}
+                                    className={`w-4 h-4 cursor-pointer ${
+                                      isSelected
+                                        ? 'accent-white'
+                                        : 'text-slate-900 border-slate-300 focus:ring-slate-900'
+                                    }`}
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0 pr-8">
+                                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                                    <span className={`text-xs font-bold ${isSelected ? 'text-white' : 'text-slate-900'}`}>
+                                      {addr.customerName}
+                                    </span>
+                                    <span className={`text-xs font-medium ${isSelected ? 'text-white/70' : 'text-slate-500'}`}>
+                                      | {addr.customerPhone}
+                                    </span>
+                                    {addr.isDefault && (
+                                      <span
+                                        className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                          isSelected
+                                            ? 'text-emerald-300 bg-emerald-950/80 border-emerald-500/40'
+                                            : 'text-emerald-700 bg-emerald-50 border-emerald-200'
+                                        }`}
+                                      >
+                                        Mặc định (Đơn trước)
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className={`text-xs leading-relaxed break-words font-medium ${isSelected ? 'text-white/95' : 'text-slate-700'}`}>
+                                    {addr.shippingAddress}
+                                  </p>
+                                  {addr.addressMeta?.isHcmInnerCity && (
+                                    <span
+                                      className={`inline-block mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded border ${
+                                        isSelected
+                                          ? 'text-blue-200 bg-blue-950/80 border-blue-400/40'
+                                          : 'text-blue-700 bg-blue-50 border-blue-200/60'
+                                      }`}
+                                    >
+                                      Nội thành TP.HCM (Hỗ trợ giao hoả tốc theo giờ)
+                                    </span>
+                                  )}
+                                </div>
+                                <button
+                                  type="button"
+                                  title="Xoá địa chỉ này khỏi danh sách đã lưu"
+                                  onClick={(e) => handleDeleteSavedAddress(e, addr.id)}
+                                  className={`absolute top-3 right-3 p-1.5 rounded-md transition-colors cursor-pointer ${
+                                    isSelected
+                                      ? 'text-white/40 hover:text-rose-400 hover:bg-white/10'
+                                      : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                                  }`}
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+
+                        {/* Ô Thêm địa chỉ mới bên dưới địa chỉ cũ */}
+                        <div
+                          onClick={handleStartNewAddress}
+                          className={`p-3.5 rounded-xl border transition-all cursor-pointer ${
+                            isEnteringNewAddress
+                              ? 'border-slate-900 bg-slate-50/70 shadow-2xs ring-1 ring-slate-900'
+                              : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50/40'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="saved_address_choice"
+                              checked={isEnteringNewAddress}
+                              onChange={handleStartNewAddress}
+                              className="w-4 h-4 text-slate-900 border-slate-300 focus:ring-slate-900 cursor-pointer"
+                            />
+                            <span className="text-xs font-bold text-slate-900">Thêm địa chỉ mới</span>
+                          </div>
+
+                          {/* Khi chọn Thêm địa chỉ mới, form nhập địa chỉ mở ra ngay bên dưới */}
+                          {isEnteringNewAddress && (
+                            <div className="mt-3.5 pt-3.5 border-t border-slate-200/80 cursor-default" onClick={(e) => e.stopPropagation()}>
+                              <VietnamAddressSelector
+                                value={shippingAddress}
+                                onChange={(val) => {
+                                  setShippingAddress(val);
+                                  if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: undefined }));
+                                }}
+                                initialMeta={savedAddressMeta}
+                                onAddressMetaChange={(meta) => {
+                                  currentAddressMetaRef.current = meta;
+                                  setIsHcmInnerCity(meta.isHcmInnerCity);
+                                }}
+                                showErrors={hasSubmitted && Boolean(formErrors.address || !isAddressValid)}
+                                onValidationChange={(valid) => {
+                                  setIsAddressValid(valid);
+                                  if (valid && formErrors.address) {
+                                    setFormErrors((prev) => ({ ...prev, address: undefined }));
+                                  }
+                                }}
+                                required
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {formErrors.address && (
+                        <p className="text-[11px] text-rose-500 mt-1 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{formErrors.address}</span>
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="sm:col-span-2 space-y-2.5" ref={addressContainerRef}>
+                      <VietnamAddressSelector
+                        value={shippingAddress}
+                        onChange={(val) => {
+                          setShippingAddress(val);
+                          if (formErrors.address) setFormErrors((prev) => ({ ...prev, address: undefined }));
+                        }}
+                        initialMeta={savedAddressMeta}
+                        onAddressMetaChange={(meta) => {
+                          currentAddressMetaRef.current = meta;
+                          setIsHcmInnerCity(meta.isHcmInnerCity);
+                        }}
+                        showErrors={hasSubmitted && Boolean(formErrors.address || !isAddressValid)}
+                        onValidationChange={(valid) => {
+                          setIsAddressValid(valid);
+                          if (valid && formErrors.address) {
+                            setFormErrors((prev) => ({ ...prev, address: undefined }));
+                          }
+                        }}
+                        required
+                      />
+                      {formErrors.address && (
+                        <p className="text-[11px] text-rose-500 mt-1.5 flex items-center gap-1 font-medium">
+                          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+                          <span>{formErrors.address}</span>
+                        </p>
+                      )}
+                    </div>
+                  )}
 
                   <div className="space-y-1.5 sm:col-span-2">
                     <label className="text-xs font-medium text-slate-500">

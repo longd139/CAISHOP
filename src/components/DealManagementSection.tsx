@@ -169,11 +169,11 @@ export default function DealManagementSection() {
   const handleSaveModal = () => {
     const cleanCode = formData.code.trim().toUpperCase().replace(/\s+/g, '');
     if (!cleanCode) {
-      alert('Vui lòng nhập Mã Voucher (Code)');
+      showToast('⚠️ Vui lòng nhập Mã Voucher (Code)');
       return;
     }
     if (!formData.title.trim()) {
-      alert('Vui lòng nhập Tiêu đề chương trình');
+      showToast('⚠️ Vui lòng nhập Tiêu đề chương trình');
       return;
     }
 
@@ -214,7 +214,7 @@ export default function DealManagementSection() {
     } else {
       // Check duplicate code
       if (deals.some(d => d.code === cleanCode)) {
-        alert(`Mã voucher "${cleanCode}" đã tồn tại. Vui lòng chọn mã khác.`);
+        showToast(`⚠️ Mã voucher "${cleanCode}" đã tồn tại. Vui lòng chọn mã khác.`);
         return;
       }
       updatedDeals = [newDeal, ...deals];
@@ -256,11 +256,11 @@ export default function DealManagementSection() {
       if (data.success) {
         showToast(`✓ ${successMsg}`);
       } else {
-        alert(data.error || 'Lỗi khi lưu dữ liệu lên server');
+        showToast(`❌ ${data.error || 'Lỗi khi lưu dữ liệu lên server'}`);
       }
     } catch (err: any) {
       console.error('Error saving deals:', err);
-      alert('Không thể kết nối đến máy chủ để lưu cấu hình deal');
+      showToast('❌ Không thể kết nối đến máy chủ để lưu cấu hình deal');
     } finally {
       setSaving(false);
     }
@@ -964,7 +964,7 @@ export default function DealManagementSection() {
       {toastMessage && (
         <div
           role="status"
-          className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-slate-900 text-white px-4 py-3 rounded-lg shadow-2xl text-xs font-medium border border-slate-700/60 animate-in fade-in slide-in-from-top-3 duration-200"
+          className="fixed top-6 right-6 z-[99999] flex items-center gap-3 bg-slate-900/95 backdrop-blur-md text-white px-4 py-3 rounded-xl shadow-2xl text-xs font-medium border border-slate-700/60 animate-in fade-in slide-in-from-top-5 duration-300"
         >
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span className="font-sans leading-relaxed">{toastMessage}</span>

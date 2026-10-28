@@ -759,12 +759,17 @@ export async function updateOrderStatus(
   trackingCode?: string,
   carrier?: string
 ): Promise<{ success: boolean; message: string }> {
+  const db = await getDb();
+  const current = await db.queryFirst<any>(`SELECT fulfillment_status FROM orders WHERE id = ? OR order_code = ?`, [orderId, orderId]);
+  if (current && current.fulfillment_status === 'DELIVERED' && fulfillmentStatus !== 'DELIVERED') {
+    return { success: false, message: 'Đơn hàng đã nhận thành công, không thể chuyển sang trạng thái khác!' };
+  }
+
   if (fulfillmentStatus === 'DISPATCHED') {
     const res = await dispatchOrder(orderId, trackingCode || '', carrier || 'VIETTEL_POST');
     return { success: res.success, message: res.message };
   }
 
-  const db = await getDb();
   await db.execute(`
     UPDATE orders 
     SET fulfillment_status = ?, updated_at = datetime('now') 
@@ -966,10 +971,12 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     `, [`fin-${Date.now().toString(36)}-shp`, orderId, 25000, `Cước ship ước tính đơn ${orderCode}`]);
   }
 
+  const fullOrder = await getOrderById(orderId);
+
   return {
     success: true,
     message: isCod ? 'Đặt hàng COD thành công!' : 'Đã tạo đơn hàng. Vui lòng quét mã QR chuyển khoản.',
-    order: {
+    order: fullOrder || {
       id: orderId,
       order_code: orderCode,
       customer_name: input.customer_name,
@@ -981,7 +988,8 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
       total_amount: totalAmount,
       payment_status: initialPaymentStatus,
       fulfillment_status: initialFulfillmentStatus,
-      payment_method: input.payment_method || 'vietqr'
+      payment_method: input.payment_method || 'vietqr',
+      created_at: new Date().toISOString()
     }
   };
 }
