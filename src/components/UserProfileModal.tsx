@@ -44,33 +44,49 @@ function OrderCountdownBadge({
 }: {
   createdAt: string;
   orderId: string;
-  onExpired: () => void;
+  onExpired?: () => void;
 }) {
-  const calculateRemaining = () => {
+  const calculateRemaining = useCallback(() => {
     if (!createdAt) return 0;
     const createdAtStr = String(createdAt);
     const createdAtMs = new Date(
       createdAtStr.endsWith('Z') ? createdAtStr : createdAtStr.replace(' ', 'T') + 'Z'
     ).getTime();
     return Math.max(0, Math.floor((createdAtMs + 3600 * 1000 - Date.now()) / 1000));
-  };
+  }, [createdAt]);
 
   const [timeLeft, setTimeLeft] = useState<number>(calculateRemaining);
+  const hasTriggeredRef = useRef<boolean>(false);
+  const onExpiredRef = useRef(onExpired);
+  onExpiredRef.current = onExpired;
 
   useEffect(() => {
+    const initial = calculateRemaining();
+    setTimeLeft(initial);
+    // Nếu đơn đã hết hạn từ trước khi mount, tuyệt đối không kích hoạt timer hay gọi xóa/refresh lặp lại
+    if (initial <= 0) {
+      hasTriggeredRef.current = true;
+      return;
+    }
+
     const timer = setInterval(() => {
       const remaining = calculateRemaining();
       setTimeLeft(remaining);
       if (remaining <= 0) {
         clearInterval(timer);
-        fetch(`/api/orders?id=${encodeURIComponent(orderId)}`, { method: 'DELETE' }).finally(() => {
-          onExpired();
-        });
+        if (!hasTriggeredRef.current) {
+          hasTriggeredRef.current = true;
+          fetch(`/api/orders?id=${encodeURIComponent(orderId)}`, { method: 'DELETE' })
+            .catch(() => {})
+            .finally(() => {
+              onExpiredRef.current?.();
+            });
+        }
       }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [createdAt, orderId, onExpired]);
+  }, [calculateRemaining, orderId]);
 
   if (timeLeft <= 0) {
     return (
@@ -176,9 +192,9 @@ export function UserProfileModal({
   }, [initialTab, isOpen]);
 
   // Fetch orders when modal opens
-  const fetchOrders = useCallback(async () => {
+  const fetchOrders = useCallback(async (isSilent = false) => {
     if (!user) return;
-    setIsLoadingOrders(true);
+    if (!isSilent) setIsLoadingOrders(true);
     try {
       const params = new URLSearchParams();
       if (user.phone) params.set('phone', user.phone);
@@ -191,7 +207,7 @@ export function UserProfileModal({
     } catch (err) {
       console.error('Failed to fetch user orders', err);
     } finally {
-      setIsLoadingOrders(false);
+      if (!isSilent) setIsLoadingOrders(false);
     }
   }, [user]);
 
@@ -950,12 +966,12 @@ export function UserProfileModal({
                               {isPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
                             </span>
 
-                            {/* Live 1-hour countdown timer badge */}
-                            {!isPaid && !isCancelled && (
+                            {/* Live 1-hour countdown timer badge (Chỉ áp dụng cho đơn thanh toán online chưa trả tiền, không áp dụng COD) */}
+                            {!isPaid && !isCancelled && ord.payment_method !== 'cod' && (
                               <OrderCountdownBadge
                                 createdAt={ord.created_at}
                                 orderId={ord.id}
-                                onExpired={fetchOrders}
+                                onExpired={() => fetchOrders(true)}
                               />
                             )}
 
@@ -1197,12 +1213,12 @@ export function UserProfileModal({
                     </span>
                   </div>
 
-                  {!isPaid && !isCancelled && (
+                  {!isPaid && !isCancelled && det.payment_method !== 'cod' && (
                     <OrderCountdownBadge
                       createdAt={det.created_at}
                       orderId={det.id}
                       onExpired={() => {
-                        fetchOrders();
+                        fetchOrders(true);
                         setSelectedDetailOrder(null);
                       }}
                     />
