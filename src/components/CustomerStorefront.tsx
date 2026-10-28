@@ -1102,6 +1102,11 @@ export default function CustomerStorefront() {
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-x-4 md:gap-x-5 lg:gap-x-6 gap-y-10 md:gap-y-12">
             {displayedProducts.map((product, idx) => {
               const minPrice = Math.min(...product.variants.map((v) => v.selling_price));
+              const originalPrice = getOriginalPrice(minPrice);
+              const discountPercent =
+                originalPrice > minPrice
+                  ? Math.round(((originalPrice - minPrice) / originalPrice) * 100)
+                  : 0;
 
               return (
                 <article
@@ -1121,6 +1126,11 @@ export default function CustomerStorefront() {
                           alt={product.name}
                           className="w-full h-full object-cover contrast-105 group-hover:scale-105 transition-transform duration-700 ease-out"
                         />
+                        {discountPercent > 0 && (
+                          <span className="absolute top-2.5 left-2.5 z-10 bg-rose-600 text-white font-mono font-bold text-[10px] md:text-[11px] px-2 py-0.5 tracking-tight shadow-xs select-none">
+                            -{discountPercent}%
+                          </span>
+                        )}
                       </Link>
                     </div>
 
@@ -1141,17 +1151,16 @@ export default function CustomerStorefront() {
                       >
                         {product.name}
                       </Link>
-                      {/* Price with sale effect (Strikethrough original price + sale discount badge) */}
+                      {/* Price with sale effect (Strikethrough original price) */}
                       <div className="flex items-baseline flex-wrap gap-2 pt-0.5">
                         <span className="text-base md:text-lg font-mono font-bold text-slate-950 tracking-tight">
                           {formatMoney(minPrice)}
                         </span>
-                        <span className="text-base md:text-lg font-mono text-slate-400 line-through decoration-slate-400 font-normal">
-                          {formatMoney(getOriginalPrice(minPrice))}
-                        </span>
-                        <span className="text-base md:text-lg font-mono font-bold text-rose-600">
-                          -{Math.round(((getOriginalPrice(minPrice) - minPrice) / getOriginalPrice(minPrice)) * 100)}%
-                        </span>
+                        {originalPrice > minPrice && (
+                          <span className="text-base md:text-lg font-mono text-slate-400 line-through decoration-slate-400 font-normal">
+                            {formatMoney(originalPrice)}
+                          </span>
+                        )}
                       </div>
                     </div>
 
