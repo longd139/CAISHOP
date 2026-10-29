@@ -70,6 +70,14 @@ it('3. Popup Check SP hiển thị checklist từng món và hỗ trợ chọn s
   );
 });
 
+// Test 3.1: Card sản phẩm hết hàng bị mờ toàn bộ card
+it('3.1. Card sản phẩm hết hàng được làm mờ toàn card (opacity-40 hover:opacity-100)', () => {
+  assert.ok(
+    dashContent.includes('opacity-40 hover:opacity-100') && dashContent.includes('grayscale'),
+    'Chưa làm mờ card sản phẩm khi hết hàng'
+  );
+});
+
 // Test 4: Backend API và db.ts hỗ trợ partial fulfillment
 it('4. Backend /api/orders và db.ts hỗ trợ SHOP_PARTIAL_FULFILLMENT và confirmPartialFulfillment', () => {
   assert.ok(

@@ -6139,11 +6139,11 @@ export default function ExecutiveDashboard() {
                       <div
                         key={key}
                         className={`p-3.5 rounded-xl border transition-all space-y-3 ${
-                          isFullyAvailable
-                            ? 'bg-emerald-50/30 border-emerald-200/90'
-                            : isOutOfStock
-                            ? 'bg-rose-50/40 border-rose-200/90'
-                            : 'bg-amber-50/40 border-amber-200/90'
+                          isOutOfStock
+                            ? 'opacity-40 hover:opacity-100 bg-slate-100/70 border-slate-300'
+                            : isFullyAvailable
+                            ? 'bg-white border-slate-200 shadow-2xs'
+                            : 'bg-slate-50 border-slate-300'
                         }`}
                       >
                         <div className="flex items-start gap-3 justify-between">
@@ -6152,7 +6152,7 @@ export default function ExecutiveDashboard() {
                               <img
                                 src={it.product_images.split(',')[0]}
                                 alt={it.product_name}
-                                className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                                className={`w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0 ${isOutOfStock ? 'grayscale' : ''}`}
                               />
                             ) : (
                               <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
