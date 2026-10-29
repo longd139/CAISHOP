@@ -5692,14 +5692,7 @@ export default function ExecutiveDashboard() {
                             <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                               <span className="text-xs font-bold uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
                                 <DollarSign className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span>Hạch toán giá vốn & Lợi nhuận đơn</span>
-                              </span>
-                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${
-                                profit >= 0
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                                  : 'bg-rose-50 text-rose-800 border-rose-300'
-                              }`}>
-                                {profit >= 0 ? `Tỷ suất lãi: ${profitMargin.toFixed(1)}%` : 'Đơn âm lợi nhuận'}
+                                <span>Lợi nhuận đơn</span>
                               </span>
                             </div>
 

@@ -42,7 +42,7 @@ it('2. ExecutiveDashboard hiển thị Số lượng, Giá bán, Giá gốc và 
 // Test 3: Kiểm tra khối hạch toán tài chính trong chi tiết đơn hàng
 it('3. ExecutiveDashboard có bảng hạch toán giá bán, ưu đãi, giá gốc và lợi nhuận còn lại', () => {
   const dashContent = fs.readFileSync(path.join(rootDir, 'src/components/ExecutiveDashboard.tsx'), 'utf-8');
-  assert.ok(dashContent.includes('Hạch toán giá vốn & Lợi nhuận đơn'), 'Thiếu tiêu đề bảng hạch toán');
+  assert.ok(dashContent.includes('<span>Lợi nhuận đơn</span>'), 'Thiếu tiêu đề <span>Lợi nhuận đơn</span>');
   assert.ok(dashContent.includes('Giá bán niêm yết (Tiền hàng):'), 'Thiếu dòng "Giá bán niêm yết"');
   assert.ok(dashContent.includes('Trừ ưu đãi / Giảm giá voucher:'), 'Thiếu dòng "Trừ ưu đãi / Giảm giá"');
   assert.ok(dashContent.includes('Doanh thu sau khi trừ ưu đãi:'), 'Thiếu dòng "Doanh thu sau khi trừ ưu đãi"');
