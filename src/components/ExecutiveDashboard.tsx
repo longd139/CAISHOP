@@ -6371,7 +6371,7 @@ export default function ExecutiveDashboard() {
                       className="px-5 py-2.5 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5 border border-black"
                     >
                       <Check className="w-4 h-4 stroke-[3]" />
-                      <span>{isSubmittingCheckSp ? 'Đang duyệt...' : '✓ Xác nhận đủ hàng & Đóng gói'}</span>
+                      <span>{isSubmittingCheckSp ? 'Đang duyệt...' : 'Xác nhận đủ hàng & Đóng gói'}</span>
                     </button>
                   );
                 }
@@ -6385,7 +6385,7 @@ export default function ExecutiveDashboard() {
                       className="px-5 py-2.5 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5 border border-black"
                     >
                       <X className="w-4 h-4 stroke-[3]" />
-                      <span>{isSubmittingCheckSp ? 'Đang xử lý...' : `✗ Hết hàng toàn bộ & Hoàn tiền ${formatMoney(checkSpModalOrder.total_amount)}`}</span>
+                      <span>{isSubmittingCheckSp ? 'Đang xử lý...' : `Hết hàng toàn bộ & Hoàn tiền ${formatMoney(checkSpModalOrder.total_amount)}`}</span>
                     </button>
                   );
                 }
@@ -6398,7 +6398,7 @@ export default function ExecutiveDashboard() {
                     className="px-5 py-2.5 rounded-xl bg-black hover:bg-slate-800 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5 border border-black"
                   >
                     <Check className="w-4 h-4 stroke-[3]" />
-                    <span>{isSubmittingCheckSp ? 'Đang xử lý...' : `⚡ Xác nhận giao phần còn & Hoàn ${formatMoney(totalRefund)}`}</span>
+                    <span>{isSubmittingCheckSp ? 'Đang xử lý...' : `Xác nhận giao phần còn & Hoàn ${formatMoney(totalRefund)}`}</span>
                   </button>
                 );
               })()}
