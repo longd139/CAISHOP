@@ -43,10 +43,9 @@ runTest("MobileCollectionsAccordion: Đã loại bỏ icon trong danh mục mobi
   );
 });
 
-// 3. Kiểm tra các thông tin cốt lõi (tên danh mục, số lượng SP, mô tả phụ) vẫn hiển thị đầy đủ
-runTest("ProductMegaMenu: Bảo toàn đầy đủ nhãn danh mục, số lượng SP và mô tả phân loại", () => {
+// 3. Kiểm tra các thông tin cốt lõi (tên danh mục và mô tả phụ) vẫn hiển thị đầy đủ
+runTest("ProductMegaMenu: Bảo toàn đầy đủ nhãn danh mục và mô tả phân loại", () => {
   assert.ok(content.includes('cat.label'), "Thiếu hiển thị tên danh mục cat.label");
-  assert.ok(content.includes('{count} SP'), "Thiếu hiển thị số lượng {count} SP");
   assert.ok(content.includes('cat.subtext'), "Thiếu hiển thị mô tả phân loại cat.subtext");
   assert.ok(content.includes("slug: 'ao'"), "Thiếu cấu hình danh mục Áo");
   assert.ok(content.includes("subtext: 'Thun • Sơ mi • Polo'"), "Thiếu subtext của Áo");

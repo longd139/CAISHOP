@@ -149,7 +149,6 @@ export function ProductMegaMenu({
         <div className="pb-4 border-b border-slate-100">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {QUICK_CATEGORIES.map((cat) => {
-              const count = getCategoryProductCount(cat.slug, collections);
               const href = `/products?category=${cat.slug}`;
 
               return (
@@ -161,16 +160,9 @@ export function ProductMegaMenu({
                   title={`Xem tất cả sản phẩm ${cat.label}`}
                 >
                   <div className="min-w-0 w-full">
-                    <div className="flex items-center justify-between gap-1">
-                      <span className="text-[13px] font-bold text-slate-900 group-hover:text-white transition-colors truncate">
-                        {cat.label}
-                      </span>
-                      {count > 0 && (
-                        <span className="text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded bg-slate-200/80 group-hover:bg-white/20 text-slate-700 group-hover:text-white transition-colors shrink-0">
-                          {count} SP
-                        </span>
-                      )}
-                    </div>
+                    <span className="text-[13px] font-bold text-slate-900 group-hover:text-white transition-colors truncate block">
+                      {cat.label}
+                    </span>
                     <p className="text-[10px] text-slate-500 group-hover:text-white/70 transition-colors truncate mt-1">
                       {cat.subtext}
                     </p>
