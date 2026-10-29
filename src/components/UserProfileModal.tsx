@@ -933,7 +933,8 @@ export function UserProfileModal({
                     const isConfirming = ord.fulfillment_status === 'CONFIRMING';
                     const isPacking = ord.fulfillment_status === 'PACKING';
                     const isRefunded = ord.payment_status === 'REFUNDED';
-                    const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || (isCancelled && isRefunded);
+                    // const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || (isCancelled && isRefunded);
+                    const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || (isCancelled && isRefunded) || (ord.cancel_reason || '').toUpperCase() === 'OUT_OF_STOCK' || (ord.refund_notes || '').toLowerCase().includes('hết hàng');
 
                     return (
                       <div
@@ -959,20 +960,19 @@ export function UserProfileModal({
 
                           {/* Status Badges */}
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                isPaid
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : isRefunded
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                  : 'bg-amber-50 text-amber-800 border border-amber-200'
-                              }`}
-                            >
-                              {isPaid ? 'Đã thanh toán' : isRefunded ? 'Đã hoàn tiền' : 'Chờ thanh toán'}
-                            </span>
+                            {/* Bỏ 'Chờ thanh toán' khi shop báo hết hàng hoặc đơn đã hủy */}
+                            {isPaid ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Đã thanh toán
+                              </span>
+                            ) : (!isOutOfStock && !isCancelled && !isRefunded) ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                                Chờ thanh toán
+                              </span>
+                            ) : null}
 
-                            {/* Live 1-hour countdown timer badge (Chỉ áp dụng cho đơn thanh toán online chưa trả tiền, không áp dụng COD) */}
-                            {!isPaid && !isCancelled && ord.payment_method !== 'cod' && (
+                            {/* Live 1-hour countdown timer badge (Chỉ áp dụng cho đơn thanh toán online chưa trả tiền, không áp dụng COD và đơn hủy/hết hàng) */}
+                            {!isPaid && !isCancelled && !isOutOfStock && ord.payment_method !== 'cod' && (
                               <OrderCountdownBadge
                                 createdAt={ord.created_at}
                                 orderId={ord.id}
@@ -1002,7 +1002,7 @@ export function UserProfileModal({
                               }`}
                             >
                               {isOutOfStock
-                                ? 'Hết hàng • Đã hoàn tiền'
+                                ? (isRefunded ? 'Hết hàng • Đã hoàn tiền' : 'Hết hàng')
                                 : isRefunded
                                 ? 'Đã hoàn tiền'
                                 : isCancelled
@@ -1158,7 +1158,12 @@ export function UserProfileModal({
         const isConfirming = det.fulfillment_status === 'CONFIRMING';
         const isPacking = det.fulfillment_status === 'PACKING';
         const isRefunded = det.payment_status === 'REFUNDED';
-        const isOutOfStock = det.cancel_reason === 'OUT_OF_STOCK' || (isCancelled && isRefunded);
+        const isOutOfStock = 
+          det.cancel_reason === 'OUT_OF_STOCK' || 
+          (det.cancel_reason || '').toUpperCase() === 'OUT_OF_STOCK' ||
+          (isCancelled && isRefunded) ||
+          (det.refund_notes || '').toLowerCase().includes('hết hàng') ||
+          (det.refund_notes || '').toLowerCase().includes('thiếu');
 
         // Tính tạm tính tiền hàng từ danh sách items
         const subtotal = Array.isArray(det.items)
@@ -1191,17 +1196,24 @@ export function UserProfileModal({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span
-                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                      isPaid
-                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        : isRefunded
-                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                        : 'bg-amber-50 text-amber-800 border border-amber-200'
-                    }`}
-                  >
-                    {isPaid ? 'Đã thanh toán' : isRefunded ? 'Đã hoàn tiền' : 'Chờ thanh toán'}
-                  </span>
+                  {/* Bỏ 'Chờ thanh toán' khi shop báo hết hàng hoặc đơn đã hủy */}
+                  {isPaid ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Đã thanh toán
+                    </span>
+                  ) : (!isOutOfStock && !isCancelled && !isRefunded) ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
+                      Chờ thanh toán
+                    </span>
+                  ) : isOutOfStock ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                      {isRefunded ? 'Hết hàng • Đã hoàn tiền' : 'Hết hàng'}
+                    </span>
+                  ) : isCancelled ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                      Đã hủy
+                    </span>
+                  ) : null}
                   <button
                     type="button"
                     onClick={() => setSelectedDetailOrder(null)}
@@ -1236,7 +1248,7 @@ export function UserProfileModal({
                       }`}
                     >
                       {isOutOfStock
-                        ? 'Hết hàng • Đã hoàn tiền'
+                        ? (isRefunded ? 'Hết hàng • Đã hoàn tiền' : 'Hết hàng')
                         : isCancelled
                         ? 'Đã hủy'
                         : isExchange

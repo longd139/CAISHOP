@@ -1338,9 +1338,9 @@ export default function ExecutiveDashboard() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setOrders(prev => prev.map(o => (o.id === refundModalOrder.id) ? { ...o, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED' } : o));
+        setOrders(prev => prev.map(o => (o.id === refundModalOrder.id) ? { ...o, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED', cancel_reason: 'OUT_OF_STOCK', refund_notes: refundNotes } : o));
         if (selectedOrderForDetail?.id === refundModalOrder.id) {
-          setSelectedOrderForDetail((prev: any) => ({ ...prev, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED' }));
+          setSelectedOrderForDetail((prev: any) => ({ ...prev, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED', cancel_reason: 'OUT_OF_STOCK', refund_notes: refundNotes }));
         }
         await fetchData();
         showToast(data.message || 'Đã hủy đơn và hoàn tiền thành công!', 'success');
@@ -4627,22 +4627,22 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
-                                if (isRefunded) {
+                                if (isCancelled) {
+                                  const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || ord.payment_status === 'REFUNDED' || (ord.refund_notes || '').toLowerCase().includes('hết hàng');
                                   return (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-                                      Đã hoàn tiền
+                                    <span
+                                      className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs"
+                                      title={isOutOfStock ? (ord.refund_notes || 'Shop hết hàng') : 'Đơn hàng đã hủy'}
+                                    >
+                                      {isOutOfStock ? (isRefunded ? 'Hết hàng (Hoàn tiền)' : 'Hết hàng') : 'Đã hủy'}
                                     </span>
                                   );
                                 }
 
-                                if (isCancelled) {
-                                  const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || ord.payment_status === 'REFUNDED';
+                                if (isRefunded) {
                                   return (
-                                    <span
-                                      className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs"
-                                      title={isOutOfStock ? (ord.refund_notes || 'Shop hết hàng và đã hoàn tiền') : 'Đơn hàng đã hủy'}
-                                    >
-                                      {isOutOfStock ? 'Hết hàng (Hoàn tiền)' : 'Đã hủy'}
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+                                      Đã hoàn tiền
                                     </span>
                                   );
                                 }

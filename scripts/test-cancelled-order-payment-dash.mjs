@@ -109,3 +109,4 @@ if (failCount > 0) {
 } else {
   console.log('TẤT CẢ KIỂM THỬ ĐỀU ĐẠT THÀNH CÔNG (100% PASS)!');
 }
+
