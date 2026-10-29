@@ -1164,9 +1164,7 @@ export default function CustomerStorefront() {
                       </div>
                     </div>
 
-                    <p className="text-[12px] text-[#0a0a0a]/70 line-clamp-2 font-light leading-relaxed min-h-[2.2rem]">
-                      {product.description}
-                    </p>
+
                   </div>
 
                   {/* Actions */}
