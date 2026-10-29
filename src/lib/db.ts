@@ -86,6 +86,12 @@ async function getLocalNodeDb() {
           localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN carrier TEXT DEFAULT 'VIETTEL_POST';`);
         } catch {}
         try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN cancel_reason TEXT;`);
+        } catch {}
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN refund_notes TEXT;`);
+        } catch {}
+        try {
           localNodeDbInstance.exec(`ALTER TABLE products ADD COLUMN size_specs TEXT;`);
         } catch {}
       } catch {}
@@ -146,6 +152,8 @@ export async function getDb(): Promise<UniversalDb> {
             `).run();
             await d1.prepare(`ALTER TABLE orders ADD COLUMN tracking_code TEXT`).run().catch(() => {});
             await d1.prepare(`ALTER TABLE orders ADD COLUMN carrier TEXT DEFAULT 'VIETTEL_POST'`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN cancel_reason TEXT`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN refund_notes TEXT`).run().catch(() => {});
           } catch {}
           d1SchemaInitialized = true;
         } catch (e) {
@@ -315,6 +323,8 @@ export interface Order {
   tracking_code?: string | null;
   carrier?: string | null;
   shipment_dispatched_at?: string | null;
+  cancel_reason?: string | null;
+  refund_notes?: string | null;
 }
 
 export interface CreateOrderItemInput {
@@ -932,9 +942,11 @@ export async function refundOutOfStockOrder(
     UPDATE orders 
     SET payment_status = 'REFUNDED', 
         fulfillment_status = 'CANCELLED', 
+        cancel_reason = 'OUT_OF_STOCK',
+        refund_notes = ?,
         updated_at = datetime('now') 
     WHERE id = ?
-  `, [order.id]);
+  `, [noteText, order.id]);
 
   // 2. Ghi nhận sổ cái tài chính: hoàn tiền OUTFLOW
   try {

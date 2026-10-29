@@ -4502,9 +4502,13 @@ export default function ExecutiveDashboard() {
                                 }
 
                                 if (isCancelled) {
+                                  const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || ord.payment_status === 'REFUNDED';
                                   return (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
-                                      Đã hủy
+                                    <span
+                                      className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs"
+                                      title={isOutOfStock ? (ord.refund_notes || 'Shop hết hàng và đã hoàn tiền') : 'Đơn hàng đã hủy'}
+                                    >
+                                      {isOutOfStock ? 'Hết hàng (Hoàn tiền)' : 'Đã hủy'}
                                     </span>
                                   );
                                 }
@@ -5413,6 +5417,29 @@ export default function ExecutiveDashboard() {
                               <span className="font-medium">{parsed.orderNote}</span>
                             </div>
                           )}
+
+                          {/* Banner thông báo Hết hàng & Ghi chú hoàn tiền */}
+                          {(selectedOrderForDetail.cancel_reason === 'OUT_OF_STOCK' || (selectedOrderForDetail.fulfillment_status === 'CANCELLED' && selectedOrderForDetail.payment_status === 'REFUNDED')) && (
+                            <div className="p-3.5 bg-rose-50 border border-rose-200 rounded-xl space-y-2 text-xs">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="font-bold text-rose-900 flex items-center gap-1.5">
+                                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                                  <span>Đơn hàng đã được đánh dấu: HẾT HÀNG TẠI KHO</span>
+                                </span>
+                                <span className="font-bold text-rose-700 bg-white px-2 py-0.5 rounded border border-rose-200">
+                                  Hoàn lại: {formatMoney(selectedOrderForDetail.total_amount)}
+                                </span>
+                              </div>
+                              <p className="text-rose-800 text-[11px] leading-relaxed">
+                                ℹ️ Hệ thống đang hiển thị thông báo hết hàng và thông tin hoàn tiền trực tiếp cho khách hàng trên website.
+                              </p>
+                              {selectedOrderForDetail.refund_notes && (
+                                <div className="p-2.5 bg-white/90 rounded-lg border border-rose-200 text-rose-950 font-medium">
+                                  💬 <strong>Ghi chú gửi khách:</strong> {selectedOrderForDetail.refund_notes}
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </>
                       )}
 
@@ -5438,7 +5465,25 @@ export default function ExecutiveDashboard() {
                           const isCancelled = selectedOrderForDetail.fulfillment_status === 'CANCELLED' || selectedOrderForDetail.payment_status === 'REFUNDED';
 
                           if (isCancelled) {
-                            return <span className="text-xs text-rose-600 font-semibold">Đã hủy / Đã hoàn tiền</span>;
+                            const isOutOfStock = selectedOrderForDetail.cancel_reason === 'OUT_OF_STOCK' || selectedOrderForDetail.payment_status === 'REFUNDED';
+                            return (
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs text-rose-700 font-bold bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
+                                  {isOutOfStock ? 'Hết hàng & Đã hoàn tiền' : 'Đơn hàng đã hủy'}
+                                </span>
+                                {isOutOfStock && selectedOrderForDetail.customer_phone && (
+                                  <a
+                                    href={`https://zalo.me/${selectedOrderForDetail.customer_phone.replace(/\D/g, '')}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-2xs"
+                                    title="Mở Zalo nhắn tin trực tiếp với khách hàng"
+                                  >
+                                    <span>Chat Zalo khách</span>
+                                  </a>
+                                )}
+                              </div>
+                            );
                           }
 
                           if (!isPaid && selectedOrderForDetail.payment_method !== 'cod') {
