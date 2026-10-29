@@ -7,10 +7,6 @@ import {
   ChevronRight,
   ArrowRight,
   Layers,
-  Shirt,
-  Footprints,
-  Watch,
-  Scissors,
 } from 'lucide-react';
 import { BrandCollection, defaultCollections } from '@/app/api/collections/route';
 
@@ -19,7 +15,7 @@ export interface QuickCategoryItem {
   slug: string;
   label: string;
   subtext: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon?: React.ComponentType<{ className?: string }>;
 }
 
 export const QUICK_CATEGORIES: QuickCategoryItem[] = [
@@ -27,31 +23,26 @@ export const QUICK_CATEGORIES: QuickCategoryItem[] = [
     slug: 'ao',
     label: 'Áo',
     subtext: 'Thun • Sơ mi • Polo',
-    icon: Shirt,
   },
   {
     slug: 'quan',
     label: 'Quần',
     subtext: 'Jean • Tây • Shorts',
-    icon: Scissors,
   },
   {
     slug: 'ao-khoac',
     label: 'Áo khoác',
     subtext: 'Bomber • Blazer • Jacket',
-    icon: Layers,
   },
   {
     slug: 'giay',
     label: 'Giày',
     subtext: 'Sneaker • Da • Loafer',
-    icon: Footprints,
   },
   {
     slug: 'phu-kien',
     label: 'Phụ kiện',
     subtext: 'Nón • Ví • Thắt lưng',
-    icon: Watch,
   },
 ];
 
@@ -158,7 +149,6 @@ export function ProductMegaMenu({
         <div className="pb-4 border-b border-slate-100">
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {QUICK_CATEGORIES.map((cat) => {
-              const IconComp = cat.icon;
               const count = getCategoryProductCount(cat.slug, collections);
               const href = `/products?category=${cat.slug}`;
 
@@ -167,13 +157,10 @@ export function ProductMegaMenu({
                   key={cat.slug}
                   href={href}
                   onClick={(e) => handleNavigate(e, href)}
-                  className="group flex items-center gap-3 p-3 rounded-xl bg-slate-50/70 hover:bg-slate-900 border border-slate-200/70 hover:border-slate-900 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer"
+                  className="group flex flex-col justify-center p-3 rounded-xl bg-slate-50/70 hover:bg-slate-900 border border-slate-200/70 hover:border-slate-900 transition-all duration-200 shadow-2xs hover:shadow-md cursor-pointer"
                   title={`Xem tất cả sản phẩm ${cat.label}`}
                 >
-                  <div className="w-9 h-9 rounded-lg bg-white group-hover:bg-white/10 flex items-center justify-center text-slate-700 group-hover:text-white border border-slate-200/60 group-hover:border-white/20 transition-colors shrink-0">
-                    <IconComp className="w-4.5 h-4.5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-0 w-full">
                     <div className="flex items-center justify-between gap-1">
                       <span className="text-[13px] font-bold text-slate-900 group-hover:text-white transition-colors truncate">
                         {cat.label}
@@ -184,7 +171,7 @@ export function ProductMegaMenu({
                         </span>
                       )}
                     </div>
-                    <p className="text-[10px] text-slate-500 group-hover:text-white/70 transition-colors truncate mt-0.5">
+                    <p className="text-[10px] text-slate-500 group-hover:text-white/70 transition-colors truncate mt-1">
                       {cat.subtext}
                     </p>
                   </div>
@@ -392,16 +379,14 @@ export function MobileCollectionsAccordion({
         </span>
         <div className="grid grid-cols-2 gap-1.5">
           {QUICK_CATEGORIES.map((cat) => {
-            const IconComp = cat.icon;
             const href = `/products?category=${cat.slug}`;
             return (
               <Link
                 key={cat.slug}
                 href={href}
                 onClick={(e) => handleLinkClick(e, href)}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200/70 text-xs font-medium text-slate-800 transition-colors"
+                className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-900 hover:text-white border border-slate-200/70 text-xs font-medium text-slate-800 transition-colors"
               >
-                <IconComp className="w-3.5 h-3.5 shrink-0" />
                 <span className="truncate">{cat.label}</span>
               </Link>
             );
