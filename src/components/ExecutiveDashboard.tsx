@@ -4443,7 +4443,7 @@ export default function ExecutiveDashboard() {
                                 // 2. Nếu đơn CHỜ THANH TOÁN: Ẩn nút gửi mã ĐVVC
                                 if (!isPaid && ord.payment_method !== 'cod') {
                                   return (
-                                    <span className="inline-flex items-center px-2 py-1 text-xs text-amber-700 bg-amber-50 border border-amber-200/60 rounded">
+                                    <span className="text-xs text-slate-400 italic select-none">
                                       Chờ thanh toán
                                     </span>
                                   );
@@ -5295,7 +5295,7 @@ export default function ExecutiveDashboard() {
                           }
 
                           if (!isPaid && selectedOrderForDetail.payment_method !== 'cod') {
-                            return <span className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded border border-amber-200">Chờ thanh toán</span>;
+                            return <span className="text-xs text-slate-400 italic select-none">Chờ thanh toán</span>;
                           }
 
                           if (selectedOrderForDetail.fulfillment_status === 'CONFIRMING') {
