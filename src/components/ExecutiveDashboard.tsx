@@ -59,6 +59,7 @@ import {
   Download,
   ExternalLink,
   ZoomIn,
+  Calendar,
   Loader2
 } from 'lucide-react';
 import OverviewSection from '@/components/OverviewSection';
@@ -645,6 +646,7 @@ export default function ExecutiveDashboard() {
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [customers, setCustomers] = useState<CustomerRankItem[]>([]);
   const [orderStatusFilter, setOrderStatusFilter] = useState<'ALL' | 'RETURNED' | 'PACKING' | 'DELIVERED' | 'UNFULFILLED'>('ALL');
+  const [orderTimeFilter, setOrderTimeFilter] = useState<'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'ALL'>('THIS_MONTH');
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
 
   // Order Detail Modal State
@@ -3971,31 +3973,70 @@ export default function ExecutiveDashboard() {
 
           {/* ================= TAB 5: ORDERS ================= */}
           {activeTab === 'orders' && (() => {
-            const totalOrdersCount = orders.length;
-            const totalRevenue = orders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth();
+            const lastMonthDate = new Date(currentYear, currentMonth - 1, 1);
+            const lastMonthYear = lastMonthDate.getFullYear();
+            const lastMonth = lastMonthDate.getMonth();
+            const startOfToday = new Date(currentYear, currentMonth, now.getDate(), 0, 0, 0, 0);
+            const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-            const packingOrders = orders.filter(o => o.fulfillment_status === 'PACKING' || o.fulfillment_status === 'DISPATCHED');
-            const packingRevenue = packingOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+            // Hàm chuẩn hóa và kiểm tra ngày của đơn hàng
+            const parseOrderDate = (dateStr?: string): Date | null => {
+              if (!dateStr) return null;
+              const isoStr = dateStr.includes('T') ? dateStr : dateStr.replace(' ', 'T');
+              const d = new Date(isoStr);
+              return isNaN(d.getTime()) ? null : d;
+            };
 
-            const deliveredOrders = orders.filter(o => o.fulfillment_status === 'DELIVERED');
-            const deliveredRevenue = deliveredOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+            const isOrderInTimeRange = (order: Order, filter: 'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'ALL'): boolean => {
+              if (filter === 'ALL') return true;
+              const d = parseOrderDate(order.created_at);
+              if (!d) return false;
 
-            const returnedOrders = orders.filter(o => o.fulfillment_status === 'RETURNED');
-            const exchangeOrdersCount = returnedOrders.filter(o => {
-              const notes = (o.return_notes || '').toLowerCase();
-              return o.return_notes?.includes('ĐỔI HÀNG') || notes.includes('đổi size') || notes.includes('đổi mẫu') || notes.includes('đổi hàng');
-            }).length;
-            const refundOrdersCount = returnedOrders.length - exchangeOrdersCount;
+              if (filter === 'THIS_MONTH') {
+                return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+              }
+              if (filter === 'LAST_MONTH') {
+                return d.getFullYear() === lastMonthYear && d.getMonth() === lastMonth;
+              }
+              if (filter === 'TODAY') {
+                return d >= startOfToday;
+              }
+              if (filter === 'LAST_7_DAYS') {
+                return d >= sevenDaysAgo;
+              }
+              return true;
+            };
 
-            const unfulfilledOrders = orders.filter(o => o.fulfillment_status === 'UNFULFILLED' || !o.fulfillment_status);
-            const unfulfilledRevenue = unfulfilledOrders.reduce((sum, o) => sum + (Number(o.total_amount) || 0), 0);
+            // 1. Tính số liệu Tháng Trước để so sánh ở phía dưới mỗi card
+            const lastMonthOrders = orders.filter(o => {
+              const d = parseOrderDate(o.created_at);
+              return d ? (d.getFullYear() === lastMonthYear && d.getMonth() === lastMonth) : false;
+            });
+            const lastMonthTotalCount = lastMonthOrders.length;
+            const lastMonthPackingCount = lastMonthOrders.filter(o => o.fulfillment_status === 'PACKING' || o.fulfillment_status === 'DISPATCHED').length;
+            const lastMonthDeliveredCount = lastMonthOrders.filter(o => o.fulfillment_status === 'DELIVERED').length;
+            const lastMonthReturnedCount = lastMonthOrders.filter(o => o.fulfillment_status === 'RETURNED').length;
+            const lastMonthUnfulfilledCount = lastMonthOrders.filter(o => o.fulfillment_status === 'UNFULFILLED' || !o.fulfillment_status).length;
+
+            // 2. Lọc đơn theo khoảng thời gian đã chọn trong select box
+            const timeFilteredOrders = orders.filter(o => isOrderInTimeRange(o, orderTimeFilter));
+
+            const totalOrdersCount = timeFilteredOrders.length;
+            const packingOrders = timeFilteredOrders.filter(o => o.fulfillment_status === 'PACKING' || o.fulfillment_status === 'DISPATCHED');
+            const deliveredOrders = timeFilteredOrders.filter(o => o.fulfillment_status === 'DELIVERED');
+            const returnedOrders = timeFilteredOrders.filter(o => o.fulfillment_status === 'RETURNED');
+            const unfulfilledOrders = timeFilteredOrders.filter(o => o.fulfillment_status === 'UNFULFILLED' || !o.fulfillment_status);
 
             const orderMetricCards = [
               {
                 id: 'ALL' as const,
                 label: 'Tổng đơn hàng',
                 count: totalOrdersCount,
-                subtext: formatMoney(totalRevenue),
+                lastMonthCount: lastMonthTotalCount,
+                subtext: `Tháng trước: ${lastMonthTotalCount} đơn`,
                 icon: ShoppingCart,
                 iconBg: 'bg-slate-100 text-slate-700',
               },
@@ -4003,7 +4044,8 @@ export default function ExecutiveDashboard() {
                 id: 'PACKING' as const,
                 label: 'Đang xử lý',
                 count: packingOrders.length,
-                subtext: formatMoney(packingRevenue),
+                lastMonthCount: lastMonthPackingCount,
+                subtext: `Tháng trước: ${lastMonthPackingCount} đơn`,
                 icon: Truck,
                 iconBg: 'bg-blue-50 text-blue-700 border border-blue-200/60',
               },
@@ -4011,7 +4053,8 @@ export default function ExecutiveDashboard() {
                 id: 'DELIVERED' as const,
                 label: 'Đã nhận hàng',
                 count: deliveredOrders.length,
-                subtext: formatMoney(deliveredRevenue),
+                lastMonthCount: lastMonthDeliveredCount,
+                subtext: `Tháng trước: ${lastMonthDeliveredCount} đơn`,
                 icon: CheckCircle2,
                 iconBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
               },
@@ -4019,7 +4062,8 @@ export default function ExecutiveDashboard() {
                 id: 'RETURNED' as const,
                 label: 'Yêu cầu đổi / hoàn',
                 count: returnedOrders.length,
-                subtext: `Đổi: ${exchangeOrdersCount} • Trả: ${refundOrdersCount}`,
+                lastMonthCount: lastMonthReturnedCount,
+                subtext: `Tháng trước: ${lastMonthReturnedCount} đơn`,
                 icon: RotateCcw,
                 iconBg: 'bg-amber-50 text-amber-700 border border-amber-200/60',
               },
@@ -4027,7 +4071,8 @@ export default function ExecutiveDashboard() {
                 id: 'UNFULFILLED' as const,
                 label: 'Chưa xử lý',
                 count: unfulfilledOrders.length,
-                subtext: formatMoney(unfulfilledRevenue),
+                lastMonthCount: lastMonthUnfulfilledCount,
+                subtext: `Tháng trước: ${lastMonthUnfulfilledCount} đơn`,
                 icon: Clock,
                 iconBg: 'bg-slate-100 text-slate-600 border border-slate-200/60',
               },
@@ -4097,14 +4142,24 @@ export default function ExecutiveDashboard() {
                             }`}
                           >
                             <span
-                              className={`truncate font-bold transition-colors ${
-                                isActive ? 'text-white' : 'text-slate-800'
+                              className={`truncate transition-colors ${
+                                isActive ? 'text-zinc-300' : 'text-slate-600'
                               }`}
                               title={card.subtext}
                             >
-                              {card.subtext}
+                              Tháng trước: <strong className={isActive ? 'text-white font-bold' : 'text-slate-800 font-bold'}>{card.lastMonthCount} đơn</strong>
                             </span>
-
+                            {card.count !== card.lastMonthCount && (
+                              <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${
+                                  card.count > card.lastMonthCount
+                                    ? isActive ? 'bg-emerald-400/20 text-emerald-300' : 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
+                                    : isActive ? 'bg-rose-400/20 text-rose-300' : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                                }`}
+                              >
+                                {card.count > card.lastMonthCount ? `+${card.count - card.lastMonthCount}` : `-${card.lastMonthCount - card.count}`}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -4140,8 +4195,30 @@ export default function ExecutiveDashboard() {
                       <span>{mockLoadingId === 'CREATE_NEW' ? 'Đang tạo...' : '+ Tạo đơn test'}</span>
                     </button>
                   )}
-                  <div className="text-xs text-slate-500 font-mono">
-                    Tổng {orders.length} đơn hàng
+                  <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                    <label htmlFor="order-time-filter" className="text-xs font-medium text-slate-600 flex items-center gap-1 pl-1 cursor-pointer">
+                      <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span className="hidden sm:inline">Thời gian:</span>
+                    </label>
+                    <div className="relative">
+                      <select
+                        id="order-time-filter"
+                        value={orderTimeFilter}
+                        onChange={(e) => setOrderTimeFilter(e.target.value as any)}
+                        className="appearance-none bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-md pl-2.5 pr-7 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors cursor-pointer shadow-2xs"
+                        title="Chọn khoảng thời gian lọc đơn hàng"
+                      >
+                        <option value="THIS_MONTH">Tháng này</option>
+                        <option value="LAST_MONTH">Tháng trước</option>
+                        <option value="TODAY">Hôm nay</option>
+                        <option value="LAST_7_DAYS">7 ngày qua</option>
+                        <option value="ALL">Toàn thời gian</option>
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    </div>
+                    <span className="text-xs font-mono text-slate-600 font-semibold bg-white px-2 py-1 rounded border border-slate-200 shadow-2xs" title="Số đơn hàng trong khoảng thời gian đã chọn">
+                      {timeFilteredOrders.length} đơn
+                    </span>
                   </div>
                 </div>
               </header>
@@ -4165,7 +4242,7 @@ export default function ExecutiveDashboard() {
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
                     {(() => {
-                      const displayedOrders = orders.filter(ord => {
+                      const displayedOrders = timeFilteredOrders.filter(ord => {
                         if (orderStatusFilter === 'RETURNED') return ord.fulfillment_status === 'RETURNED';
                         if (orderStatusFilter === 'PACKING') return ord.fulfillment_status === 'PACKING' || ord.fulfillment_status === 'DISPATCHED';
                         if (orderStatusFilter === 'DELIVERED') return ord.fulfillment_status === 'DELIVERED';
