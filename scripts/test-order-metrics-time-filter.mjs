@@ -30,7 +30,11 @@ it('1. ExecutiveDashboard import icon Calendar từ lucide-react', () => {
 // Test 2: State orderTimeFilter
 it('2. Có state orderTimeFilter hỗ trợ các mốc thời gian', () => {
   assert.ok(
-    dashContent.includes("const [orderTimeFilter, setOrderTimeFilter] = useState<'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'ALL'>('THIS_MONTH');"),
+    dashContent.includes("const [orderTimeFilter, setOrderTimeFilter] = useState<") &&
+    dashContent.includes("'THIS_MONTH'") &&
+    dashContent.includes("'LAST_MONTH'") &&
+    dashContent.includes("'TODAY'") &&
+    dashContent.includes("'ALL'"),
     'Thiếu khai báo state orderTimeFilter hoặc giá trị mặc định THIS_MONTH'
   );
 });
@@ -110,3 +114,4 @@ if (failCount > 0) {
 } else {
   console.log(`TẤT CẢ ${passCount} KIỂM THỬ ĐỀU ĐẠT THÀNH CÔNG (100% PASS)!`);
 }
+

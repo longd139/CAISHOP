@@ -646,7 +646,67 @@ export default function ExecutiveDashboard() {
   const [users, setUsers] = useState<UserAccount[]>([]);
   const [customers, setCustomers] = useState<CustomerRankItem[]>([]);
   const [orderStatusFilter, setOrderStatusFilter] = useState<'ALL' | 'RETURNED' | 'PACKING' | 'DELIVERED' | 'UNFULFILLED'>('ALL');
-  const [orderTimeFilter, setOrderTimeFilter] = useState<'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'ALL'>('THIS_MONTH');
+  const [orderTimeFilter, setOrderTimeFilter] = useState<'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'CUSTOM' | 'ALL'>('THIS_MONTH');
+  const [orderStartDate, setOrderStartDate] = useState<string>(() => {
+    const now = new Date();
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const y = start.getFullYear();
+    const m = String(start.getMonth() + 1).padStart(2, '0');
+    const d = String(start.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
+  const [orderEndDate, setOrderEndDate] = useState<string>(() => {
+    const now = new Date();
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const y = end.getFullYear();
+    const m = String(end.getMonth() + 1).padStart(2, '0');
+    const d = String(end.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  });
+
+  const formatDateToYMD = (date: Date): string => {
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+
+  const handleTimeFilterPresetChange = (preset: 'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'CUSTOM' | 'ALL') => {
+    setOrderTimeFilter(preset);
+    const now = new Date();
+    if (preset === 'THIS_MONTH') {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      setOrderStartDate(formatDateToYMD(start));
+      setOrderEndDate(formatDateToYMD(end));
+    } else if (preset === 'LAST_MONTH') {
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0);
+      setOrderStartDate(formatDateToYMD(start));
+      setOrderEndDate(formatDateToYMD(end));
+    } else if (preset === 'TODAY') {
+      const todayStr = formatDateToYMD(now);
+      setOrderStartDate(todayStr);
+      setOrderEndDate(todayStr);
+    } else if (preset === 'LAST_7_DAYS') {
+      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      setOrderStartDate(formatDateToYMD(sevenDaysAgo));
+      setOrderEndDate(formatDateToYMD(now));
+    } else if (preset === 'ALL') {
+      setOrderStartDate('');
+      setOrderEndDate('');
+    }
+  };
+
+  const handleCustomStartDateChange = (val: string) => {
+    setOrderStartDate(val);
+    setOrderTimeFilter('CUSTOM');
+  };
+
+  const handleCustomEndDateChange = (val: string) => {
+    setOrderEndDate(val);
+    setOrderTimeFilter('CUSTOM');
+  };
   const [availableProducts, setAvailableProducts] = useState<any[]>([]);
 
   // Order Detail Modal State
@@ -3990,23 +4050,23 @@ export default function ExecutiveDashboard() {
               return isNaN(d.getTime()) ? null : d;
             };
 
-            const isOrderInTimeRange = (order: Order, filter: 'THIS_MONTH' | 'LAST_MONTH' | 'TODAY' | 'LAST_7_DAYS' | 'ALL'): boolean => {
-              if (filter === 'ALL') return true;
+            const isOrderInTimeRange = (order: Order): boolean => {
+              if (orderTimeFilter === 'ALL' && !orderStartDate && !orderEndDate) return true;
               const d = parseOrderDate(order.created_at);
               if (!d) return false;
 
-              if (filter === 'THIS_MONTH') {
-                return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+              if (orderStartDate) {
+                const [sYear, sMonth, sDay] = orderStartDate.split('-').map(Number);
+                const startOfDay = new Date(sYear, sMonth - 1, sDay, 0, 0, 0, 0);
+                if (d < startOfDay) return false;
               }
-              if (filter === 'LAST_MONTH') {
-                return d.getFullYear() === lastMonthYear && d.getMonth() === lastMonth;
+
+              if (orderEndDate) {
+                const [eYear, eMonth, eDay] = orderEndDate.split('-').map(Number);
+                const endOfDay = new Date(eYear, eMonth - 1, eDay, 23, 59, 59, 999);
+                if (d > endOfDay) return false;
               }
-              if (filter === 'TODAY') {
-                return d >= startOfToday;
-              }
-              if (filter === 'LAST_7_DAYS') {
-                return d >= sevenDaysAgo;
-              }
+
               return true;
             };
 
@@ -4021,8 +4081,8 @@ export default function ExecutiveDashboard() {
             const lastMonthReturnedCount = lastMonthOrders.filter(o => o.fulfillment_status === 'RETURNED').length;
             const lastMonthUnfulfilledCount = lastMonthOrders.filter(o => o.fulfillment_status === 'UNFULFILLED' || !o.fulfillment_status).length;
 
-            // 2. Lọc đơn theo khoảng thời gian đã chọn trong select box
-            const timeFilteredOrders = orders.filter(o => isOrderInTimeRange(o, orderTimeFilter));
+            // 2. Lọc đơn theo khoảng thời gian đã chọn (từ ngày -> đến ngày hoặc preset)
+            const timeFilteredOrders = orders.filter(o => isOrderInTimeRange(o));
 
             const totalOrdersCount = timeFilteredOrders.length;
             const packingOrders = timeFilteredOrders.filter(o => o.fulfillment_status === 'PACKING' || o.fulfillment_status === 'DISPATCHED');
@@ -4195,7 +4255,7 @@ export default function ExecutiveDashboard() {
                       <span>{mockLoadingId === 'CREATE_NEW' ? 'Đang tạo...' : '+ Tạo đơn test'}</span>
                     </button>
                   )}
-                  <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-lg border border-slate-200">
+                  <div className="flex items-center gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-200 flex-wrap">
                     <label htmlFor="order-time-filter" className="text-xs font-medium text-slate-600 flex items-center gap-1 pl-1 cursor-pointer">
                       <Calendar className="w-3.5 h-3.5 text-slate-400" />
                       <span className="hidden sm:inline">Thời gian:</span>
@@ -4204,18 +4264,43 @@ export default function ExecutiveDashboard() {
                       <select
                         id="order-time-filter"
                         value={orderTimeFilter}
-                        onChange={(e) => setOrderTimeFilter(e.target.value as any)}
+                        onChange={(e) => handleTimeFilterPresetChange(e.target.value as any)}
                         className="appearance-none bg-white hover:bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-md pl-2.5 pr-7 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-colors cursor-pointer shadow-2xs"
-                        title="Chọn khoảng thời gian lọc đơn hàng"
+                        title="Chọn nhanh khoảng thời gian lọc đơn hàng"
                       >
                         <option value="THIS_MONTH">Tháng này</option>
                         <option value="LAST_MONTH">Tháng trước</option>
                         <option value="TODAY">Hôm nay</option>
                         <option value="LAST_7_DAYS">7 ngày qua</option>
                         <option value="ALL">Toàn thời gian</option>
+                        {orderTimeFilter === 'CUSTOM' && (
+                          <option value="CUSTOM">Tùy chỉnh</option>
+                        )}
                       </select>
                       <ChevronDown className="w-3.5 h-3.5 text-slate-400 absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
                     </div>
+
+                    <div className="flex items-center gap-1 text-xs text-slate-600">
+                      <span className="text-[11px] text-slate-500 font-medium">Từ</span>
+                      <input
+                        type="date"
+                        aria-label="Từ ngày"
+                        value={orderStartDate}
+                        onChange={(e) => handleCustomStartDateChange(e.target.value)}
+                        className="bg-white border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-2xs"
+                        title="Chọn ngày bắt đầu"
+                      />
+                      <span className="text-[11px] text-slate-500 font-medium">đến</span>
+                      <input
+                        type="date"
+                        aria-label="Đến ngày"
+                        value={orderEndDate}
+                        onChange={(e) => handleCustomEndDateChange(e.target.value)}
+                        className="bg-white border border-slate-200 text-slate-800 text-xs rounded-md px-2 py-1 font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer shadow-2xs"
+                        title="Chọn ngày kết thúc"
+                      />
+                    </div>
+
                     <span className="text-xs font-mono text-slate-600 font-semibold bg-white px-2 py-1 rounded border border-slate-200 shadow-2xs" title="Số đơn hàng trong khoảng thời gian đã chọn">
                       {timeFilteredOrders.length} đơn
                     </span>
