@@ -30,13 +30,13 @@ it('1. src/lib/db.ts truy vấn unit_cost với fallback pv.cost_price', () => {
   );
 });
 
-// Test 2: Kiểm tra ExecutiveDashboard.tsx hiển thị giá gốc và lợi nhuận trên từng sản phẩm
-it('2. ExecutiveDashboard hiển thị Giá bán, Giá gốc và Lãi trên từng dòng sản phẩm', () => {
+// Test 2: Kiểm tra ExecutiveDashboard.tsx hiển thị 4 thông số: Số lượng, Giá bán, Giá gốc và Lãi trên từng dòng sản phẩm
+it('2. ExecutiveDashboard hiển thị Số lượng, Giá bán, Giá gốc và Lãi trên từng dòng sản phẩm', () => {
   const dashContent = fs.readFileSync(path.join(rootDir, 'src/components/ExecutiveDashboard.tsx'), 'utf-8');
+  assert.ok(dashContent.includes('Số lượng:'), 'Thiếu nhãn "Số lượng:" trên dòng sản phẩm');
   assert.ok(dashContent.includes('Giá bán:'), 'Thiếu nhãn "Giá bán:" trên dòng sản phẩm');
   assert.ok(dashContent.includes('Giá gốc:'), 'Thiếu nhãn "Giá gốc:" trên dòng sản phẩm');
   assert.ok(dashContent.includes('Lãi: +'), 'Thiếu nhãn "Lãi: +" trên dòng sản phẩm');
-  assert.ok(dashContent.includes('Vốn:'), 'Thiếu nhãn "Vốn:" dưới tổng tiền sản phẩm');
 });
 
 // Test 3: Kiểm tra khối hạch toán tài chính trong chi tiết đơn hàng
@@ -77,3 +77,4 @@ if (failCount > 0) {
 } else {
   console.log(`TẤT CẢ ${passCount} KIỂM THỬ ĐỀU ĐẠT THÀNH CÔNG (100% PASS)!`);
 }
+

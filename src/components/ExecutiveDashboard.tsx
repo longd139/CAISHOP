@@ -5366,29 +5366,24 @@ export default function ExecutiveDashboard() {
                                       </>
                                     )}
                                   </div>
-                                  <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-2 flex-wrap">
-                                    <span>Giá bán: <strong className="text-slate-900 font-semibold">{formatMoney(it.unit_price)}</strong> × {it.quantity}</span>
-                                    {Number(it.unit_cost) > 0 && (
-                                      <>
-                                        <span className="text-slate-300">•</span>
-                                        <span className="text-slate-500">Giá gốc: <strong className="text-slate-700">{formatMoney(it.unit_cost)}</strong></span>
-                                        <span className="text-slate-300">•</span>
-                                        <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 text-[10px]">
-                                          Lãi: +{formatMoney(((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 1))}
-                                        </span>
-                                      </>
-                                    )}
+                                  {/* Hiển thị rõ ràng 4 thông số cốt lõi: Số lượng, Giá gốc, Giá bán, Lãi (Không lặp lại số tiền) */}
+                                  <div className="text-[11px] text-slate-600 mt-1 flex items-center gap-2.5 flex-wrap">
+                                    <span className="inline-flex items-center gap-1 font-medium text-slate-700">
+                                      <span>Số lượng:</span>
+                                      <strong className="text-xs font-bold text-slate-900 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 tabular-nums">
+                                        {it.quantity}
+                                      </strong>
+                                    </span>
+                                    <span className="text-slate-300">•</span>
+                                    <span>Giá gốc: <strong className="text-slate-700 font-semibold tabular-nums">{formatMoney(it.unit_cost || 0)}</strong></span>
+                                    <span className="text-slate-300">•</span>
+                                    <span>Giá bán: <strong className="text-slate-900 font-bold tabular-nums">{formatMoney(it.unit_price || 0)}</strong></span>
                                   </div>
                                 </div>
-                                <div className="text-right">
-                                  <div className="font-bold text-xs text-slate-900 tabular-nums">
-                                    {formatMoney(it.total_price || (it.unit_price * it.quantity))}
+                                <div className="text-right shrink-0">
+                                  <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs whitespace-nowrap">
+                                    <span>Lãi: +{formatMoney(((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 1))}</span>
                                   </div>
-                                  {Number(it.unit_cost) > 0 && (
-                                    <div className="text-[10px] text-slate-400 mt-0.5 tabular-nums">
-                                      Vốn: {formatMoney(Number(it.unit_cost) * (Number(it.quantity) || 1))}
-                                    </div>
-                                  )}
                                 </div>
                               </div>
                             );
