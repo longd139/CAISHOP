@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
 import { AuthUser } from '@/lib/useAuth';
 import { MEMBERSHIP_TIERS, calculateTier, getNextTierInfo, MembershipTier } from '@/lib/membership';
