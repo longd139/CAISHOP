@@ -3996,8 +3996,6 @@ export default function ExecutiveDashboard() {
                 label: 'Tổng đơn hàng',
                 count: totalOrdersCount,
                 subtext: formatMoney(totalRevenue),
-                badge: 'Tất cả',
-                badgeColor: 'bg-slate-100 text-slate-700',
                 icon: ShoppingCart,
                 iconBg: 'bg-slate-100 text-slate-700',
               },
@@ -4006,8 +4004,6 @@ export default function ExecutiveDashboard() {
                 label: 'Đang xử lý',
                 count: packingOrders.length,
                 subtext: formatMoney(packingRevenue),
-                badge: 'Đang giao & gói',
-                badgeColor: 'bg-blue-50 text-blue-700 border border-blue-200/60',
                 icon: Truck,
                 iconBg: 'bg-blue-50 text-blue-700 border border-blue-200/60',
               },
@@ -4016,8 +4012,6 @@ export default function ExecutiveDashboard() {
                 label: 'Đã nhận hàng',
                 count: deliveredOrders.length,
                 subtext: formatMoney(deliveredRevenue),
-                badge: 'Giao thành công',
-                badgeColor: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
                 icon: CheckCircle2,
                 iconBg: 'bg-emerald-50 text-emerald-700 border border-emerald-200/60',
               },
@@ -4026,8 +4020,6 @@ export default function ExecutiveDashboard() {
                 label: 'Yêu cầu đổi / hoàn',
                 count: returnedOrders.length,
                 subtext: `Đổi: ${exchangeOrdersCount} • Trả: ${refundOrdersCount}`,
-                badge: returnedOrders.length > 0 ? `${returnedOrders.length} yêu cầu` : '0 đơn',
-                badgeColor: returnedOrders.length > 0 ? 'bg-amber-100 text-amber-800 font-bold' : 'bg-slate-100 text-slate-500',
                 icon: RotateCcw,
                 iconBg: 'bg-amber-50 text-amber-700 border border-amber-200/60',
               },
@@ -4036,8 +4028,6 @@ export default function ExecutiveDashboard() {
                 label: 'Chưa xử lý',
                 count: unfulfilledOrders.length,
                 subtext: formatMoney(unfulfilledRevenue),
-                badge: 'Chờ tiếp nhận',
-                badgeColor: 'bg-slate-100 text-slate-600',
                 icon: Clock,
                 iconBg: 'bg-slate-100 text-slate-600 border border-slate-200/60',
               },
@@ -4114,17 +4104,7 @@ export default function ExecutiveDashboard() {
                             >
                               {card.subtext}
                             </span>
-                            {card.badge && (
-                              <span
-                                className={`px-2 py-0.5 rounded text-[10px] font-bold shrink-0 transition-colors ${
-                                  isActive
-                                    ? 'bg-white/20 text-white border border-white/30 backdrop-blur-xs'
-                                    : card.badgeColor
-                                }`}
-                              >
-                                {card.badge}
-                              </span>
-                            )}
+
                           </div>
                         </div>
 
