@@ -148,14 +148,13 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ success: false, message: 'Đơn hàng đã hủy, không thể xác nhận nhận hàng.' }, { status: 400 });
       }
 
-      if (!order.tracking_code) {
-        if (!body.is_admin) {
-          return NextResponse.json({ success: false, message: 'Đơn hàng chưa có mã vận chuyển, chưa thể xác nhận nhận hàng.' }, { status: 400 });
-        }
-        await db.execute(
-          `UPDATE orders SET tracking_code = ?, carrier = COALESCE(carrier, 'VIETTEL_POST') WHERE id = ?`,
-          [`DG-${order.order_code}`, order.id]
-        );
+      if (order.payment_status === 'PENDING') {
+        return NextResponse.json({ success: false, message: 'Đơn hàng đang chờ thanh toán, không thể xác nhận nhận hàng.' }, { status: 400 });
+      }
+
+      const isDispatched = order.fulfillment_status === 'DISPATCHED' || Boolean(order.tracking_code);
+      if (!isDispatched) {
+        return NextResponse.json({ success: false, message: 'Đơn hàng chưa bàn giao cho ĐVVC, không thể xác nhận nhận hàng.' }, { status: 400 });
       }
 
       await db.execute(`

@@ -832,6 +832,15 @@ export default function ExecutiveDashboard() {
       showToast('Đơn hàng này đã được xác nhận nhận hàng trước đó.', 'warning');
       return;
     }
+    const isDispatched = order.fulfillment_status === 'DISPATCHED' || Boolean(order.tracking_code);
+    if (!isDispatched) {
+      showToast('Đơn hàng chưa bàn giao cho ĐVVC, chưa thể xác nhận nhận hàng.', 'error');
+      return;
+    }
+    if (order.payment_status === 'PENDING') {
+      showToast('Đơn hàng đang chờ thanh toán, không thể xác nhận nhận hàng.', 'error');
+      return;
+    }
     setIsConfirmingDelivered(true);
     try {
       const res = await fetch('/api/orders', {
@@ -5784,16 +5793,23 @@ export default function ExecutiveDashboard() {
                     <span>Khách đã nhận hàng</span>
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => handleAdminConfirmDelivered(selectedOrderForDetail)}
-                    disabled={isConfirmingDelivered}
-                    className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs hover:shadow cursor-pointer disabled:opacity-50"
-                    title="Xác nhận khách đã nhận được hàng (dành cho trường hợp khách quên bấm xác nhận)"
-                  >
-                    <CheckCircle2 className="w-4 h-4 shrink-0" />
-                    <span>{isConfirmingDelivered ? 'Đang cập nhật...' : 'Khách đã nhận hàng'}</span>
-                  </button>
+                  // Chỉ hiển thị nút "Khách đã nhận hàng" khi đơn ĐÃ BÀN GIAO ĐVVC (DISPATCHED / có tracking_code) và không ở trạng thái chờ thanh toán
+                  (selectedOrderForDetail.fulfillment_status === 'DISPATCHED' || Boolean(selectedOrderForDetail.tracking_code)) &&
+                  selectedOrderForDetail.payment_status !== 'PENDING' &&
+                  selectedOrderForDetail.fulfillment_status !== 'CANCELLED' &&
+                  selectedOrderForDetail.fulfillment_status !== 'RETURNED' &&
+                  selectedOrderForDetail.fulfillment_status !== 'REFUNDED' && (
+                    <button
+                      type="button"
+                      onClick={() => handleAdminConfirmDelivered(selectedOrderForDetail)}
+                      disabled={isConfirmingDelivered}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all shadow-xs hover:shadow cursor-pointer disabled:opacity-50"
+                      title="Xác nhận khách đã nhận được hàng (chỉ khả dụng sau khi đã bàn giao cho ĐVVC)"
+                    >
+                      <CheckCircle2 className="w-4 h-4 shrink-0" />
+                      <span>{isConfirmingDelivered ? 'Đang cập nhật...' : 'Khách đã nhận hàng'}</span>
+                    </button>
+                  )
                 )}
               </div>
 
