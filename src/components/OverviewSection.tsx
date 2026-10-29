@@ -361,7 +361,7 @@ export default function OverviewSection({
               <span className="text-xs font-medium text-slate-500">Tổng doanh thu thực tế</span>
               <DollarSign className="w-4 h-4 text-slate-400" />
             </div>
-            <div className="mt-1.5 text-2xl font-semibold text-slate-900 font-mono tracking-tight">
+            <div className="mt-1.5 text-3xl sm:text-4xl font-black text-slate-900 font-mono tracking-tight leading-none">
               {formatMoney(cashflow?.total_revenue || 0)}
             </div>
             <div className="mt-1 text-xs text-slate-500 flex items-center gap-1">
@@ -378,7 +378,7 @@ export default function OverviewSection({
                 Biên {netMarginPercent}%
               </span>
             </div>
-            <div className="mt-1.5 text-2xl font-semibold text-emerald-600 dark:text-emerald-400 font-mono tracking-tight">
+            <div className="mt-1.5 text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight leading-none">
               {formatMoney(cashflow?.net_profit || 0)}
             </div>
             <div className="mt-1 text-xs text-slate-500">
@@ -392,7 +392,7 @@ export default function OverviewSection({
               <span className="text-xs font-medium text-slate-500">Đơn hàng vận hành</span>
               <ShoppingCart className="w-4 h-4 text-slate-400" />
             </div>
-            <div className="mt-1.5 text-2xl font-semibold text-slate-900 font-mono tracking-tight">
+            <div className="mt-1.5 text-3xl sm:text-4xl font-black text-slate-900 font-mono tracking-tight leading-none">
               {orders.length}
             </div>
             <div className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
@@ -410,11 +410,11 @@ export default function OverviewSection({
               <span className="text-xs font-medium text-slate-500">Mã SKU kinh doanh</span>
               <Package className="w-4 h-4 text-slate-400" />
             </div>
-            <div className="mt-1.5 text-2xl font-semibold text-slate-900 font-mono tracking-tight flex items-baseline gap-2">
+            <div className="mt-1.5 text-3xl sm:text-4xl font-black text-slate-900 font-mono tracking-tight leading-none flex items-baseline gap-2">
               <span className="text-slate-900">
                 {inventory.length}
               </span>
-              <span className="text-xs font-normal text-slate-400 font-sans">SKU</span>
+              <span className="text-xs font-bold text-slate-400 font-sans">SKU</span>
             </div>
             <div className="mt-1 text-xs text-slate-500 flex items-center gap-1.5">
               <span className="text-emerald-700 font-medium">Luôn sẵn bán</span>

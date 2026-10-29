@@ -3826,7 +3826,7 @@ export default function ExecutiveDashboard() {
                   {/* Total Revenue */}
                   <div className="p-4 sm:p-5">
                     <div className="text-xs font-medium text-slate-500">Tổng doanh thu</div>
-                    <div className="mt-1 text-2xl font-semibold text-slate-900">
+                    <div className="mt-1 text-3xl sm:text-4xl font-black text-slate-900 font-mono tracking-tight leading-none">
                       {formatMoney(cashflow.total_revenue)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500 flex items-center gap-1">
@@ -3838,7 +3838,7 @@ export default function ExecutiveDashboard() {
                   {/* COGS */}
                   <div className="p-4 sm:p-5">
                     <div className="text-xs font-medium text-slate-500">Giá vốn hàng bán (COGS)</div>
-                    <div className="mt-1 text-2xl font-semibold text-slate-900">
+                    <div className="mt-1 text-3xl sm:text-4xl font-black text-slate-900 font-mono tracking-tight leading-none">
                       {formatMoney(cashflow.total_cogs)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
@@ -3849,7 +3849,7 @@ export default function ExecutiveDashboard() {
                   {/* Shipping & Fees */}
                   <div className="p-4 sm:p-5">
                     <div className="text-xs font-medium text-slate-500">Cước vận chuyển & Phí sàn</div>
-                    <div className="mt-1 text-2xl font-semibold text-slate-900">
+                    <div className="mt-1 text-3xl sm:text-4xl font-black text-slate-900 font-mono tracking-tight leading-none">
                       {formatMoney(cashflow.total_shipping_fee + cashflow.total_gateway_fee)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
@@ -3865,7 +3865,7 @@ export default function ExecutiveDashboard() {
                         Biên {cashflow.gross_margin_percentage}%
                       </span>
                     </div>
-                    <div className="mt-1 text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
+                    <div className="mt-1 text-3xl sm:text-4xl font-black text-emerald-600 dark:text-emerald-400 font-mono tracking-tight leading-none">
                       {formatMoney(cashflow.net_profit)}
                     </div>
                     <div className="mt-1 text-xs text-slate-500">
