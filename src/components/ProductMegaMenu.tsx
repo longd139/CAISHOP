@@ -274,17 +274,6 @@ export function ProductMegaMenu({
                   })}
                 </div>
 
-                {/* Brand Direct Link Footer */}
-                <div className="pt-2 mt-3 border-t border-slate-200/60">
-                  <Link
-                    href={`/products?brand=${encodeURIComponent(col.id)}`}
-                    onClick={(e) => handleNavigate(e, `/products?brand=${encodeURIComponent(col.id)}`)}
-                    className="flex items-center justify-between text-[10px] font-mono uppercase text-slate-600 hover:text-black font-semibold transition-colors"
-                  >
-                    <span>Khám phá {col.brand}</span>
-                    <ChevronRight className="w-3 h-3" />
-                  </Link>
-                </div>
               </div>
             );
           })}
