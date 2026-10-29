@@ -22,6 +22,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   CheckCircle2,
+  ClipboardCheck,
   AlertCircle,
   FileText,
   Layout,

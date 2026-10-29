@@ -24,6 +24,11 @@ const dashContent = fs.readFileSync(path.join(rootDir, 'src/components/Executive
 const routeContent = fs.readFileSync(path.join(rootDir, 'src/app/api/orders/route.ts'), 'utf-8');
 const dbContent = fs.readFileSync(path.join(rootDir, 'src/lib/db.ts'), 'utf-8');
 
+// Test 0: ClipboardCheck được import đầy đủ từ lucide-react
+it('0. ClipboardCheck được import từ lucide-react trong ExecutiveDashboard', () => {
+  assert.ok(dashContent.includes('ClipboardCheck,\r\n') || dashContent.includes('ClipboardCheck,\n'), 'ExecutiveDashboard chưa import ClipboardCheck');
+});
+
 // Test 1: Cột thao tác của bảng đơn hàng hiển thị button "Check SP" khi đơn CONFIRMING
 it('1. Cột thao tác trong ExecutiveDashboard hiển thị button "Check SP" cho đơn CONFIRMING', () => {
   assert.ok(
@@ -85,3 +90,4 @@ if (failCount > 0) {
 } else {
   console.log('TẤT CẢ KIỂM THỬ ĐỀU ĐẠT THÀNH CÔNG (100% PASS)!');
 }
+
