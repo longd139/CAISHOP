@@ -930,7 +930,9 @@ export function UserProfileModal({
                     const isRefund = isReturned && !isExchange;
                     const isCancelled = ord.fulfillment_status === 'CANCELLED';
                     const isDispatched = ord.fulfillment_status === 'DISPATCHED';
-                    const isPacking = ord.fulfillment_status === 'PACKING' || (!isDispatched && !isDelivered && !isCancelled && !isReturned && isPaid);
+                    const isConfirming = ord.fulfillment_status === 'CONFIRMING';
+                    const isPacking = ord.fulfillment_status === 'PACKING';
+                    const isRefunded = ord.payment_status === 'REFUNDED';
 
                     return (
                       <div
@@ -960,10 +962,12 @@ export function UserProfileModal({
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                 isPaid
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : isRefunded
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                   : 'bg-amber-50 text-amber-800 border border-amber-200'
                               }`}
                             >
-                              {isPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                              {isPaid ? 'Đã thanh toán' : isRefunded ? 'Đã hoàn tiền' : 'Chờ thanh toán'}
                             </span>
 
                             {/* Live 1-hour countdown timer badge (Chỉ áp dụng cho đơn thanh toán online chưa trả tiền, không áp dụng COD) */}
@@ -977,7 +981,9 @@ export function UserProfileModal({
 
                             <span
                               className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                isCancelled
+                                isRefunded
+                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                                  : isCancelled
                                   ? 'bg-rose-50 text-rose-700 border border-rose-200'
                                   : isExchange
                                   ? 'bg-blue-50 text-blue-700 border border-blue-200'
@@ -987,12 +993,16 @@ export function UserProfileModal({
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : isDispatched
                                   ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                                  : isConfirming
+                                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
                                   : isPacking
                                   ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
                                   : 'bg-slate-100 text-slate-700 border border-slate-200'
                               }`}
                             >
-                              {isCancelled
+                              {isRefunded
+                                ? 'Đã hoàn tiền'
+                                : isCancelled
                                 ? 'Đã hủy'
                                 : isExchange
                                 ? 'Đang đổi hàng'
@@ -1002,6 +1012,8 @@ export function UserProfileModal({
                                 ? 'Đã nhận'
                                 : isDispatched
                                 ? 'Đang vận chuyển'
+                                : isConfirming
+                                ? 'Chờ shop xác nhận'
                                 : isPacking
                                 ? 'Chờ vận chuyển'
                                 : 'Chưa xử lý'}
@@ -1122,7 +1134,9 @@ export function UserProfileModal({
         const isCancelled = det.fulfillment_status === 'CANCELLED';
         const isDispatched = det.fulfillment_status === 'DISPATCHED';
         const isDelivered = det.fulfillment_status === 'DELIVERED';
-        const isPacking = det.fulfillment_status === 'PACKING' || (!isDispatched && !isDelivered && !isCancelled && !isReturned && isPaid);
+        const isConfirming = det.fulfillment_status === 'CONFIRMING';
+        const isPacking = det.fulfillment_status === 'PACKING';
+        const isRefunded = det.payment_status === 'REFUNDED';
 
         // Tính tạm tính tiền hàng từ danh sách items
         const subtotal = Array.isArray(det.items)
@@ -1159,10 +1173,12 @@ export function UserProfileModal({
                     className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                       isPaid
                         ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        : isRefunded
+                        ? 'bg-rose-50 text-rose-700 border border-rose-200'
                         : 'bg-amber-50 text-amber-800 border border-amber-200'
                     }`}
                   >
-                    {isPaid ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                    {isPaid ? 'Đã thanh toán' : isRefunded ? 'Đã hoàn tiền' : 'Chờ thanh toán'}
                   </span>
                   <button
                     type="button"
@@ -1253,7 +1269,13 @@ export function UserProfileModal({
                       </span>
                     ) : (
                       <span className="text-[11px] text-amber-700 italic">
-                        Chờ cập nhật mã vận chuyển
+                        {isCancelled || isRefunded
+                          ? (isRefunded ? 'Đã hoàn tiền về tài khoản ngân hàng' : 'Đơn hàng đã hủy')
+                          : isConfirming
+                          ? 'Chờ shop xác nhận còn hàng'
+                          : isPacking
+                          ? 'Shop đang chuẩn bị đóng gói hàng'
+                          : 'Chờ thanh toán'}
                       </span>
                     )}
                   </div>

@@ -1091,6 +1091,73 @@ export default function ExecutiveDashboard() {
 
   const isMockPaymentEnabled = process.env.NEXT_PUBLIC_ENABLE_MOCK_PAYMENT === 'true';
   const [mockLoadingId, setMockLoadingId] = useState<string | null>(null);
+  const [confirmStockLoadingId, setConfirmStockLoadingId] = useState<string | null>(null);
+  const [refundModalOrder, setRefundModalOrder] = useState<any | null>(null);
+  const [refundNotes, setRefundNotes] = useState<string>('');
+  const [isRefunding, setIsRefunding] = useState<boolean>(false);
+
+  const handleShopConfirmStock = async (orderId: string) => {
+    setConfirmStockLoadingId(orderId);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ order_id: orderId, action: 'SHOP_CONFIRM_STOCK' })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOrders(prev => prev.map(o => (o.id === orderId || o.order_code === orderId) ? { ...o, fulfillment_status: 'PACKING' } : o));
+        if (selectedOrderForDetail?.id === orderId || selectedOrderForDetail?.order_code === orderId) {
+          setSelectedOrderForDetail((prev: any) => ({ ...prev, fulfillment_status: 'PACKING' }));
+        }
+        await fetchData();
+        showToast(data.message || 'Đã xác nhận còn hàng! Đơn hàng chuyển sang Chờ xử lý.', 'success');
+      } else {
+        showToast(data.message || 'Không thể xác nhận đơn hàng.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi kết nối khi xác nhận đơn.', 'error');
+    } finally {
+      setConfirmStockLoadingId(null);
+    }
+  };
+
+  const handleOpenRefundModal = (order: any) => {
+    setRefundModalOrder(order);
+    setRefundNotes(`Shop hết hàng - Hoàn tiền ${formatMoney(order.total_amount)} về tài khoản ngân hàng của khách ${order.customer_name}`);
+  };
+
+  const handleConfirmRefund = async () => {
+    if (!refundModalOrder) return;
+    setIsRefunding(true);
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: refundModalOrder.id,
+          action: 'SHOP_OUT_OF_STOCK_REFUND',
+          refund_notes: refundNotes
+        })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setOrders(prev => prev.map(o => (o.id === refundModalOrder.id) ? { ...o, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED' } : o));
+        if (selectedOrderForDetail?.id === refundModalOrder.id) {
+          setSelectedOrderForDetail((prev: any) => ({ ...prev, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED' }));
+        }
+        await fetchData();
+        showToast(data.message || 'Đã hủy đơn và hoàn tiền thành công!', 'success');
+        setRefundModalOrder(null);
+      } else {
+        showToast(data.message || 'Không thể thực hiện hoàn tiền.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi gửi yêu cầu hoàn tiền.', 'error');
+    } finally {
+      setIsRefunding(false);
+    }
+  };
 
   const handleMockPayOrder = async (orderId: string) => {
     setMockLoadingId(orderId);
@@ -4250,7 +4317,10 @@ export default function ExecutiveDashboard() {
                                 const isDelivered = ord.fulfillment_status === 'DELIVERED';
                                 const isDispatched = ord.fulfillment_status === 'DISPATCHED' || Boolean(ord.tracking_code);
                                 const isPaid = ord.payment_status === 'PAID' || (ord as any).deposit_status === 'PAID';
-                                const isPacking = ord.fulfillment_status === 'PACKING' || isPaid;
+                                const isConfirming = ord.fulfillment_status === 'CONFIRMING';
+                                const isPacking = ord.fulfillment_status === 'PACKING';
+                                const isCancelled = ord.fulfillment_status === 'CANCELLED';
+                                const isRefunded = ord.payment_status === 'REFUNDED';
 
                                 if (isExchange) {
                                   return (
@@ -4276,7 +4346,15 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
-                                if (ord.fulfillment_status === 'CANCELLED') {
+                                if (isRefunded) {
+                                  return (
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
+                                      Đã hoàn tiền
+                                    </span>
+                                  );
+                                }
+
+                                if (isCancelled) {
                                   return (
                                     <span className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-rose-50 text-rose-700 border border-rose-200 shadow-2xs">
                                       Đã hủy
@@ -4284,7 +4362,6 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
-                                // 4. Khách xác nhận đã nhận hoặc bưu tá giao thành công -> Đã nhận
                                 if (isDelivered) {
                                   return (
                                     <span
@@ -4296,7 +4373,6 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
-                                // 3. Khi add mã ĐVVC vào -> Đã bàn giao ĐVVC
                                 if (isDispatched) {
                                   return (
                                     <span
@@ -4308,19 +4384,28 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
-                                // 2. Khi thanh toán xong (PAID hoặc PACKING) -> Đang xử lý
-                                if (isPacking) {
+                                if (isConfirming) {
                                   return (
                                     <span
-                                      className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs"
-                                      title="Đơn hàng đã thanh toán, shop đang chuẩn bị gói hàng"
+                                      className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs"
+                                      title="Khách đã thanh toán, chờ shop xác nhận còn hàng"
                                     >
-                                      Đang xử lý
+                                      Chờ shop xác nhận
                                     </span>
                                   );
                                 }
 
-                                // 1. Đang chờ thanh toán
+                                if (isPacking) {
+                                  return (
+                                    <span
+                                      className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 shadow-2xs"
+                                      title="Shop đã xác nhận còn hàng, đang chuẩn bị gói hàng"
+                                    >
+                                      Chờ xử lý
+                                    </span>
+                                  );
+                                }
+
                                 return (
                                   <span
                                     className="inline-flex items-center px-2.5 py-1 rounded-sm text-[11px] font-semibold bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs"
@@ -4344,9 +4429,55 @@ export default function ExecutiveDashboard() {
                               }`}
                             >
                               {(() => {
-                                const hasTracking = ord.fulfillment_status === 'DISPATCHED' || Boolean(ord.tracking_code);
+                                const isPaid = ord.payment_status === 'PAID';
+                                const isDispatched = ord.fulfillment_status === 'DISPATCHED' || Boolean(ord.tracking_code);
+                                const isCancelled = ord.fulfillment_status === 'CANCELLED' || ord.payment_status === 'REFUNDED';
 
-                                if (hasTracking) {
+                                // 1. Đơn đã hủy hoặc đã hoàn tiền
+                                if (isCancelled) {
+                                  return (
+                                    <span className="text-xs text-slate-400 italic">Đã hủy / Hoàn tiền</span>
+                                  );
+                                }
+
+                                // 2. Nếu đơn CHỜ THANH TOÁN: Ẩn nút gửi mã ĐVVC
+                                if (!isPaid && ord.payment_method !== 'cod') {
+                                  return (
+                                    <span className="inline-flex items-center px-2 py-1 text-xs text-amber-700 bg-amber-50 border border-amber-200/60 rounded">
+                                      Chờ thanh toán
+                                    </span>
+                                  );
+                                }
+
+                                // 3. Nếu đơn ĐANG CHỜ SHOP XÁC NHẬN (CONFIRMING): Hiển thị 2 nút Còn hàng / Hết hàng
+                                if (ord.fulfillment_status === 'CONFIRMING') {
+                                  return (
+                                    <div className="inline-flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleShopConfirmStock(ord.id)}
+                                        disabled={confirmStockLoadingId === ord.id}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                        title="Xác nhận còn hàng và chuyển sang đóng gói"
+                                      >
+                                        <Check className="w-3.5 h-3.5 shrink-0 text-white" />
+                                        <span>{confirmStockLoadingId === ord.id ? 'Đang duyệt...' : 'Còn hàng'}</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleOpenRefundModal(ord)}
+                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                        title="Báo hết hàng và tạo lệnh hoàn tiền về tài khoản ngân hàng"
+                                      >
+                                        <X className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                                        <span>Hết hàng</span>
+                                      </button>
+                                    </div>
+                                  );
+                                }
+
+                                // 4. Nếu đã có mã vận đơn
+                                if (isDispatched) {
                                   return (
                                     <button
                                       type="button"
@@ -4360,6 +4491,7 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
+                                // 5. Nếu đang ở PACKING (Chờ xử lý / Đóng gói) -> Mới hiển thị Gửi mã ĐVVC
                                 return (
                                   <button
                                     type="button"
@@ -5154,15 +5286,54 @@ export default function ExecutiveDashboard() {
                           )}
                         </div>
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenDispatchModal(selectedOrderForDetail)}
-                          className="px-3 py-1 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold border border-slate-900 inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
-                          title="Cập nhật hoặc chỉnh sửa mã vận đơn đơn vị vận chuyển"
-                        >
-                          <Truck className="w-3.5 h-3.5 text-white shrink-0" />
-                          <span>{selectedOrderForDetail.tracking_code ? 'Sửa mã ĐVVC' : 'Gửi mã ĐVVC'}</span>
-                        </button>
+                        {(() => {
+                          const isPaid = selectedOrderForDetail.payment_status === 'PAID';
+                          const isCancelled = selectedOrderForDetail.fulfillment_status === 'CANCELLED' || selectedOrderForDetail.payment_status === 'REFUNDED';
+
+                          if (isCancelled) {
+                            return <span className="text-xs text-rose-600 font-semibold">Đã hủy / Đã hoàn tiền</span>;
+                          }
+
+                          if (!isPaid && selectedOrderForDetail.payment_method !== 'cod') {
+                            return <span className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded border border-amber-200">Chờ thanh toán</span>;
+                          }
+
+                          if (selectedOrderForDetail.fulfillment_status === 'CONFIRMING') {
+                            return (
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => handleShopConfirmStock(selectedOrderForDetail.id)}
+                                  disabled={confirmStockLoadingId === selectedOrderForDetail.id}
+                                  className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                                >
+                                  <Check className="w-3.5 h-3.5 text-white shrink-0" />
+                                  <span>{confirmStockLoadingId === selectedOrderForDetail.id ? 'Đang duyệt...' : 'Còn hàng'}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenRefundModal(selectedOrderForDetail)}
+                                  className="px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
+                                >
+                                  <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
+                                  <span>Hết hàng & Hoàn tiền</span>
+                                </button>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDispatchModal(selectedOrderForDetail)}
+                              className="px-3 py-1 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold border border-slate-900 inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                              title="Cập nhật hoặc chỉnh sửa mã vận đơn đơn vị vận chuyển"
+                            >
+                              <Truck className="w-3.5 h-3.5 text-white shrink-0" />
+                              <span>{selectedOrderForDetail.tracking_code ? 'Sửa mã ĐVVC' : 'Gửi mã ĐVVC'}</span>
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -5485,6 +5656,102 @@ export default function ExecutiveDashboard() {
                 <span>{copyImageToast}</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Refund Out Of Stock Modal */}
+      {refundModalOrder && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Modal Header */}
+            <div className="px-6 py-4.5 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs">
+                  <RotateCcw className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">
+                    Báo hết hàng & Hoàn tiền cho khách
+                  </h3>
+                  <p className="text-xs text-rose-600 font-medium">
+                    Đơn hàng #{refundModalOrder.order_code || refundModalOrder.id}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setRefundModalOrder(null)}
+                className="w-8 h-8 rounded-lg hover:bg-white text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl space-y-1.5 text-xs text-amber-900">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-700">Khách hàng:</span>
+                  <span className="font-bold text-slate-900">{refundModalOrder.customer_name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-700">Số điện thoại:</span>
+                  <span className="font-mono text-slate-900">{refundModalOrder.customer_phone}</span>
+                </div>
+                <div className="flex items-center justify-between pt-1 border-t border-amber-200/60">
+                  <span className="font-semibold text-slate-700">Số tiền hoàn về STK:</span>
+                  <span className="font-bold text-rose-600 text-sm">{formatMoney(refundModalOrder.total_amount)}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700">
+                  Ghi chú hoàn tiền / Lý do hết hàng
+                </label>
+                <textarea
+                  rows={3}
+                  value={refundNotes}
+                  onChange={e => setRefundNotes(e.target.value)}
+                  className="w-full text-xs px-3 py-2 rounded-lg border border-slate-200 focus:outline-hidden focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900"
+                  placeholder="Nhập ghi chú hoặc thông tin đối soát chuyển khoản hoàn trả khách..."
+                />
+              </div>
+
+              <div className="rounded-lg bg-slate-50 p-3 border border-slate-200/80 text-[11px] text-slate-600 leading-relaxed">
+                ℹ️ Sau khi bấm xác nhận, trạng thái đơn sẽ chuyển sang <strong className="text-rose-600">Đã hủy / Đã hoàn tiền</strong>, đồng thời hệ thống ghi nhận khoản tiền hoàn vào sổ cái tài chính.
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50/70 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setRefundModalOrder(null)}
+                disabled={isRefunding}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 transition-colors"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmRefund}
+                disabled={isRefunding}
+                className="px-4 py-2 rounded-xl text-xs font-bold bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-all active:scale-95 flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isRefunding ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Đang hoàn tiền...</span>
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Xác nhận hoàn tiền ngay</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

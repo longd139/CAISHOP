@@ -309,7 +309,7 @@ export interface Order {
   discount_amount: number;
   total_amount: number;
   payment_status: 'PENDING' | 'PAID' | 'REFUNDED' | 'FAILED';
-  fulfillment_status: 'UNFULFILLED' | 'PACKING' | 'DISPATCHED' | 'DELIVERED' | 'RETURNED' | 'CANCELLED';
+  fulfillment_status: 'UNFULFILLED' | 'CONFIRMING' | 'PACKING' | 'DISPATCHED' | 'DELIVERED' | 'RETURNED' | 'CANCELLED';
   created_at: string;
   items_count?: number;
   tracking_code?: string | null;
@@ -701,6 +701,29 @@ export async function dispatchOrder(
     return { success: false, message: 'Không tìm thấy đơn hàng' };
   }
 
+  // Chặn thao tác nếu đơn chưa thanh toán hoặc tiền chưa về tài khoản
+  if (order.payment_method !== 'cod' && order.payment_status !== 'PAID') {
+    return {
+      success: false,
+      message: 'Thao tác bị chặn: Đơn hàng chưa hoàn tất thanh toán hoặc tiền chưa về tài khoản!'
+    };
+  }
+
+  // Chặn nếu đơn chưa được shop kiểm tra xác nhận còn hàng
+  if (order.fulfillment_status === 'CONFIRMING') {
+    return {
+      success: false,
+      message: 'Thao tác bị chặn: Đơn hàng đang ở trạng thái Chờ shop xác nhận còn hàng trước khi bàn giao vận chuyển!'
+    };
+  }
+
+  if (order.fulfillment_status === 'CANCELLED' || order.payment_status === 'REFUNDED') {
+    return {
+      success: false,
+      message: 'Thao tác bị chặn: Đơn hàng đã bị hủy hoặc đã hoàn tiền!'
+    };
+  }
+
   const cleanTracking = (trackingCode || `VTP${(order.order_code || '').replace(/\D/g, '')}VN`).trim().toUpperCase();
   const cleanCarrier = (carrier || 'VIETTEL_POST').trim().toUpperCase();
 
@@ -829,10 +852,10 @@ export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ succ
     return { success: false, message: 'Không tìm thấy đơn hàng' };
   }
 
-  // Cập nhật trạng thái đơn: PAID và PACKING (Chờ vận chuyển)
+  // Cập nhật trạng thái đơn: PAID và CONFIRMING (Chờ shop xác nhận)
   await db.execute(`
     UPDATE orders 
-    SET payment_status = 'PAID', fulfillment_status = 'PACKING', updated_at = datetime('now') 
+    SET payment_status = 'PAID', fulfillment_status = 'CONFIRMING', updated_at = datetime('now') 
     WHERE id = ?
   `, [order.id]);
 
@@ -851,7 +874,7 @@ export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ succ
   const updatedOrder = await db.queryFirst<Order>(`SELECT * FROM orders WHERE id = ?`, [order.id]);
   return {
     success: true,
-    message: 'Thanh toán thành công. Đơn hàng đã chuyển sang trạng thái: Chờ vận chuyển!',
+    message: 'Thanh toán thành công. Đơn hàng đã chuyển sang trạng thái: Chờ shop xác nhận còn hàng!',
     order: updatedOrder || undefined,
   };
 }
@@ -859,6 +882,82 @@ export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ succ
 /**
  * Khách hàng tạo đơn hàng tự động (Tự trừ kho reserved, ghi sổ cái tài chính)
  */
+/**
+ * Shop xác nhận còn hàng: chuyển fulfillment_status từ CONFIRMING sang PACKING (Chờ xử lý / Đóng gói)
+ */
+export async function confirmStockAvailable(orderIdOrCode: string): Promise<{ success: boolean; message: string; order?: any }> {
+  const db = await getDb();
+  const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
+  if (!order) {
+    return { success: false, message: 'Không tìm thấy đơn hàng' };
+  }
+
+  if (order.payment_method !== 'cod' && order.payment_status !== 'PAID') {
+    return { success: false, message: 'Thao tác bị chặn: Đơn hàng chưa thanh toán thành công!' };
+  }
+
+  await db.execute(`
+    UPDATE orders 
+    SET fulfillment_status = 'PACKING', updated_at = datetime('now') 
+    WHERE id = ?
+  `, [order.id]);
+
+  const updatedOrder = await getOrderById(order.id);
+  return {
+    success: true,
+    message: 'Đã xác nhận còn hàng thành công! Đơn hàng đã chuyển sang tiến trình Chờ xử lý / Đóng gói.',
+    order: updatedOrder
+  };
+}
+
+/**
+ * Shop báo hết hàng: hoàn tiền ngay về tài khoản ngân hàng và chuyển trạng thái đơn hàng sang CANCELLED / REFUNDED
+ */
+export async function refundOutOfStockOrder(
+  orderIdOrCode: string,
+  refundNotes?: string
+): Promise<{ success: boolean; message: string; order?: any }> {
+  const db = await getDb();
+  const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
+  if (!order) {
+    return { success: false, message: 'Không tìm thấy đơn hàng' };
+  }
+
+  const noteText = (refundNotes || `Shop hết hàng - Đã hoàn ${new Intl.NumberFormat('vi-VN').format(order.total_amount)}đ về tài khoản ngân hàng của khách`).trim();
+
+  // 1. Cập nhật orders: payment_status = REFUNDED, fulfillment_status = CANCELLED
+  await db.execute(`
+    UPDATE orders 
+    SET payment_status = 'REFUNDED', 
+        fulfillment_status = 'CANCELLED', 
+        updated_at = datetime('now') 
+    WHERE id = ?
+  `, [order.id]);
+
+  // 2. Ghi nhận sổ cái tài chính: hoàn tiền OUTFLOW
+  try {
+    await db.execute(`
+      INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes, recorded_at)
+      VALUES (?, ?, 'REFUND', ?, 'OUTFLOW', 'VIETQR', ?, ?, datetime('now'))
+    `, [
+      `fin-${Date.now().toString(36)}-ref`,
+      order.id,
+      order.total_amount,
+      `REFUND-${order.order_code}`,
+      noteText
+    ]);
+  } catch (err) {
+    console.error('Error inserting refund transaction:', err);
+  }
+
+  const updatedOrder = await getOrderById(order.id);
+  return {
+    success: true,
+    message: `Đã xác nhận hết hàng và tạo lệnh hoàn tiền ${new Intl.NumberFormat('vi-VN').format(order.total_amount)}đ về tài khoản ngân hàng của khách ${order.customer_name}!`,
+    order: updatedOrder
+  };
+}
+
 export async function createCustomerOrder(input: CreateOrderInput): Promise<{ success: boolean; message: string; order?: any }> {
   const db = await getDb();
 

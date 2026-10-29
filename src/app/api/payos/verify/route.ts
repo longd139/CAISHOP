@@ -44,7 +44,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           success: true,
           payment_status: 'PAID',
-          fulfillment_status: 'PACKING',
+          fulfillment_status: 'CONFIRMING',
           message: 'Xác thực thanh toán thành công (Chế độ Mock Test)!'
         });
       }
@@ -70,7 +70,7 @@ export async function POST(request: Request) {
           return NextResponse.json({
             success: true,
             payment_status: 'PAID',
-            fulfillment_status: 'PACKING',
+            fulfillment_status: 'CONFIRMING',
             message: 'Xác thực thanh toán PayOS thành công!'
           });
         }
