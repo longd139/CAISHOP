@@ -25,6 +25,8 @@ import {
   ClipboardCheck,
   AlertCircle,
   FileText,
+  Upload,
+  Building2,
   Layout,
   Globe,
   Plus,
@@ -568,6 +570,37 @@ function PhoneZaloContact({ phone, className = '' }: PhoneZaloContactProps) {
         </div>,
         document.body
       )}
+      {/* Lightbox Modal: Xem ảnh bill phóng to */}
+      {previewProofModalUrl && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewProofModalUrl(null)}
+        >
+          <div 
+            className="relative max-w-lg w-full max-h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <span className="text-xs font-bold text-slate-900">Ảnh xác nhận chuyển khoản (Bill chuyển tiền)</span>
+              <button
+                type="button"
+                onClick={() => setPreviewProofModalUrl(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex items-center justify-center bg-slate-900/5 min-h-[250px]">
+              <img
+                src={previewProofModalUrl}
+                alt="Bill xác nhận chuyển khoản"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xs"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -1166,13 +1199,56 @@ export default function ExecutiveDashboard() {
   const [confirmStockLoadingId, setConfirmStockLoadingId] = useState<string | null>(null);
   const [refundModalOrder, setRefundModalOrder] = useState<any | null>(null);
   const [refundNotes, setRefundNotes] = useState<string>('');
+  const [refundProofImage, setRefundProofImage] = useState<string>('');
   const [isRefunding, setIsRefunding] = useState<boolean>(false);
 
   // Check SP Modal State & Handlers
   const [checkSpModalOrder, setCheckSpModalOrder] = useState<any | null>(null);
   const [checkSpItems, setCheckSpItems] = useState<{ [itemId: string]: number }>({});
   const [checkSpNotes, setCheckSpNotes] = useState<string>('');
+  const [checkSpProofImage, setCheckSpProofImage] = useState<string>('');
+  const [isUploadingProof, setIsUploadingProof] = useState<boolean>(false);
+  const [previewProofModalUrl, setPreviewProofModalUrl] = useState<string | null>(null);
   const [isSubmittingCheckSp, setIsSubmittingCheckSp] = useState<boolean>(false);
+
+  const handleUploadProofImage = async (file: File, isCheckSp: boolean) => {
+    setIsUploadingProof(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok && (data.url || data.secure_url)) {
+        const url = data.url || data.secure_url;
+        if (isCheckSp) setCheckSpProofImage(url);
+        else setRefundProofImage(url);
+        showToast('Tải lên ảnh xác nhận chuyển khoản thành công!', 'success');
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = reader.result as string;
+          if (isCheckSp) setCheckSpProofImage(dataUrl);
+          else setRefundProofImage(dataUrl);
+          showToast('Đã đính kèm ảnh xác nhận chuyển khoản!', 'success');
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (_) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        if (isCheckSp) setCheckSpProofImage(dataUrl);
+        else setRefundProofImage(dataUrl);
+        showToast('Đã đính kèm ảnh xác nhận chuyển khoản!', 'success');
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingProof(false);
+    }
+  };
 
   const handleOpenCheckSpModal = async (order: any) => {
     let currentOrder = order;
@@ -1197,6 +1273,7 @@ export default function ExecutiveDashboard() {
     });
     setCheckSpItems(initialMap);
     setCheckSpNotes('');
+    setCheckSpProofImage('');
   };
 
   const handleSetCheckSpQty = (key: string, qty: number) => {
@@ -1241,6 +1318,7 @@ export default function ExecutiveDashboard() {
         action = 'SHOP_OUT_OF_STOCK_REFUND';
         payload.action = action;
         payload.refund_notes = checkSpNotes.trim() || `Shop hết hàng toàn bộ - Hoàn tiền ${formatMoney(checkSpModalOrder.total_amount)} về tài khoản của khách ${checkSpModalOrder.customer_name}`;
+        if (checkSpProofImage) payload.refund_proof_image = checkSpProofImage;
       } else if (isAllInStock) {
         payload.action = 'SHOP_CONFIRM_STOCK';
       } else {
@@ -1248,6 +1326,7 @@ export default function ExecutiveDashboard() {
         payload.action = action;
         payload.refund_amount = refundAmount;
         payload.refund_notes = checkSpNotes.trim() || `Shop thiếu 1 phần (${missingItemsText.join('; ')}) - Đã hoàn ${formatMoney(refundAmount)} cho khách`;
+        if (checkSpProofImage) payload.refund_proof_image = checkSpProofImage;
       }
 
       const res = await fetch('/api/orders', {
@@ -1266,6 +1345,7 @@ export default function ExecutiveDashboard() {
           fulfillment_status: nextStatus, 
           payment_status: nextPayment,
           refund_notes: payload.refund_notes || o.refund_notes,
+          refund_proof_image: payload.refund_proof_image || o.refund_proof_image,
           cancel_reason: isAllOutOfStock ? 'OUT_OF_STOCK' : o.cancel_reason
         } : o));
 
@@ -1275,6 +1355,7 @@ export default function ExecutiveDashboard() {
             fulfillment_status: nextStatus,
             payment_status: nextPayment,
             refund_notes: payload.refund_notes || prev?.refund_notes,
+            refund_proof_image: payload.refund_proof_image || prev?.refund_proof_image,
             cancel_reason: isAllOutOfStock ? 'OUT_OF_STOCK' : prev?.cancel_reason
           }));
         }
@@ -1321,26 +1402,30 @@ export default function ExecutiveDashboard() {
   const handleOpenRefundModal = (order: any) => {
     setRefundModalOrder(order);
     setRefundNotes(`Shop hết hàng - Hoàn tiền ${formatMoney(order.total_amount)} về tài khoản ngân hàng của khách ${order.customer_name}`);
+    setRefundProofImage('');
   };
 
   const handleConfirmRefund = async () => {
     if (!refundModalOrder) return;
     setIsRefunding(true);
     try {
+      const refundPayload: any = {
+        order_id: refundModalOrder.id,
+        action: 'SHOP_OUT_OF_STOCK_REFUND',
+        refund_notes: refundNotes
+      };
+      if (refundProofImage) refundPayload.refund_proof_image = refundProofImage;
+
       const res = await fetch('/api/orders', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_id: refundModalOrder.id,
-          action: 'SHOP_OUT_OF_STOCK_REFUND',
-          refund_notes: refundNotes
-        })
+        body: JSON.stringify(refundPayload)
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setOrders(prev => prev.map(o => (o.id === refundModalOrder.id) ? { ...o, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED', cancel_reason: 'OUT_OF_STOCK', refund_notes: refundNotes } : o));
+        setOrders(prev => prev.map(o => (o.id === refundModalOrder.id) ? { ...o, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED', cancel_reason: 'OUT_OF_STOCK', refund_notes: refundNotes, refund_proof_image: refundProofImage || o.refund_proof_image } : o));
         if (selectedOrderForDetail?.id === refundModalOrder.id) {
-          setSelectedOrderForDetail((prev: any) => ({ ...prev, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED', cancel_reason: 'OUT_OF_STOCK', refund_notes: refundNotes }));
+          setSelectedOrderForDetail((prev: any) => ({ ...prev, fulfillment_status: 'CANCELLED', payment_status: 'REFUNDED', cancel_reason: 'OUT_OF_STOCK', refund_notes: refundNotes, refund_proof_image: refundProofImage || prev?.refund_proof_image }));
         }
         await fetchData();
         showToast(data.message || 'Đã hủy đơn và hoàn tiền thành công!', 'success');
@@ -5560,6 +5645,70 @@ export default function ExecutiveDashboard() {
                                   💬 <strong>Ghi chú gửi khách:</strong> {selectedOrderForDetail.refund_notes}
                                 </div>
                               )}
+
+                              {/* Thông tin tài khoản & Bill chuyển khoản hoàn tiền */}
+                              {(selectedOrderForDetail.refund_bank_account || selectedOrderForDetail.refund_proof_image) && (
+                                <div className="p-3 bg-white/95 rounded-xl border border-rose-200/90 space-y-2 mt-2">
+                                  <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                                    <span className="flex items-center gap-1.5">
+                                      <Building2 className="w-3.5 h-3.5 text-slate-700" />
+                                      <span>Tài khoản hoàn tiền của khách:</span>
+                                    </span>
+                                    {selectedOrderForDetail.refund_bank_account && (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(selectedOrderForDetail.refund_bank_account);
+                                          showToast('Đã sao chép STK!', 'success');
+                                        }}
+                                        className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                        <span>Sao chép STK</span>
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {selectedOrderForDetail.refund_bank_account && (
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                                      <div className="bg-slate-50 p-2 rounded border border-slate-200/60">
+                                        <span className="text-slate-400 block text-[10px]">Ngân hàng</span>
+                                        <span className="font-bold text-slate-900">{selectedOrderForDetail.refund_bank_name || 'Chưa rõ'}</span>
+                                      </div>
+                                      <div className="bg-slate-50 p-2 rounded border border-slate-200/60">
+                                        <span className="text-slate-400 block text-[10px]">Số tài khoản</span>
+                                        <span className="font-bold text-slate-900 font-mono">{selectedOrderForDetail.refund_bank_account}</span>
+                                      </div>
+                                      <div className="bg-slate-50 p-2 rounded border border-slate-200/60">
+                                        <span className="text-slate-400 block text-[10px]">Chủ tài khoản</span>
+                                        <span className="font-bold text-slate-900 uppercase">{selectedOrderForDetail.refund_account_holder || selectedOrderForDetail.customer_name}</span>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {selectedOrderForDetail.refund_proof_image && (
+                                    <div className="pt-2 border-t border-slate-100 flex items-center gap-3">
+                                      <img
+                                        src={selectedOrderForDetail.refund_proof_image}
+                                        alt="Bill chuyển khoản"
+                                        className="w-12 h-12 object-cover rounded-lg border border-slate-300 shadow-xs cursor-pointer hover:scale-105 transition-transform"
+                                        onClick={() => setPreviewProofModalUrl(selectedOrderForDetail.refund_proof_image)}
+                                        title="Bấm để xem ảnh phóng to"
+                                      />
+                                      <div>
+                                        <span className="text-xs font-bold text-slate-900 block">Ảnh bill xác nhận chuyển khoản:</span>
+                                        <button
+                                          type="button"
+                                          onClick={() => setPreviewProofModalUrl(selectedOrderForDetail.refund_proof_image)}
+                                          className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                                        >
+                                          Xem bill phóng to →
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </>
@@ -6330,6 +6479,124 @@ export default function ExecutiveDashboard() {
                       </div>
                     </div>
 
+                    {/* THÔNG TIN TÀI KHOẢN NGÂN HÀNG CỦA KHÁCH */}
+                    <div className="p-3 bg-white rounded-lg border border-amber-200/80 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-bold text-slate-800">
+                        <span className="flex items-center gap-1.5">
+                          <Building2 className="w-3.5 h-3.5 text-slate-700" />
+                          <span>Tài khoản nhận tiền hoàn của khách:</span>
+                        </span>
+                        {checkSpModalOrder.refund_bank_account && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              navigator.clipboard.writeText(checkSpModalOrder.refund_bank_account);
+                              showToast('Đã sao chép số tài khoản!', 'success');
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] text-blue-600 hover:text-blue-800 font-semibold cursor-pointer"
+                          >
+                            <Copy className="w-3 h-3" />
+                            <span>Sao chép STK</span>
+                          </button>
+                        )}
+                      </div>
+
+                      {checkSpModalOrder.refund_bank_account ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200/60">
+                            <span className="text-slate-400 block text-[10px]">Ngân hàng</span>
+                            <span className="font-bold text-slate-900">{checkSpModalOrder.refund_bank_name || 'Chưa rõ'}</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200/60">
+                            <span className="text-slate-400 block text-[10px]">Số tài khoản</span>
+                            <span className="font-bold text-slate-900 font-mono tracking-wider">{checkSpModalOrder.refund_bank_account}</span>
+                          </div>
+                          <div className="bg-slate-50 p-2 rounded border border-slate-200/60">
+                            <span className="text-slate-400 block text-[10px]">Chủ tài khoản</span>
+                            <span className="font-bold text-slate-900 uppercase">{checkSpModalOrder.refund_account_holder || checkSpModalOrder.customer_name}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-amber-800 bg-amber-50/60 p-2.5 rounded border border-amber-200/60 flex items-center justify-between gap-2">
+                          <span>Khách chưa điền STK khi đặt hàng. Vui lòng liên hệ SĐT/Zalo khách để nhận STK chuyển tiền.</span>
+                          {checkSpModalOrder.customer_phone && (
+                            <a
+                              href={`https://zalo.me/${checkSpModalOrder.customer_phone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="shrink-0 px-2 py-1 rounded bg-blue-600 text-white font-semibold text-[10px] hover:bg-blue-700"
+                            >
+                              Chat Zalo
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* KHUNG GỬI HÌNH XÁC NHẬN ĐÃ CHUYỂN KHOẢN */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Upload className="w-3.5 h-3.5 text-slate-700" />
+                          <span>Hình xác nhận đã chuyển khoản (Bill chuyển tiền):</span>
+                        </span>
+                        {checkSpProofImage && (
+                          <button
+                            type="button"
+                            onClick={() => setCheckSpProofImage('')}
+                            className="text-rose-600 hover:underline text-[10px] font-semibold cursor-pointer"
+                          >
+                            Xóa ảnh
+                          </button>
+                        )}
+                      </label>
+
+                      {checkSpProofImage ? (
+                        <div className="relative group inline-block">
+                          <img
+                            src={checkSpProofImage}
+                            alt="Bill chuyển khoản"
+                            className="w-24 h-24 object-cover rounded-lg border border-slate-300 shadow-xs cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => setPreviewProofModalUrl(checkSpProofImage)}
+                            title="Bấm để xem ảnh phóng to"
+                          />
+                          <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            <span>Đã đính kèm bill chuyển khoản</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="border border-dashed border-slate-300 rounded-lg p-3 bg-white hover:bg-slate-50 transition-colors">
+                          <input
+                            type="file"
+                            id="checksp-proof-upload"
+                            accept="image/*"
+                            onChange={(e) => {
+                              const f = e.target.files?.[0];
+                              if (f) handleUploadProofImage(f, true);
+                            }}
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor="checksp-proof-upload"
+                            className="flex items-center justify-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 py-1"
+                          >
+                            {isUploadingProof ? (
+                              <>
+                                <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
+                                <span>Đang tải ảnh lên...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="w-4 h-4 text-slate-500" />
+                                <span>Tải ảnh bill / chụp màn hình chuyển khoản (tuỳ chọn)</span>
+                              </>
+                            )}
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
                         <span>Ghi chú gửi khách hàng & Đối soát kế toán:</span>
@@ -6458,7 +6725,7 @@ export default function ExecutiveDashboard() {
 
             {/* Modal Body */}
             <div className="p-6 space-y-4">
-              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl space-y-1.5 text-xs text-amber-900">
+              <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-xl space-y-2 text-xs text-amber-900">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-700">Khách hàng:</span>
                   <span className="font-bold text-slate-900">{refundModalOrder.customer_name}</span>
@@ -6471,6 +6738,111 @@ export default function ExecutiveDashboard() {
                   <span className="font-semibold text-slate-700">Số tiền hoàn về STK:</span>
                   <span className="font-bold text-rose-600 text-sm">{formatMoney(refundModalOrder.total_amount)}</span>
                 </div>
+
+                {/* Thông tin STK của khách */}
+                {refundModalOrder.refund_bank_account ? (
+                  <div className="pt-2 border-t border-amber-200/60 space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-slate-800 flex items-center gap-1">
+                        <Building2 className="w-3.5 h-3.5" />
+                        <span>Tài khoản nhận tiền của khách:</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(refundModalOrder.refund_bank_account);
+                          showToast('Đã sao chép STK!', 'success');
+                        }}
+                        className="text-[11px] text-blue-600 font-semibold hover:underline"
+                      >
+                        Sao chép STK
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1.5 text-[10px] text-slate-800 bg-white p-2 rounded border border-amber-200/70">
+                      <div><span className="text-slate-400 block">Ngân hàng</span><strong>{refundModalOrder.refund_bank_name || 'Chưa rõ'}</strong></div>
+                      <div><span className="text-slate-400 block">Số tài khoản</span><strong className="font-mono">{refundModalOrder.refund_bank_account}</strong></div>
+                      <div><span className="text-slate-400 block">Chủ tài khoản</span><strong>{refundModalOrder.refund_account_holder || refundModalOrder.customer_name}</strong></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="pt-1.5 border-t border-amber-200/60 text-[11px] text-amber-800 flex items-center justify-between gap-1">
+                    <span>Khách chưa điền STK khi đặt hàng.</span>
+                    {refundModalOrder.customer_phone && (
+                      <a
+                        href={`https://zalo.me/${refundModalOrder.customer_phone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 font-bold underline text-[11px]"
+                      >
+                        Chat Zalo xin STK
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Upload ảnh bill chuyển khoản trong modal hoàn tiền */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Upload className="w-3.5 h-3.5 text-slate-700" />
+                    <span>Hình xác nhận đã chuyển khoản (Bill chuyển tiền):</span>
+                  </span>
+                  {refundProofImage && (
+                    <button
+                      type="button"
+                      onClick={() => setRefundProofImage('')}
+                      className="text-rose-600 hover:underline text-[10px] font-semibold cursor-pointer"
+                    >
+                      Xóa ảnh
+                    </button>
+                  )}
+                </label>
+
+                {refundProofImage ? (
+                  <div className="inline-block relative">
+                    <img
+                      src={refundProofImage}
+                      alt="Bill chuyển khoản"
+                      className="w-24 h-24 object-cover rounded-lg border border-slate-300 shadow-xs cursor-pointer hover:opacity-90"
+                      onClick={() => setPreviewProofModalUrl(refundProofImage)}
+                      title="Bấm để xem ảnh phóng to"
+                    />
+                    <div className="text-[10px] text-emerald-700 font-semibold mt-1 flex items-center gap-1">
+                      <Check className="w-3 h-3" />
+                      <span>Đã đính kèm bill chuyển khoản</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="border border-dashed border-slate-300 rounded-lg p-3 bg-white hover:bg-slate-50 transition-colors">
+                    <input
+                      type="file"
+                      id="refund-proof-upload"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) handleUploadProofImage(f, false);
+                      }}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="refund-proof-upload"
+                      className="flex items-center justify-center gap-2 cursor-pointer text-xs font-semibold text-slate-700 py-1"
+                    >
+                      {isUploadingProof ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin text-slate-600" />
+                          <span>Đang tải ảnh lên...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 text-slate-500" />
+                          <span>Tải ảnh bill / chụp màn hình chuyển khoản (tuỳ chọn)</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1.5">

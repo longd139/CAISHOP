@@ -47,7 +47,17 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { customer_name, customer_phone, customer_email, shipping_address, items, payment_method } = body;
+    const { 
+      customer_name, 
+      customer_phone, 
+      customer_email, 
+      shipping_address, 
+      items, 
+      payment_method,
+      refund_bank_name,
+      refund_bank_account,
+      refund_account_holder
+    } = body;
 
     if (!customer_name || !customer_phone || !shipping_address || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({
@@ -62,7 +72,10 @@ export async function POST(request: Request) {
       customer_email,
       shipping_address,
       items,
-      payment_method: payment_method || 'vietqr'
+      payment_method: payment_method || 'vietqr',
+      refund_bank_name,
+      refund_bank_account,
+      refund_account_holder
     });
 
     if (!result.success) {
@@ -116,8 +129,8 @@ export async function PATCH(request: Request) {
     }
 
     if (action === 'SHOP_PARTIAL_FULFILLMENT') {
-      const { refund_amount, refund_notes } = body;
-      const result = await confirmPartialFulfillment(order_id, refund_amount, refund_notes);
+      const { refund_amount, refund_notes, refund_proof_image } = body;
+      const result = await confirmPartialFulfillment(order_id, refund_amount, refund_notes, refund_proof_image);
       if (!result.success) {
         return NextResponse.json(result, { status: 400 });
       }
@@ -125,8 +138,8 @@ export async function PATCH(request: Request) {
     }
 
     if (action === 'SHOP_OUT_OF_STOCK_REFUND') {
-      const { refund_notes } = body;
-      const result = await refundOutOfStockOrder(order_id, refund_notes);
+      const { refund_notes, refund_proof_image } = body;
+      const result = await refundOutOfStockOrder(order_id, refund_notes, refund_proof_image);
       if (!result.success) {
         return NextResponse.json(result, { status: 400 });
       }

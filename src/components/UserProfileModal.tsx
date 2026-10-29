@@ -138,6 +138,7 @@ export function UserProfileModal({
   const [orders, setOrders] = useState<any[]>([]);
   const [isLoadingOrders, setIsLoadingOrders] = useState(false);
   const [selectedDetailOrder, setSelectedDetailOrder] = useState<any | null>(null);
+  const [selectedProofImage, setSelectedProofImage] = useState<string | null>(null);
   const [returnRequestOrder, setReturnRequestOrder] = useState<any | null>(null);
   const [redirectingOrderId, setRedirectingOrderId] = useState<string | null>(null);
   const [membershipStats, setMembershipStats] = useState<{ past_orders: number } | null>(null);
@@ -1039,6 +1040,27 @@ export function UserProfileModal({
                                 💬 Ghi chú từ Shop: {ord.refund_notes}
                               </p>
                             )}
+
+                            {ord.refund_proof_image && (
+                              <div className="pt-2 border-t border-rose-200/60 flex items-center gap-2.5">
+                                <img
+                                  src={ord.refund_proof_image}
+                                  alt="Bill chuyển khoản"
+                                  className="w-10 h-10 object-cover rounded-md border border-rose-300 shadow-2xs cursor-pointer hover:scale-105 transition-transform"
+                                  onClick={() => setSelectedProofImage(ord.refund_proof_image)}
+                                />
+                                <div>
+                                  <span className="text-[11px] font-bold text-rose-950 block">Xác nhận chuyển khoản từ Shop:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedProofImage(ord.refund_proof_image)}
+                                    className="text-[10px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                                  >
+                                    Xem bill chuyển tiền phóng to →
+                                  </button>
+                                </div>
+                              </div>
+                            )}
                           </div>
                         )}
 
@@ -1290,6 +1312,28 @@ export function UserProfileModal({
                     {det.refund_notes && (
                       <div className="text-xs text-rose-950 bg-white/90 p-2.5 rounded-lg border border-rose-200 font-medium">
                         💬 <strong>Ghi chú từ Shop:</strong> {det.refund_notes}
+                      </div>
+                    )}
+
+                    {det.refund_proof_image && (
+                      <div className="p-3 bg-white/95 rounded-xl border border-rose-200/90 flex items-center gap-3">
+                        <img
+                          src={det.refund_proof_image}
+                          alt="Bill chuyển khoản"
+                          className="w-12 h-12 object-cover rounded-lg border border-slate-300 shadow-xs cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => setSelectedProofImage(det.refund_proof_image)}
+                          title="Bấm để xem ảnh phóng to"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 block">Hình ảnh xác nhận chuyển khoản (Bill):</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedProofImage(det.refund_proof_image)}
+                            className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                          >
+                            Bấm xem bill chuyển khoản phóng to →
+                          </button>
+                        </div>
                       </div>
                     )}
                     <div className="flex items-center gap-2 pt-1 flex-wrap">
@@ -1596,6 +1640,37 @@ export function UserProfileModal({
           </div>
         );
       })()}
+
+      {/* Lightbox Modal: Xem ảnh bill phóng to */}
+      {selectedProofImage && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setSelectedProofImage(null)}
+        >
+          <div 
+            className="relative max-w-lg w-full max-h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <span className="text-xs font-bold text-slate-900">Ảnh xác nhận chuyển khoản hoàn tiền</span>
+              <button
+                type="button"
+                onClick={() => setSelectedProofImage(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex items-center justify-center bg-slate-900/5 min-h-[250px]">
+              <img
+                src={selectedProofImage}
+                alt="Bill xác nhận chuyển khoản"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xs"
+              />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Return Request Modal with 2-Column layout */}
       <ReturnRequestModal

@@ -92,6 +92,18 @@ async function getLocalNodeDb() {
           localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN refund_notes TEXT;`);
         } catch {}
         try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN refund_bank_name TEXT;`);
+        } catch {}
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN refund_bank_account TEXT;`);
+        } catch {}
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN refund_account_holder TEXT;`);
+        } catch {}
+        try {
+          localNodeDbInstance.exec(`ALTER TABLE orders ADD COLUMN refund_proof_image TEXT;`);
+        } catch {}
+        try {
           localNodeDbInstance.exec(`ALTER TABLE products ADD COLUMN size_specs TEXT;`);
         } catch {}
       } catch {}
@@ -154,6 +166,10 @@ export async function getDb(): Promise<UniversalDb> {
             await d1.prepare(`ALTER TABLE orders ADD COLUMN carrier TEXT DEFAULT 'VIETTEL_POST'`).run().catch(() => {});
             await d1.prepare(`ALTER TABLE orders ADD COLUMN cancel_reason TEXT`).run().catch(() => {});
             await d1.prepare(`ALTER TABLE orders ADD COLUMN refund_notes TEXT`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN refund_bank_name TEXT`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN refund_bank_account TEXT`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN refund_account_holder TEXT`).run().catch(() => {});
+            await d1.prepare(`ALTER TABLE orders ADD COLUMN refund_proof_image TEXT`).run().catch(() => {});
           } catch {}
           d1SchemaInitialized = true;
         } catch (e) {
@@ -325,6 +341,10 @@ export interface Order {
   shipment_dispatched_at?: string | null;
   cancel_reason?: string | null;
   refund_notes?: string | null;
+  refund_bank_name?: string | null;
+  refund_bank_account?: string | null;
+  refund_account_holder?: string | null;
+  refund_proof_image?: string | null;
 }
 
 export interface CreateOrderItemInput {
@@ -339,6 +359,9 @@ export interface CreateOrderInput {
   shipping_address: string;
   payment_method?: 'vietqr' | 'cod';
   items: CreateOrderItemInput[];
+  refund_bank_name?: string | null;
+  refund_bank_account?: string | null;
+  refund_account_holder?: string | null;
 }
 
 // ----------------- QUERY SERVICES -----------------
@@ -903,7 +926,8 @@ export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ succ
 export async function confirmPartialFulfillment(
   orderIdOrCode: string,
   refundAmount: number,
-  refundNotes?: string
+  refundNotes?: string,
+  refundProofImage?: string
 ): Promise<{ success: boolean; message: string; order?: any }> {
   const db = await getDb();
   const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
@@ -918,9 +942,10 @@ export async function confirmPartialFulfillment(
     UPDATE orders 
     SET fulfillment_status = 'PACKING', 
         refund_notes = ?,
+        refund_proof_image = COALESCE(?, refund_proof_image),
         updated_at = datetime('now') 
     WHERE id = ?
-  `, [noteText, order.id]);
+  `, [noteText, refundProofImage || null, order.id]);
 
   if (cleanRefundAmount > 0) {
     try {
@@ -979,7 +1004,8 @@ export async function confirmStockAvailable(orderIdOrCode: string): Promise<{ su
  */
 export async function refundOutOfStockOrder(
   orderIdOrCode: string,
-  refundNotes?: string
+  refundNotes?: string,
+  refundProofImage?: string
 ): Promise<{ success: boolean; message: string; order?: any }> {
   const db = await getDb();
   const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
@@ -996,9 +1022,10 @@ export async function refundOutOfStockOrder(
         fulfillment_status = 'CANCELLED', 
         cancel_reason = 'OUT_OF_STOCK',
         refund_notes = ?,
+        refund_proof_image = COALESCE(?, refund_proof_image),
         updated_at = datetime('now') 
     WHERE id = ?
-  `, [noteText, order.id]);
+  `, [noteText, refundProofImage || null, order.id]);
 
   // 2. Ghi nhận sổ cái tài chính: hoàn tiền OUTFLOW
   try {
@@ -1091,8 +1118,8 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
 
   // 2. Insert Order
   await db.execute(`
-    INSERT INTO orders (id, order_code, customer_name, customer_phone, customer_email, shipping_address, subtotal, shipping_fee, discount_amount, total_amount, payment_status, fulfillment_status)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO orders (id, order_code, customer_name, customer_phone, customer_email, shipping_address, subtotal, shipping_fee, discount_amount, total_amount, payment_status, fulfillment_status, refund_bank_name, refund_bank_account, refund_account_holder)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `, [
     orderId,
     orderCode,
@@ -1105,7 +1132,10 @@ export async function createCustomerOrder(input: CreateOrderInput): Promise<{ su
     discountAmount,
     totalAmount,
     initialPaymentStatus,
-    initialFulfillmentStatus
+    initialFulfillmentStatus,
+    input.refund_bank_name || null,
+    input.refund_bank_account || null,
+    input.refund_account_holder || null
   ]);
 
   // 3. Insert Order Items

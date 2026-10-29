@@ -31,7 +31,8 @@ import {
   RotateCcw,
   Plus,
   Trash2,
-  MapPin
+  MapPin,
+  Building2
 } from 'lucide-react';
 import { VietnamAddressSelector, AddressMeta } from '@/components/VietnamAddressSelector';
 import { FacebookFreeshipConfig, DEFAULT_FACEBOOK_FREESHIP_CONFIG } from '@/app/api/deals/facebook-freeship/route';
@@ -74,6 +75,22 @@ export default function CheckoutPage() {
   const [customerEmail, setCustomerEmail] = useState('');
   const [shippingAddress, setShippingAddress] = useState('');
   const [orderNote, setOrderNote] = useState('');
+  const [refundBankName, setRefundBankName] = useState('');
+  const [refundBankAccount, setRefundBankAccount] = useState('');
+  const [refundAccountHolder, setRefundAccountHolder] = useState('');
+
+  // Auto-fill refund bank from localStorage
+  useEffect(() => {
+    try {
+      const savedBank = localStorage.getItem('caishop_saved_refund_bank');
+      if (savedBank) {
+        const parsed = JSON.parse(savedBank);
+        if (parsed.bankName) setRefundBankName(parsed.bankName);
+        if (parsed.accountNumber) setRefundBankAccount(parsed.accountNumber);
+        if (parsed.accountHolder) setRefundAccountHolder(parsed.accountHolder);
+      }
+    } catch (_) {}
+  }, []);
   const [paymentSettings, setPaymentSettings] = useState<PaymentSettings>(defaultPaymentSettings);
   const [paymentMethod, setPaymentMethod] = useState<'vietqr' | 'cod'>('vietqr');
   const [isHcmInnerCity, setIsHcmInnerCity] = useState(false);
@@ -804,7 +821,21 @@ export default function CheckoutPage() {
           quantity: i.quantity,
           unit_price: i.price,
         })),
+        refund_bank_name: refundBankName.trim() || undefined,
+        refund_bank_account: refundBankAccount.trim() || undefined,
+        refund_account_holder: (refundAccountHolder.trim() || customerName.trim()).toUpperCase() || undefined,
       };
+
+      // Lưu lại thông tin ngân hàng nhận tiền hoàn để tự động điền lần sau
+      try {
+        if (refundBankName || refundBankAccount) {
+          localStorage.setItem('caishop_saved_refund_bank', JSON.stringify({
+            bankName: refundBankName.trim(),
+            accountNumber: refundBankAccount.trim(),
+            accountHolder: (refundAccountHolder.trim() || customerName.trim()).toUpperCase(),
+          }));
+        }
+      } catch (_) {}
 
       const res = await fetch('/api/orders', {
         method: 'POST',
@@ -2578,6 +2609,77 @@ export default function CheckoutPage() {
                       onChange={(e) => setOrderNote(e.target.value)}
                       className="w-full h-11 px-3.5 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-all bg-white"
                     />
+                  </div>
+
+                  {/* THÔNG TIN TÀI KHOẢN NHẬN TIỀN HOÀN (TRƯỜNG HỢP SHOP HẾT HÀNG) */}
+                  <div className="sm:col-span-2 pt-3 border-t border-slate-100 space-y-3">
+                    <div className="flex items-start gap-2.5 bg-amber-50/70 border border-amber-200/80 p-3 rounded-xl">
+                      <Building2 className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+                      <div className="space-y-0.5">
+                        <span className="text-xs font-bold text-amber-950 block">
+                          Tài khoản ngân hàng nhận tiền hoàn (khi shop hết hàng)
+                        </span>
+                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                          DE&apos;GENT chuyển khoản hoàn lại 100% tiền ngay về tài khoản này nếu sản phẩm đặt mua hết hàng tại kho.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-700">
+                          Ngân hàng
+                        </label>
+                        <input
+                          type="text"
+                          list="bank-list-suggestions"
+                          placeholder="Chọn hoặc nhập tên ngân hàng"
+                          value={refundBankName}
+                          onChange={(e) => setRefundBankName(e.target.value)}
+                          className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 bg-white"
+                        />
+                        <datalist id="bank-list-suggestions">
+                          <option value="Vietcombank (VCB)" />
+                          <option value="MB Bank (Quân Đội)" />
+                          <option value="Techcombank (TCB)" />
+                          <option value="VPBank" />
+                          <option value="ACB (Á Châu)" />
+                          <option value="BIDV" />
+                          <option value="Agribank" />
+                          <option value="TPBank" />
+                          <option value="Sacombank" />
+                          <option value="VIB" />
+                          <option value="VietinBank" />
+                          <option value="MoMo" />
+                        </datalist>
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-700">
+                          Số tài khoản
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Nhập số tài khoản"
+                          value={refundBankAccount}
+                          onChange={(e) => setRefundBankAccount(e.target.value.replace(/\s/g, ''))}
+                          className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 bg-white font-mono"
+                        />
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-semibold text-slate-700">
+                          Tên chủ tài khoản
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={customerName ? customerName.toUpperCase() : "NGUYEN VAN A"}
+                          value={refundAccountHolder}
+                          onChange={(e) => setRefundAccountHolder(e.target.value.toUpperCase())}
+                          className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 bg-white uppercase font-medium"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
