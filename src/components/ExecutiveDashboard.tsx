@@ -4560,27 +4560,36 @@ export default function ExecutiveDashboard() {
                               )}
                             </td>
                             <td className="py-2.5 px-4 text-center whitespace-nowrap">
-                              <div className="flex flex-col items-center gap-1">
-                                <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium ${ord.payment_status === 'PAID'
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-amber-50 text-amber-800'
-                                  }`}>
-                                  {ord.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
-                                </span>
+                              {(() => {
+                                const isCancelledOrRefunded = ord.fulfillment_status === 'CANCELLED' || ord.payment_status === 'REFUNDED';
+                                if (isCancelledOrRefunded) {
+                                  return <span className="text-xs text-slate-400 font-semibold">—</span>;
+                                }
 
-                                {isMockPaymentEnabled && ord.payment_status !== 'PAID' && (
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMockPayOrder(ord.id)}
-                                    disabled={mockLoadingId === ord.id}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 transition-all cursor-pointer shadow-2xs active:scale-[0.97]"
-                                    title="Giả lập ngân hàng báo tiền về thành công (Chỉ bật khi có biến NEXT_PUBLIC_ENABLE_MOCK_PAYMENT)"
-                                  >
-                                    <Zap className="w-3 h-3 text-indigo-500" />
-                                    <span>{mockLoadingId === ord.id ? 'Đang nạp...' : 'Thanh toán test'}</span>
-                                  </button>
-                                )}
-                              </div>
+                                return (
+                                  <div className="flex flex-col items-center gap-1">
+                                    <span className={`inline-flex px-2 py-0.5 rounded-sm text-[11px] font-medium ${ord.payment_status === 'PAID'
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : 'bg-amber-50 text-amber-800'
+                                      }`}>
+                                      {ord.payment_status === 'PAID' ? 'Đã thanh toán' : 'Chờ thanh toán'}
+                                    </span>
+
+                                    {isMockPaymentEnabled && ord.payment_status !== 'PAID' && (
+                                      <button
+                                        type="button"
+                                        onClick={() => handleMockPayOrder(ord.id)}
+                                        disabled={mockLoadingId === ord.id}
+                                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-200 transition-all cursor-pointer shadow-2xs active:scale-[0.97]"
+                                        title="Giả lập ngân hàng báo tiền về thành công (Chỉ bật khi có biến NEXT_PUBLIC_ENABLE_MOCK_PAYMENT)"
+                                      >
+                                        <Zap className="w-3 h-3 text-indigo-500" />
+                                        <span>{mockLoadingId === ord.id ? 'Đang nạp...' : 'Thanh toán test'}</span>
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
                             </td>
                             <td className="py-2.5 px-4 text-center whitespace-nowrap">
                               {(() => {
@@ -5732,13 +5741,25 @@ export default function ExecutiveDashboard() {
                           <Truck className="w-3.5 h-3.5 text-slate-900" />
                           <span>Gói giao hàng & Thanh toán</span>
                         </div>
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold shadow-2xs ${
-                          selectedOrderForDetail.payment_status === 'PAID'
-                            ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                            : 'bg-amber-100 text-amber-900 border border-amber-300'
-                        }`}>
-                          {selectedOrderForDetail.payment_status === 'PAID' ? '✓ Đã thanh toán' : '⏳ Chờ thanh toán'}
-                        </span>
+{(() => {
+                          const isCancelledOrRefunded = selectedOrderForDetail.fulfillment_status === 'CANCELLED' || selectedOrderForDetail.payment_status === 'REFUNDED';
+                          if (isCancelledOrRefunded) {
+                            return (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold text-slate-400">
+                                —
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md text-[11px] font-bold shadow-2xs ${
+                              selectedOrderForDetail.payment_status === 'PAID'
+                                ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                : 'bg-amber-100 text-amber-900 border border-amber-300'
+                            }`}>
+                              {selectedOrderForDetail.payment_status === 'PAID' ? '✓ Đã thanh toán' : '⏳ Chờ thanh toán'}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
