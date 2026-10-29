@@ -897,6 +897,58 @@ export async function confirmOrderPayment(orderIdOrCode: string): Promise<{ succ
 /**
  * Shop xác nhận còn hàng: chuyển fulfillment_status từ CONFIRMING sang PACKING (Chờ xử lý / Đóng gói)
  */
+/**
+ * Shop kiểm kho: xác nhận giao 1 phần và hoàn tiền phần thiếu/hết hàng cho khách
+ */
+export async function confirmPartialFulfillment(
+  orderIdOrCode: string,
+  refundAmount: number,
+  refundNotes?: string
+): Promise<{ success: boolean; message: string; order?: any }> {
+  const db = await getDb();
+  const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);
+  if (!order) {
+    return { success: false, message: 'Không tìm thấy đơn hàng' };
+  }
+
+  const cleanRefundAmount = Math.max(0, Number(refundAmount) || 0);
+  const noteText = (refundNotes || `Shop hết/thiếu hàng 1 phần - Đã hoàn ${new Intl.NumberFormat('vi-VN').format(cleanRefundAmount)}đ về tài khoản của khách`).trim();
+
+  await db.execute(`
+    UPDATE orders 
+    SET fulfillment_status = 'PACKING', 
+        refund_notes = ?,
+        updated_at = datetime('now') 
+    WHERE id = ?
+  `, [noteText, order.id]);
+
+  if (cleanRefundAmount > 0) {
+    try {
+      await db.execute(`
+        INSERT INTO financial_transactions (id, order_id, transaction_type, amount, direction, payment_gateway, bank_ref_code, notes, recorded_at)
+        VALUES (?, ?, 'REFUND', ?, 'OUTFLOW', 'VIETQR', ?, ?, datetime('now'))
+      `, [
+        `fin-${Date.now().toString(36)}-partref`,
+        order.id,
+        cleanRefundAmount,
+        `PARTIAL-REFUND-${order.order_code}`,
+        noteText
+      ]);
+    } catch (err) {
+      console.error('Error recording partial refund:', err);
+    }
+  }
+
+  const updatedOrder = await getOrderById(order.id);
+  return {
+    success: true,
+    message: cleanRefundAmount > 0 
+      ? `Đã xác nhận kiểm kho! Đơn đã chuyển sang Đóng gói và ghi nhận hoàn ${new Intl.NumberFormat('vi-VN').format(cleanRefundAmount)}đ cho khách.`
+      : `Đã xác nhận đủ hàng thành công! Đơn hàng đã chuyển sang đóng gói.`,
+    order: updatedOrder
+  };
+}
+
 export async function confirmStockAvailable(orderIdOrCode: string): Promise<{ success: boolean; message: string; order?: any }> {
   const db = await getDb();
   const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [orderIdOrCode, orderIdOrCode]);

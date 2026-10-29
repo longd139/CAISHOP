@@ -1167,6 +1167,130 @@ export default function ExecutiveDashboard() {
   const [refundNotes, setRefundNotes] = useState<string>('');
   const [isRefunding, setIsRefunding] = useState<boolean>(false);
 
+  // Check SP Modal State & Handlers
+  const [checkSpModalOrder, setCheckSpModalOrder] = useState<any | null>(null);
+  const [checkSpItems, setCheckSpItems] = useState<{ [itemId: string]: number }>({});
+  const [checkSpNotes, setCheckSpNotes] = useState<string>('');
+  const [isSubmittingCheckSp, setIsSubmittingCheckSp] = useState<boolean>(false);
+
+  const handleOpenCheckSpModal = async (order: any) => {
+    let currentOrder = order;
+    let items = Array.isArray(order.items) && order.items.length > 0 ? order.items : null;
+    if (!items) {
+      try {
+        const res = await fetch(`/api/orders?id=${encodeURIComponent(order.id || order.order_code)}`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          currentOrder = { ...order, ...data.data };
+          items = data.data.items || [];
+        }
+      } catch (err) {
+        console.error('Lỗi khi tải chi tiết sản phẩm cho Check SP:', err);
+      }
+    }
+    setCheckSpModalOrder(currentOrder);
+    const initialMap: { [key: string]: number } = {};
+    (items || []).forEach((it: any, idx: number) => {
+      const key = it.id || `item-${idx}`;
+      initialMap[key] = Number(it.quantity) || 1;
+    });
+    setCheckSpItems(initialMap);
+    setCheckSpNotes('');
+  };
+
+  const handleSetCheckSpQty = (key: string, qty: number) => {
+    setCheckSpItems(prev => ({
+      ...prev,
+      [key]: Math.max(0, qty)
+    }));
+  };
+
+  const handleConfirmCheckSp = async () => {
+    if (!checkSpModalOrder) return;
+    setIsSubmittingCheckSp(true);
+    try {
+      const items = Array.isArray(checkSpModalOrder.items) ? checkSpModalOrder.items : [];
+      let totalOrderedAmount = 0;
+      let totalDeliveryAmount = 0;
+      let missingItemsText: string[] = [];
+
+      items.forEach((it: any, idx: number) => {
+        const key = it.id || `item-${idx}`;
+        const orderedQty = Number(it.quantity) || 1;
+        const availableQty = checkSpItems[key] !== undefined ? checkSpItems[key] : orderedQty;
+        const unitPrice = Number(it.unit_price) || 0;
+
+        totalOrderedAmount += orderedQty * unitPrice;
+        totalDeliveryAmount += availableQty * unitPrice;
+
+        if (availableQty < orderedQty) {
+          const diff = orderedQty - availableQty;
+          missingItemsText.push(`${it.product_name} (${it.color ? it.color + ', ' : ''}Size ${it.size}): thiếu ${diff}/${orderedQty}`);
+        }
+      });
+
+      const refundAmount = Math.max(0, totalOrderedAmount - totalDeliveryAmount);
+      const isAllOutOfStock = items.length > 0 && totalDeliveryAmount === 0;
+      const isAllInStock = refundAmount === 0;
+
+      let action = 'SHOP_CONFIRM_STOCK';
+      let payload: any = { order_id: checkSpModalOrder.id };
+
+      if (isAllOutOfStock) {
+        action = 'SHOP_OUT_OF_STOCK_REFUND';
+        payload.action = action;
+        payload.refund_notes = checkSpNotes.trim() || `Shop hết hàng toàn bộ - Hoàn tiền ${formatMoney(checkSpModalOrder.total_amount)} về tài khoản của khách ${checkSpModalOrder.customer_name}`;
+      } else if (isAllInStock) {
+        payload.action = 'SHOP_CONFIRM_STOCK';
+      } else {
+        action = 'SHOP_PARTIAL_FULFILLMENT';
+        payload.action = action;
+        payload.refund_amount = refundAmount;
+        payload.refund_notes = checkSpNotes.trim() || `Shop thiếu 1 phần (${missingItemsText.join('; ')}) - Đã hoàn ${formatMoney(refundAmount)} cho khách`;
+      }
+
+      const res = await fetch('/api/orders', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const nextStatus = isAllOutOfStock ? 'CANCELLED' : 'PACKING';
+        const nextPayment = isAllOutOfStock ? 'REFUNDED' : checkSpModalOrder.payment_status;
+
+        setOrders(prev => prev.map(o => (o.id === checkSpModalOrder.id) ? { 
+          ...o, 
+          fulfillment_status: nextStatus, 
+          payment_status: nextPayment,
+          refund_notes: payload.refund_notes || o.refund_notes,
+          cancel_reason: isAllOutOfStock ? 'OUT_OF_STOCK' : o.cancel_reason
+        } : o));
+
+        if (selectedOrderForDetail?.id === checkSpModalOrder.id) {
+          setSelectedOrderForDetail((prev: any) => ({
+            ...prev,
+            fulfillment_status: nextStatus,
+            payment_status: nextPayment,
+            refund_notes: payload.refund_notes || prev?.refund_notes,
+            cancel_reason: isAllOutOfStock ? 'OUT_OF_STOCK' : prev?.cancel_reason
+          }));
+        }
+
+        await fetchData();
+        showToast(data.message || 'Xác nhận kiểm kho thành công!', 'success');
+        setCheckSpModalOrder(null);
+      } else {
+        showToast(data.message || 'Không thể lưu kết quả kiểm kho.', 'error');
+      }
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi gửi yêu cầu kiểm kho.', 'error');
+    } finally {
+      setIsSubmittingCheckSp(false);
+    }
+  };
+
   const handleShopConfirmStock = async (orderId: string) => {
     setConfirmStockLoadingId(orderId);
     try {
@@ -4600,30 +4724,18 @@ export default function ExecutiveDashboard() {
                                   );
                                 }
 
-                                // 3. Nếu đơn ĐANG CHỜ SHOP XÁC NHẬN (CONFIRMING): Hiển thị 2 nút Còn hàng / Hết hàng
+                                // 3. Nếu đơn ĐANG CHỜ SHOP XÁC NHẬN (CONFIRMING): Hiển thị button "Check SP" mở Checklist
                                 if (ord.fulfillment_status === 'CONFIRMING') {
                                   return (
-                                    <div className="inline-flex items-center gap-1.5">
-                                      <button
-                                        type="button"
-                                        onClick={() => handleShopConfirmStock(ord.id)}
-                                        disabled={confirmStockLoadingId === ord.id}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                        title="Xác nhận còn hàng và chuyển sang đóng gói"
-                                      >
-                                        <Check className="w-3.5 h-3.5 shrink-0 text-white" />
-                                        <span>{confirmStockLoadingId === ord.id ? 'Đang duyệt...' : 'Còn hàng'}</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleOpenRefundModal(ord)}
-                                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 transition-all active:scale-95 cursor-pointer whitespace-nowrap"
-                                        title="Báo hết hàng và tạo lệnh hoàn tiền về tài khoản ngân hàng"
-                                      >
-                                        <X className="w-3.5 h-3.5 shrink-0 text-rose-600" />
-                                        <span>Hết hàng</span>
-                                      </button>
-                                    </div>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenCheckSpModal(ord)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                                      title="Kiểm tra tồn kho từng sản phẩm trong đơn hàng"
+                                    >
+                                      <ClipboardCheck className="w-3.5 h-3.5 shrink-0 text-white" />
+                                      <span>Check SP</span>
+                                    </button>
                                   );
                                 }
 
@@ -5492,25 +5604,15 @@ export default function ExecutiveDashboard() {
 
                           if (selectedOrderForDetail.fulfillment_status === 'CONFIRMING') {
                             return (
-                              <div className="inline-flex items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleShopConfirmStock(selectedOrderForDetail.id)}
-                                  disabled={confirmStockLoadingId === selectedOrderForDetail.id}
-                                  className="px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
-                                >
-                                  <Check className="w-3.5 h-3.5 text-white shrink-0" />
-                                  <span>{confirmStockLoadingId === selectedOrderForDetail.id ? 'Đang duyệt...' : 'Còn hàng'}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenRefundModal(selectedOrderForDetail)}
-                                  className="px-3 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer"
-                                >
-                                  <X className="w-3.5 h-3.5 text-rose-600 shrink-0" />
-                                  <span>Hết hàng & Hoàn tiền</span>
-                                </button>
-                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleOpenCheckSpModal(selectedOrderForDetail)}
+                                className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold inline-flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                                title="Kiểm tra tồn kho từng sản phẩm trong đơn hàng"
+                              >
+                                <ClipboardCheck className="w-3.5 h-3.5 text-white shrink-0" />
+                                <span>Check SP</span>
+                              </button>
                             );
                           }
 
@@ -5595,9 +5697,21 @@ export default function ExecutiveDashboard() {
                                   </div>
                                 </div>
                                 <div className="text-right shrink-0">
-                                  <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs whitespace-nowrap">
-                                    <span>Lãi: +{formatMoney(((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 1))}</span>
-                                  </div>
+                                  {selectedOrderForDetail.fulfillment_status === 'CONFIRMING' ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenCheckSpModal(selectedOrderForDetail)}
+                                      className="inline-flex items-center gap-1 text-xs font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2.5 py-1 rounded-lg border border-indigo-200 shadow-2xs transition-all cursor-pointer active:scale-95 whitespace-nowrap"
+                                      title="Kiểm tra tồn kho cho sản phẩm này"
+                                    >
+                                      <ClipboardCheck className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                                      <span>Check SP</span>
+                                    </button>
+                                  ) : (
+                                    <div className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 shadow-2xs whitespace-nowrap">
+                                      <span>Lãi: +{formatMoney(((Number(it.unit_price) || 0) - (Number(it.unit_cost) || 0)) * (Number(it.quantity) || 1))}</span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             );
@@ -5955,6 +6069,343 @@ export default function ExecutiveDashboard() {
                 <span>{copyImageToast}</span>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Check SP & Kiểm kho Modal */}
+      {checkSpModalOrder && (
+        <div className="fixed inset-0 z-[70] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[90vh]">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-indigo-50/60 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <ClipboardCheck className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <span>Check SP & Kiểm tra tồn kho</span>
+                    <span className="text-indigo-600 font-mono text-xs font-semibold bg-indigo-100 px-2 py-0.5 rounded">
+                      #{checkSpModalOrder.order_code || checkSpModalOrder.id}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium">
+                    Khách: <strong>{checkSpModalOrder.customer_name}</strong> • SĐT: <span className="font-mono">{checkSpModalOrder.customer_phone}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setCheckSpModalOrder(null)}
+                className="w-8 h-8 rounded-lg hover:bg-white text-slate-400 hover:text-slate-600 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-4">
+              <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs text-slate-600 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-800">Tổng đơn hàng:</span>
+                  <span className="font-bold text-slate-900 font-mono text-sm">{formatMoney(checkSpModalOrder.total_amount)}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                  <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <span className="truncate max-w-[280px]" title={checkSpModalOrder.shipping_address}>{checkSpModalOrder.shipping_address}</span>
+                </div>
+              </div>
+
+              {/* Danh sách checklist sản phẩm */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-700 uppercase tracking-wider">
+                  <span>Sản phẩm trong đơn ({Array.isArray(checkSpModalOrder.items) ? checkSpModalOrder.items.length : 0})</span>
+                  <span className="text-[11px] text-slate-500 font-normal lowercase">chọn còn hàng / hết hàng từng món</span>
+                </div>
+
+                {Array.isArray(checkSpModalOrder.items) && checkSpModalOrder.items.length > 0 ? (
+                  checkSpModalOrder.items.map((it: any, idx: number) => {
+                    const key = it.id || `item-${idx}`;
+                    const orderedQty = Number(it.quantity) || 1;
+                    const availableQty = checkSpItems[key] !== undefined ? checkSpItems[key] : orderedQty;
+                    const isFullyAvailable = availableQty === orderedQty;
+                    const isOutOfStock = availableQty === 0;
+                    const isPartial = availableQty > 0 && availableQty < orderedQty;
+                    const unitPrice = Number(it.unit_price) || 0;
+
+                    return (
+                      <div
+                        key={key}
+                        className={`p-3.5 rounded-xl border transition-all space-y-3 ${
+                          isFullyAvailable
+                            ? 'bg-emerald-50/30 border-emerald-200/90'
+                            : isOutOfStock
+                            ? 'bg-rose-50/40 border-rose-200/90'
+                            : 'bg-amber-50/40 border-amber-200/90'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3 justify-between">
+                          <div className="flex items-start gap-3 min-w-0">
+                            {it.product_images ? (
+                              <img
+                                src={it.product_images.split(',')[0]}
+                                alt={it.product_name}
+                                className="w-12 h-12 rounded-lg object-cover border border-slate-200 shrink-0"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0 text-slate-400">
+                                <Package className="w-5 h-5" />
+                              </div>
+                            )}
+                            <div className="min-w-0 space-y-1">
+                              <h4 className="text-xs font-bold text-slate-900 truncate">
+                                {it.product_name}
+                              </h4>
+                              <div className="text-[11px] text-slate-500 flex items-center gap-2 flex-wrap">
+                                {it.color && <span>Màu: <strong className="text-slate-700">{it.color}</strong></span>}
+                                {it.color && it.size && <span>•</span>}
+                                {it.size && <span>Size: <strong className="text-slate-700">{it.size}</strong></span>}
+                                {it.variant_sku && (
+                                  <>
+                                    <span>•</span>
+                                    <span className="text-[10px] text-slate-400">SKU: {it.variant_sku}</span>
+                                  </>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-slate-600 flex items-center gap-2 flex-wrap">
+                                <span>Khách đặt: <strong className="font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded border border-slate-200">{orderedQty}</strong></span>
+                                <span>•</span>
+                                <span>Đơn giá: <strong className="text-slate-900">{formatMoney(unitPrice)}</strong></span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Trạng thái & Action buttons */}
+                          <div className="flex flex-col items-end gap-1.5 shrink-0">
+                            {orderedQty === 1 ? (
+                              <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetCheckSpQty(key, 1)}
+                                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                    isFullyAvailable
+                                      ? 'bg-emerald-600 text-white shadow-2xs'
+                                      : 'text-slate-600 hover:text-slate-900'
+                                  }`}
+                                >
+                                  <Check className="w-3 h-3 stroke-[3]" />
+                                  <span>Còn hàng</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSetCheckSpQty(key, 0)}
+                                  className={`px-2.5 py-1 rounded-md text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                                    isOutOfStock
+                                      ? 'bg-rose-600 text-white shadow-2xs'
+                                      : 'text-slate-600 hover:text-rose-700'
+                                  }`}
+                                >
+                                  <X className="w-3 h-3 stroke-[3]" />
+                                  <span>Hết hàng</span>
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="space-y-1 text-right">
+                                <div className="text-[11px] font-semibold text-slate-600 flex items-center justify-end gap-1.5">
+                                  <span>Thực giao:</span>
+                                  <div className="inline-flex items-center gap-1 bg-white border border-slate-300 rounded-lg p-0.5">
+                                    {Array.from({ length: orderedQty + 1 }).map((_, q) => (
+                                      <button
+                                        key={q}
+                                        type="button"
+                                        onClick={() => handleSetCheckSpQty(key, q)}
+                                        className={`w-7 h-6 rounded text-xs font-bold transition-all cursor-pointer ${
+                                          availableQty === q
+                                            ? q === orderedQty
+                                              ? 'bg-emerald-600 text-white'
+                                              : q === 0
+                                              ? 'bg-rose-600 text-white'
+                                              : 'bg-amber-600 text-white'
+                                            : 'text-slate-600 hover:bg-slate-100'
+                                        }`}
+                                      >
+                                        {q}
+                                      </button>
+                                    ))}
+                                  </div>
+                                </div>
+                                <div className="text-[10px] text-slate-500">
+                                  {availableQty === orderedQty ? (
+                                    <span className="text-emerald-700 font-bold">✓ Còn đủ {orderedQty}/{orderedQty}</span>
+                                  ) : availableQty === 0 ? (
+                                    <span className="text-rose-700 font-bold">✗ Hết hàng (0/{orderedQty})</span>
+                                  ) : (
+                                    <span className="text-amber-800 font-bold">⚠️ Chỉ còn {availableQty}/{orderedQty} (thiếu {orderedQty - availableQty})</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            {availableQty < orderedQty && (
+                              <span className="text-[10px] font-bold text-rose-600 bg-white px-2 py-0.5 rounded border border-rose-200">
+                                Hoàn lại: -{formatMoney((orderedQty - availableQty) * unitPrice)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="p-4 text-center text-xs text-slate-400">
+                    Không có sản phẩm nào để kiểm tra.
+                  </div>
+                )}
+              </div>
+
+              {/* Khối tổng kết tài chính & Ghi chú hoàn tiền */}
+              {(() => {
+                const items = Array.isArray(checkSpModalOrder.items) ? checkSpModalOrder.items : [];
+                let totalOrdered = 0;
+                let totalDeliver = 0;
+                items.forEach((it: any, idx: number) => {
+                  const key = it.id || `item-${idx}`;
+                  const orderedQty = Number(it.quantity) || 1;
+                  const availableQty = checkSpItems[key] !== undefined ? checkSpItems[key] : orderedQty;
+                  const unitPrice = Number(it.unit_price) || 0;
+                  totalOrdered += orderedQty * unitPrice;
+                  totalDeliver += availableQty * unitPrice;
+                });
+                const totalRefund = Math.max(0, totalOrdered - totalDeliver);
+
+                if (totalRefund === 0) {
+                  return (
+                    <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-center justify-between">
+                      <span className="font-semibold flex items-center gap-1.5">
+                        <Check className="w-4 h-4 text-emerald-600" />
+                        Tất cả sản phẩm trong đơn đều CÒN ĐỦ HÀNG.
+                      </span>
+                      <span className="font-bold text-emerald-700">Sẵn sàng xuất kho đóng gói</span>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-xl space-y-3 text-xs">
+                    <div className="flex items-center justify-between flex-wrap gap-2 pb-2 border-b border-amber-200/80">
+                      <div>
+                        <span className="font-bold text-amber-900 block">
+                          {totalDeliver === 0 ? '🚨 ĐƠN HÀNG HẾT HÀNG TOÀN BỘ' : '⚠️ ĐƠN HÀNG THIẾU HÀNG 1 PHẦN'}
+                        </span>
+                        <span className="text-[11px] text-amber-700">
+                          {totalDeliver === 0
+                            ? 'Tất cả món đều hết hàng, hệ thống sẽ hủy đơn và hoàn 100% tiền cho khách.'
+                            : `Shop sẽ đóng gói giao phần hàng có sẵn (${formatMoney(totalDeliver)}).`}
+                        </span>
+                      </div>
+                      <div className="text-right">
+                        <span className="text-[11px] text-amber-700 block">Số tiền cần hoàn trả khách:</span>
+                        <span className="text-base font-bold text-rose-600 font-mono">
+                          {formatMoney(totalRefund)}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                        <span>Ghi chú gửi khách hàng & Đối soát kế toán:</span>
+                        {checkSpModalOrder.customer_phone && (
+                          <a
+                            href={`https://zalo.me/${checkSpModalOrder.customer_phone.replace(/\D/g, '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline inline-flex items-center gap-1 text-[11px] font-semibold"
+                          >
+                            <span>Chat Zalo trước với khách</span>
+                          </a>
+                        )}
+                      </label>
+                      <textarea
+                        rows={2}
+                        value={checkSpNotes}
+                        onChange={e => setCheckSpNotes(e.target.value)}
+                        placeholder={`Shop thiếu/hết hàng - Đã hoàn tiền ${formatMoney(totalRefund)} về tài khoản của khách...`}
+                        className="w-full text-xs px-3 py-2 bg-white rounded-lg border border-amber-200 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 text-slate-900"
+                      />
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => setCheckSpModalOrder(null)}
+                disabled={isSubmittingCheckSp}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 transition-colors cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+
+              {(() => {
+                const items = Array.isArray(checkSpModalOrder.items) ? checkSpModalOrder.items : [];
+                let totalOrdered = 0;
+                let totalDeliver = 0;
+                items.forEach((it: any, idx: number) => {
+                  const key = it.id || `item-${idx}`;
+                  const orderedQty = Number(it.quantity) || 1;
+                  const availableQty = checkSpItems[key] !== undefined ? checkSpItems[key] : orderedQty;
+                  const unitPrice = Number(it.unit_price) || 0;
+                  totalOrdered += orderedQty * unitPrice;
+                  totalDeliver += availableQty * unitPrice;
+                });
+                const totalRefund = Math.max(0, totalOrdered - totalDeliver);
+                const isAllOutOfStock = items.length > 0 && totalDeliver === 0;
+
+                if (totalRefund === 0) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleConfirmCheckSp}
+                      disabled={isSubmittingCheckSp}
+                      className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                    >
+                      <Check className="w-4 h-4 stroke-[3]" />
+                      <span>{isSubmittingCheckSp ? 'Đang duyệt...' : '✓ Xác nhận đủ hàng - Chuyển sang đóng gói'}</span>
+                    </button>
+                  );
+                }
+
+                if (isAllOutOfStock) {
+                  return (
+                    <button
+                      type="button"
+                      onClick={handleConfirmCheckSp}
+                      disabled={isSubmittingCheckSp}
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                    >
+                      <X className="w-4 h-4 stroke-[3]" />
+                      <span>{isSubmittingCheckSp ? 'Đang xử lý...' : `✗ Hết hàng toàn bộ & Hoàn tiền ${formatMoney(checkSpModalOrder.total_amount)}`}</span>
+                    </button>
+                  );
+                }
+
+                return (
+                  <button
+                    type="button"
+                    onClick={handleConfirmCheckSp}
+                    disabled={isSubmittingCheckSp}
+                    className="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95 inline-flex items-center gap-1.5"
+                  >
+                    <Check className="w-4 h-4 stroke-[3]" />
+                    <span>{isSubmittingCheckSp ? 'Đang xử lý...' : `⚡ Xác nhận giao phần còn & Hoàn ${formatMoney(totalRefund)}`}</span>
+                  </button>
+                );
+              })()}
+            </div>
           </div>
         </div>
       )}

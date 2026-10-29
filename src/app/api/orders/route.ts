@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getOrders, getOrderById, getCustomerOrders, createCustomerOrder, updateOrderStatus, confirmOrderPayment, cleanupExpiredOrders, dispatchOrder, confirmStockAvailable, refundOutOfStockOrder } from '@/lib/db';
+import { getOrders, getOrderById, getCustomerOrders, createCustomerOrder, updateOrderStatus, confirmOrderPayment, cleanupExpiredOrders, dispatchOrder, confirmStockAvailable, refundOutOfStockOrder, confirmPartialFulfillment } from '@/lib/db';
 import { getAuthUserFromRequest } from '@/lib/auth';
 
 export async function GET(request: Request) {
@@ -109,6 +109,15 @@ export async function PATCH(request: Request) {
 
     if (action === 'SHOP_CONFIRM_STOCK') {
       const result = await confirmStockAvailable(order_id);
+      if (!result.success) {
+        return NextResponse.json(result, { status: 400 });
+      }
+      return NextResponse.json(result);
+    }
+
+    if (action === 'SHOP_PARTIAL_FULFILLMENT') {
+      const { refund_amount, refund_notes } = body;
+      const result = await confirmPartialFulfillment(order_id, refund_amount, refund_notes);
       if (!result.success) {
         return NextResponse.json(result, { status: 400 });
       }
