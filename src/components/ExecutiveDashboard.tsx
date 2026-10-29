@@ -4128,9 +4128,7 @@ export default function ExecutiveDashboard() {
                           </div>
                         </div>
 
-                        {isActive && (
-                          <div className="absolute top-2.5 right-2.5 w-2 h-2 rounded-full bg-white shadow-xs" />
-                        )}
+
                       </button>
                     );
                   })}
