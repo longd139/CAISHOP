@@ -4301,9 +4301,7 @@ export default function ExecutiveDashboard() {
                       />
                     </div>
 
-                    <span className="text-xs font-mono text-slate-600 font-semibold bg-white px-2 py-1 rounded border border-slate-200 shadow-2xs" title="Số đơn hàng trong khoảng thời gian đã chọn">
-                      {timeFilteredOrders.length} đơn
-                    </span>
+
                   </div>
                 </div>
               </header>
