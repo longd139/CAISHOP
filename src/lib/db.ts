@@ -601,7 +601,8 @@ export async function getOrders(limit: number = 50): Promise<any[]> {
 
   for (const ord of orders) {
     const items = await db.queryAll<any>(`
-      SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size, pv.sku as variant_sku
+      SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size, pv.sku as variant_sku,
+             COALESCE(NULLIF(oi.unit_cost, 0), pv.cost_price, 0) as unit_cost
       FROM order_items oi
       LEFT JOIN product_variants pv ON oi.variant_id = pv.id
       LEFT JOIN products p ON pv.product_id = p.id
@@ -831,7 +832,8 @@ export async function getOrderById(orderIdOrCode: string): Promise<any | null> {
   if (!order) return null;
 
   const items = await db.queryAll<any>(`
-    SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size, pv.sku as variant_sku
+    SELECT oi.*, p.name as product_name, p.image_url as product_images, pv.color, pv.size, pv.sku as variant_sku,
+           COALESCE(NULLIF(oi.unit_cost, 0), pv.cost_price, 0) as unit_cost
     FROM order_items oi
     LEFT JOIN product_variants pv ON oi.variant_id = pv.id
     LEFT JOIN products p ON pv.product_id = p.id
