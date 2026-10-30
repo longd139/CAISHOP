@@ -48,6 +48,20 @@ export async function GET(request: Request) {
     const tier = calculateTier(pastOrders);
     const nextInfo = getNextTierInfo(pastOrders);
 
+    // Lấy thông tin tài khoản ngân hàng nhận tiền hoàn từ đơn hàng gần nhất (nếu có)
+    const latestBank = await db.queryFirst<{
+      refund_bank_name: string | null;
+      refund_bank_account: string | null;
+      refund_account_holder: string | null;
+    }>(`
+      SELECT refund_bank_name, refund_bank_account, refund_account_holder
+      FROM orders
+      WHERE (customer_phone = ? OR (customer_email IS NOT NULL AND customer_email = ?))
+        AND (refund_bank_account IS NOT NULL AND refund_bank_account != '')
+      ORDER BY created_at DESC
+      LIMIT 1
+    `, [phone, email || phone]);
+
     return NextResponse.json({
       success: true,
       data: {
@@ -60,7 +74,12 @@ export async function GET(request: Request) {
         order_count: pastOrders,
         tier,
         next_tier_info: nextInfo,
-        all_tiers: MEMBERSHIP_TIERS
+        all_tiers: MEMBERSHIP_TIERS,
+        saved_refund_bank: latestBank ? {
+          bankName: latestBank.refund_bank_name || '',
+          accountNumber: latestBank.refund_bank_account || '',
+          accountHolder: latestBank.refund_account_holder || ''
+        } : null
       }
     });
   } catch (error: any) {

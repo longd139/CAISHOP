@@ -966,7 +966,6 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
               <div className="space-y-3">
                 <div className="flex justify-between text-xs font-mono uppercase">
                   <span className="text-[#0a0a0a]/60">Màu sắc lựa chọn:</span>
-                  <strong className="text-black">{selectedColor}</strong>
                 </div>
                 <div className="flex flex-wrap gap-2.5">
                   {uniqueColors.map((color) => {
@@ -1033,11 +1032,11 @@ export default function ProductDetail({ initialProduct, productId }: ProductDeta
                 <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-sm text-[11px] font-mono text-slate-600 flex items-center justify-between">
                   <span>
                     <strong>Size {selectedSize}</strong>:{' '}
-                    {selectedSize === 'S' && 'Phù hợp 1m55 - 1m65 • 48 - 55 kg (Vừa vặn)'}
-                    {selectedSize === 'M' && 'Phù hợp 1m65 - 1m72 • 55 - 65 kg (Vừa vặn)'}
-                    {selectedSize === 'L' && 'Phù hợp 1m70 - 1m78 • 65 - 75 kg (Thoải mái)'}
-                    {selectedSize === 'XL' && 'Phù hợp 1m75 - 1m85 • 75 - 85 kg (Oversize)'}
-                    {selectedSize === 'XXL' && 'Phù hợp 1m80 - 1m92 • 85 - 95 kg (Rộng rãi)'}
+                    {selectedSize === 'S' && 'Phù hợp 1m55 - 1m65 • 48 - 55 kg'}
+                    {selectedSize === 'M' && 'Phù hợp 1m65 - 1m72 • 55 - 65 kg'}
+                    {selectedSize === 'L' && 'Phù hợp 1m70 - 1m78 • 65 - 75 kg'}
+                    {selectedSize === 'XL' && 'Phù hợp 1m75 - 1m85 • 75 - 85 kg'}
+                    {selectedSize === 'XXL' && 'Phù hợp 1m80 - 1m92 • 85 - 95 kg'}
                     {!['S', 'M', 'L', 'XL', 'XXL'].includes(selectedSize) && 'Form chuẩn thương hiệu DE\'GENT'}
                   </span>
                   <button

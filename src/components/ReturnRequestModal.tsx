@@ -17,8 +17,13 @@ import {
   Package,
   ShieldCheck,
   Sparkles,
+  Camera,
+  Upload,
+  Image as ImageIcon,
+  Trash2,
 } from 'lucide-react';
 import { parseOrderAddressDetails } from '@/components/ExecutiveDashboard';
+import { VietnamBankSelect } from '@/components/VietnamBankSelect';
 
 interface ReturnRequestModalProps {
   isOpen: boolean;
@@ -87,6 +92,10 @@ export default function ReturnRequestModal({
   const [returnReason, setReturnReason] = useState('TIGHT');
   const [notes, setNotes] = useState('');
 
+  // Tag Image for Exchange
+  const [tagImage, setTagImage] = useState<string>('');
+  const [isUploadingTag, setIsUploadingTag] = useState<boolean>(false);
+
   // Item selection (default all checked)
   const [selectedItemIds, setSelectedItemIds] = useState<Record<string, boolean>>(() => {
     const init: Record<string, boolean> = {};
@@ -126,6 +135,37 @@ export default function ReturnRequestModal({
     });
   };
 
+  const handleTagImageUpload = async (file: File) => {
+    setIsUploadingTag(true);
+    setErrorMessage('');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (res.ok && (data.url || data.secure_url)) {
+        setTagImage(data.url || data.secure_url);
+      } else {
+        const reader = new FileReader();
+        reader.onload = () => {
+          setTagImage(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch {
+      const reader = new FileReader();
+      reader.onload = () => {
+        setTagImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setIsUploadingTag(false);
+    }
+  };
+
   const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
@@ -137,6 +177,11 @@ export default function ReturnRequestModal({
 
     if (addressChoice === 'NEW' && !newAddressText.trim()) {
       setErrorMessage('Vui lòng nhập địa chỉ lấy hàng hoàn / đổi mới.');
+      return;
+    }
+
+    if (refundMethod === 'EXCHANGE' && !tagImage) {
+      setErrorMessage('Vui lòng chụp và tải lên ảnh tag áo còn nguyên vẹn trên sản phẩm để tiếp tục yêu cầu đổi hàng.');
       return;
     }
 
@@ -164,6 +209,7 @@ export default function ReturnRequestModal({
 
     const combinedNotes = [
       notes ? `Ghi chú: ${notes}` : '',
+      refundMethod === 'EXCHANGE' ? '[Yêu cầu: Khách giữ nguyên tag áo và gửi sản phẩm về lại shop]' : '',
       addressChoice === 'NEW' ? `[Địa chỉ lấy hàng mới: ${finalAddress}]` : '',
       `[Sản phẩm hoàn: ${selectedItemNames}]`
     ].filter(Boolean).join(' • ');
@@ -182,6 +228,7 @@ export default function ReturnRequestModal({
           account_holder: refundMethod === 'REFUND' ? accountHolder : undefined,
           notes: combinedNotes,
           contact_phone: phone,
+          tag_image: refundMethod === 'EXCHANGE' ? tagImage : undefined,
         }),
       });
 
@@ -291,6 +338,33 @@ export default function ReturnRequestModal({
                   </div>
                 )}
               </div>
+
+              {refundMethod === 'EXCHANGE' && (
+                <div className="p-3.5 bg-amber-50/80 border border-amber-200 rounded-xl text-left space-y-2">
+                  <div className="flex items-center gap-1.5 text-xs font-bold text-amber-950">
+                    <Camera className="w-4 h-4 text-amber-700 shrink-0" />
+                    <span>Ảnh tag áo & Yêu cầu gửi lại shop:</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {tagImage ? (
+                      <img
+                        src={tagImage}
+                        alt="Ảnh tag áo"
+                        className="w-14 h-14 object-cover rounded-lg border border-amber-300 shadow-2xs shrink-0"
+                      />
+                    ) : null}
+                    <div className="text-[11px] text-amber-900 leading-relaxed font-sans">
+                      <p className="font-semibold text-emerald-800 flex items-center gap-1">
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        Đã đính kèm ảnh tag áo còn nguyên
+                      </p>
+                      <p className="text-amber-800 mt-0.5">
+                        Quý khách vui lòng đóng gói cẩn thận để shipper DE&apos;GENT đến lấy gửi về lại shop.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {errorMessage && (
                 <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 rounded-xl text-xs flex items-center gap-2 text-left">
@@ -532,6 +606,127 @@ export default function ReturnRequestModal({
                     </div>
                   </div>
 
+                  {/* Yêu cầu bắt buộc khi Đổi hàng: Chụp ảnh tag áo & Gửi hàng về lại shop */}
+                  {refundMethod === 'EXCHANGE' && (
+                    <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3.5 animate-in fade-in duration-150">
+                      <div className="flex items-start gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                          <Camera className="w-4 h-4" />
+                        </div>
+                        <div className="space-y-0.5">
+                          <h4 className="text-xs font-bold text-amber-950 uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                            <span>Chụp ảnh tag áo & Gửi về lại shop</span>
+                            <span className="text-[10px] px-1.5 py-0.2 bg-rose-600 text-white rounded font-bold">
+                              Bắt buộc
+                            </span>
+                          </h4>
+                          <p className="text-[11px] text-amber-900 leading-relaxed">
+                            Để được đổi size/mẫu, sản phẩm phải còn <strong>nguyên vẹn tag áo/tem mác</strong>. Quý khách vui lòng chụp rõ tag áo và đóng gói sản phẩm để gửi về lại cho shop.
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Khu vực Upload / Chụp ảnh tag áo */}
+                      <div>
+                        {tagImage ? (
+                          <div className="flex items-center justify-between p-3 bg-white rounded-xl border border-amber-300 shadow-2xs gap-3">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <img
+                                src={tagImage}
+                                alt="Ảnh tag áo đã chụp"
+                                className="w-14 h-14 object-cover rounded-lg border border-slate-200 shadow-2xs shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <span className="text-xs font-bold flex items-center gap-1 text-emerald-700">
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                  Đã chụp ảnh tag áo hợp lệ
+                                </span>
+                                <p className="text-[11px] text-slate-500 mt-0.5 truncate">
+                                  Tag áo sẵn sàng gửi kèm yêu cầu đổi hàng.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <label className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold cursor-pointer transition-colors flex items-center gap-1">
+                                <Camera className="w-3.5 h-3.5" />
+                                <span>Chụp lại</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  capture="environment"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) handleTagImageUpload(file);
+                                  }}
+                                />
+                              </label>
+                              <button
+                                type="button"
+                                onClick={() => setTagImage('')}
+                                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Xóa ảnh"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <label className={`block border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
+                            isUploadingTag
+                              ? 'bg-slate-50 border-slate-300 opacity-70 cursor-wait'
+                              : 'bg-white hover:bg-amber-50/50 border-amber-300 hover:border-amber-400'
+                          }`}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              className="hidden"
+                              disabled={isUploadingTag}
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleTagImageUpload(file);
+                              }}
+                            />
+                            <div className="flex flex-col items-center justify-center space-y-2">
+                              <div className="w-10 h-10 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center">
+                                {isUploadingTag ? (
+                                  <Loader2 className="w-5 h-5 animate-spin text-amber-700" />
+                                ) : (
+                                  <Camera className="w-5 h-5" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-xs font-bold text-slate-900">
+                                  {isUploadingTag ? 'Đang tải ảnh tag áo...' : 'Chụp ảnh hoặc tải lên ảnh tag áo còn nguyên'}
+                                </p>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                  Bấm để mở máy ảnh chụp trực tiếp hoặc tải ảnh từ máy
+                                </p>
+                              </div>
+                              <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
+                                <Upload className="w-3 h-3" />
+                                Chọn / Chụp ảnh tag áo
+                              </span>
+                            </div>
+                          </label>
+                        )}
+                      </div>
+
+                      {/* Lưu ý gửi sản phẩm về lại shop */}
+                      <div className="p-2.5 bg-white/90 rounded-lg border border-amber-200 text-[11px] text-amber-950 space-y-1">
+                        <span className="font-bold flex items-center gap-1 text-slate-900">
+                          <Package className="w-3.5 h-3.5 text-amber-700" />
+                          <span>Quy trình gửi sản phẩm về lại shop:</span>
+                        </span>
+                        <p className="leading-relaxed text-slate-600">
+                          Sau khi gửi yêu cầu, shipper DE&apos;GENT sẽ liên hệ đến địa chỉ nhận hàng của bạn để thu hồi kiện hàng mang về shop kiểm tra và gửi sản phẩm đổi mới cho bạn.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Thông tin tài khoản hoàn tiền (nếu chọn REFUND) */}
                   {refundMethod === 'REFUND' && (
                     <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3 animate-in fade-in duration-150">
@@ -543,13 +738,11 @@ export default function ReturnRequestModal({
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                         <div className="space-y-1">
                           <label className="text-[11px] text-slate-500 font-medium">Tên ngân hàng *</label>
-                          <input
-                            type="text"
-                            required={refundMethod === 'REFUND'}
-                            placeholder="Ví dụ: Vietcombank, Techcombank, MB..."
+                          <VietnamBankSelect
                             value={bankName}
-                            onChange={(e) => setBankName(e.target.value)}
-                            className="w-full h-8.5 px-3 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:border-slate-900 focus:outline-none"
+                            onChange={setBankName}
+                            required={refundMethod === 'REFUND'}
+                            placeholder="Chọn hoặc nhập tên ngân hàng"
                           />
                         </div>
 
@@ -745,7 +938,7 @@ export default function ReturnRequestModal({
                       <span>Cam kết dịch vụ DE&apos;GENT</span>
                     </div>
                     <p>
-                      Đổi trả miễn phí trong 7 ngày đối với sản phẩm còn nguyên tem mác. Nhân viên giao hàng sẽ đến tận địa chỉ của bạn để nhận hàng.
+                      Đổi trả miễn phí trong 7 ngày đối với sản phẩm còn nguyên tag áo/tem mác. Quý khách vui lòng gửi sản phẩm về lại shop (shipper sẽ đến nhận tận nơi).
                     </p>
                   </div>
 

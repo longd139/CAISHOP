@@ -38,6 +38,7 @@ import { VietnamAddressSelector, AddressMeta } from '@/components/VietnamAddress
 import { FacebookFreeshipConfig, DEFAULT_FACEBOOK_FREESHIP_CONFIG } from '@/app/api/deals/facebook-freeship/route';
 import { parseOrderAddressDetails } from '@/components/ExecutiveDashboard';
 import ReturnRequestModal from '@/components/ReturnRequestModal';
+import { VietnamBankSelect } from '@/components/VietnamBankSelect';
 
 interface DeliveryTimeSlot {
   id: string;
@@ -63,6 +64,9 @@ export interface SavedCustomerAddress {
   addressMeta?: AddressMeta | null;
   isDefault?: boolean;
   lastUsedAt?: number;
+  refundBankName?: string;
+  refundBankAccount?: string;
+  refundAccountHolder?: string;
 }
 
 export default function CheckoutPage() {
@@ -78,6 +82,21 @@ export default function CheckoutPage() {
   const [refundBankName, setRefundBankName] = useState('');
   const [refundBankAccount, setRefundBankAccount] = useState('');
   const [refundAccountHolder, setRefundAccountHolder] = useState('');
+
+  const saveRefundBankToStorage = (bankName?: string, accountNum?: string, holder?: string) => {
+    try {
+      const bName = bankName !== undefined ? bankName : refundBankName;
+      const aNum = accountNum !== undefined ? accountNum : refundBankAccount;
+      const aHolder = holder !== undefined ? holder : refundAccountHolder;
+      if (bName || aNum || aHolder) {
+        localStorage.setItem('caishop_saved_refund_bank', JSON.stringify({
+          bankName: (bName || '').trim(),
+          accountNumber: (aNum || '').trim(),
+          accountHolder: (aHolder || '').trim(),
+        }));
+      }
+    } catch (_) {}
+  };
 
   // Auto-fill refund bank from localStorage
   useEffect(() => {
@@ -296,6 +315,9 @@ export default function CheckoutPage() {
             setShippingAddress(defaultAddr.shippingAddress);
             setIsAddressValid(true);
           }
+          if (defaultAddr.refundBankName) setRefundBankName((prev) => prev || defaultAddr.refundBankName || '');
+          if (defaultAddr.refundBankAccount) setRefundBankAccount((prev) => prev || defaultAddr.refundBankAccount || '');
+          if (defaultAddr.refundAccountHolder) setRefundAccountHolder((prev) => prev || defaultAddr.refundAccountHolder || '');
           if (defaultAddr.addressMeta) {
             setSavedAddressMeta(defaultAddr.addressMeta);
             currentAddressMetaRef.current = defaultAddr.addressMeta;
@@ -324,6 +346,9 @@ export default function CheckoutPage() {
       setShippingAddress(addr.shippingAddress);
       setIsAddressValid(true);
     }
+    if (addr.refundBankName) setRefundBankName((prev) => prev || addr.refundBankName || '');
+    if (addr.refundBankAccount) setRefundBankAccount((prev) => prev || addr.refundBankAccount || '');
+    if (addr.refundAccountHolder) setRefundAccountHolder((prev) => prev || addr.refundAccountHolder || '');
     if (addr.addressMeta) {
       setSavedAddressMeta(addr.addressMeta);
       currentAddressMetaRef.current = addr.addressMeta;
@@ -653,6 +678,15 @@ export default function CheckoutPage() {
             past_orders: json.data.order_count || 0,
             tier_name: json.data.tier?.name || 'Hội viên Đồng',
           });
+
+          // Tự động điền lại thông tin tài khoản ngân hàng nhận tiền hoàn từ đơn hàng trước
+          if (json.data.saved_refund_bank) {
+            const b = json.data.saved_refund_bank;
+            if (b.bankName) setRefundBankName((prev) => prev || b.bankName);
+            if (b.accountNumber) setRefundBankAccount((prev) => prev || b.accountNumber);
+            if (b.accountHolder) setRefundAccountHolder((prev) => prev || b.accountHolder);
+            saveRefundBankToStorage(b.bankName, b.accountNumber, b.accountHolder);
+          }
         }
       } catch (e) {}
     }, 400);
@@ -878,6 +912,9 @@ export default function CheckoutPage() {
             addressMeta: currentAddressMetaRef.current,
             isDefault: true,
             lastUsedAt: Date.now(),
+            refundBankName: refundBankName.trim() || undefined,
+            refundBankAccount: refundBankAccount.trim() || undefined,
+            refundAccountHolder: (refundAccountHolder.trim() || customerName.trim()).toUpperCase() || undefined,
           };
           list.splice(existingIdx, 1);
         } else {
@@ -890,6 +927,9 @@ export default function CheckoutPage() {
             addressMeta: currentAddressMetaRef.current,
             isDefault: true,
             lastUsedAt: Date.now(),
+            refundBankName: refundBankName.trim() || undefined,
+            refundBankAccount: refundBankAccount.trim() || undefined,
+            refundAccountHolder: (refundAccountHolder.trim() || customerName.trim()).toUpperCase() || undefined,
           };
         }
 
@@ -1942,7 +1982,7 @@ export default function CheckoutPage() {
                   ) : isDelivered ? (
                     <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được bạn xác nhận nhận hàng thành công.</>
                   ) : orderSuccess.tracking_code ? (
-                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được bàn giao cho <strong>{orderSuccess.carrier === 'GHTK' ? 'GHTK' : orderSuccess.carrier === 'GHN' ? 'GHN' : 'Viettel Post'}</strong> (Mã: <strong>{orderSuccess.tracking_code}</strong>). Bưu tá đang vận chuyển giao đến bạn.</>
+                    <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được bàn giao cho <strong>{orderSuccess.carrier === 'GHTK' ? 'GHTK' : orderSuccess.carrier === 'GHN' ? 'GHN' : orderSuccess.carrier === 'SHIPPER' ? "Shipper riêng DE'GENT" : orderSuccess.carrier === 'VIETTEL_POST' ? 'Viettel Post' : orderSuccess.carrier || 'đối tác vận chuyển'}</strong> (Mã: <strong>{orderSuccess.tracking_code}</strong>). Bưu tá đang vận chuyển giao đến bạn.</>
                   ) : (
                     <>Đơn hàng <strong>#{orderSuccess.order_code}</strong> đã được chuyển sang trạng thái <strong>Bàn giao cho shipper</strong>. DE&apos;GENT đang chuẩn bị gói hàng và bàn giao cho shipper.</>
                   )}
@@ -2008,14 +2048,24 @@ export default function CheckoutPage() {
                     {orderSuccess.carrier === 'SHIPPER' ? 'Hình thức giao:' : 'Đơn vị vận chuyển:'}
                   </span>
                   {orderSuccess.tracking_code ? (
-                    <span className="font-bold text-red-600 flex items-center gap-1.5">
-                      <img
-                        src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
-                        alt="Viettel Post"
-                        className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
-                      />
-                      {orderSuccess.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : orderSuccess.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : orderSuccess.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      {orderSuccess.carrier === 'VIETTEL_POST' && (
+                        <img
+                          src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
+                          alt="Viettel Post"
+                          className="w-5 h-5 rounded object-cover shadow-2xs border border-red-100"
+                        />
+                      )}
+                      {orderSuccess.carrier === 'GHTK'
+                        ? 'Giao Hàng Tiết Kiệm (GHTK)'
+                        : orderSuccess.carrier === 'GHN'
+                        ? 'Giao Hàng Nhanh (GHN)'
+                        : orderSuccess.carrier === 'SHIPPER'
+                        ? "Shipper riêng DE'GENT"
+                        : orderSuccess.carrier === 'VIETTEL_POST'
+                        ? 'Viettel Post'
+                        : orderSuccess.carrier || 'Đang cập nhật'}
                     </span>
                   ) : (
                     <span className="text-slate-400 italic font-normal">Chờ cập nhật</span>
@@ -2613,13 +2663,13 @@ export default function CheckoutPage() {
 
                   {/* THÔNG TIN TÀI KHOẢN NHẬN TIỀN HOÀN (TRƯỜNG HỢP SHOP HẾT HÀNG) */}
                   <div className="sm:col-span-2 pt-3 border-t border-slate-100 space-y-3">
-                    <div className="flex items-start gap-2.5 bg-amber-50/70 border border-amber-200/80 p-3 rounded-xl">
-                      <Building2 className="w-4 h-4 text-amber-800 shrink-0 mt-0.5" />
+                    <div className="flex items-start gap-2.5 bg-slate-50 border border-slate-200 p-3 rounded-xl">
+                      <Building2 className="w-4 h-4 text-slate-600 shrink-0 mt-0.5" />
                       <div className="space-y-0.5">
-                        <span className="text-xs font-bold text-amber-950 block">
+                        <span className="text-xs font-bold text-slate-900 block">
                           Tài khoản ngân hàng nhận tiền hoàn (khi shop hết hàng)
                         </span>
-                        <p className="text-[11px] text-amber-800 leading-relaxed">
+                        <p className="text-[11px] text-slate-500 leading-relaxed">
                           DE&apos;GENT chuyển khoản hoàn lại 100% tiền ngay về tài khoản này nếu sản phẩm đặt mua hết hàng tại kho.
                         </p>
                       </div>
@@ -2630,28 +2680,14 @@ export default function CheckoutPage() {
                         <label className="text-[11px] font-semibold text-slate-700">
                           Ngân hàng
                         </label>
-                        <input
-                          type="text"
-                          list="bank-list-suggestions"
-                          placeholder="Chọn hoặc nhập tên ngân hàng"
+                        <VietnamBankSelect
                           value={refundBankName}
-                          onChange={(e) => setRefundBankName(e.target.value)}
-                          className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 bg-white"
+                          onChange={(val) => {
+                            setRefundBankName(val);
+                            saveRefundBankToStorage(val, refundBankAccount, refundAccountHolder);
+                          }}
+                          placeholder="Chọn hoặc nhập tên ngân hàng"
                         />
-                        <datalist id="bank-list-suggestions">
-                          <option value="Vietcombank (VCB)" />
-                          <option value="MB Bank (Quân Đội)" />
-                          <option value="Techcombank (TCB)" />
-                          <option value="VPBank" />
-                          <option value="ACB (Á Châu)" />
-                          <option value="BIDV" />
-                          <option value="Agribank" />
-                          <option value="TPBank" />
-                          <option value="Sacombank" />
-                          <option value="VIB" />
-                          <option value="VietinBank" />
-                          <option value="MoMo" />
-                        </datalist>
                       </div>
 
                       <div className="space-y-1">
@@ -2662,7 +2698,11 @@ export default function CheckoutPage() {
                           type="text"
                           placeholder="Nhập số tài khoản"
                           value={refundBankAccount}
-                          onChange={(e) => setRefundBankAccount(e.target.value.replace(/\s/g, ''))}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/\s/g, '');
+                            setRefundBankAccount(val);
+                            saveRefundBankToStorage(refundBankName, val, refundAccountHolder);
+                          }}
                           className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 bg-white font-mono"
                         />
                       </div>
@@ -2675,7 +2715,11 @@ export default function CheckoutPage() {
                           type="text"
                           placeholder={customerName ? customerName.toUpperCase() : "NGUYEN VAN A"}
                           value={refundAccountHolder}
-                          onChange={(e) => setRefundAccountHolder(e.target.value.toUpperCase())}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            setRefundAccountHolder(val);
+                            saveRefundBankToStorage(refundBankName, refundBankAccount, val);
+                          }}
                           className="w-full h-10 px-3 text-xs rounded-lg border border-slate-200 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 bg-white uppercase font-medium"
                         />
                       </div>

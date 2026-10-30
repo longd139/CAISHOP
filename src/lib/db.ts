@@ -613,7 +613,7 @@ export async function getOrders(limit: number = 50): Promise<any[]> {
   const orders = await db.queryAll<any>(`
     SELECT o.*, 
       COALESCE(o.tracking_code, sh.tracking_code) as tracking_code,
-      COALESCE(o.carrier, sh.carrier, 'VIETTEL_POST') as carrier,
+      COALESCE(o.carrier, sh.carrier) as carrier,
       sh.dispatched_at as shipment_dispatched_at,
       COUNT(oi.id) as items_count, 
       sr.notes as return_notes, 
@@ -671,7 +671,7 @@ export async function getCustomerOrders(phone: string, email?: string): Promise<
   const orders = await db.queryAll<any>(`
     SELECT o.*, 
       COALESCE(o.tracking_code, sh.tracking_code) as tracking_code,
-      COALESCE(o.carrier, sh.carrier, 'VIETTEL_POST') as carrier,
+      COALESCE(o.carrier, sh.carrier) as carrier,
       sh.dispatched_at as shipment_dispatched_at,
       COUNT(oi.id) as items_count, 
       sr.notes as return_notes, 
@@ -844,7 +844,7 @@ export async function getOrderById(orderIdOrCode: string): Promise<any | null> {
   const order = await db.queryFirst<any>(`
     SELECT o.*, 
       COALESCE(o.tracking_code, sh.tracking_code) as tracking_code,
-      COALESCE(o.carrier, sh.carrier, 'VIETTEL_POST') as carrier,
+      COALESCE(o.carrier, sh.carrier) as carrier,
       sh.dispatched_at as shipment_dispatched_at,
       COUNT(oi.id) as items_count, 
       sr.notes as return_notes, 

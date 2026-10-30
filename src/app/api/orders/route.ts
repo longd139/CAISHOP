@@ -208,7 +208,7 @@ export async function PATCH(request: Request) {
 
     if (action === 'REQUEST_RETURN') {
       const db = await (await import('@/lib/db')).getDb();
-      const { return_reason, refund_method, bank_account, bank_name, account_holder, notes, contact_phone } = body;
+      const { return_reason, refund_method, bank_account, bank_name, account_holder, notes, contact_phone, tag_image } = body;
       const order = await db.queryFirst<any>(`SELECT * FROM orders WHERE id = ? OR order_code = ?`, [order_id, order_id]);
       if (!order) {
         return NextResponse.json({ success: false, message: 'Không tìm thấy đơn hàng' }, { status: 404 });
@@ -216,10 +216,10 @@ export async function PATCH(request: Request) {
 
       await db.execute(`
         UPDATE orders 
-        SET fulfillment_status = 'RETURNED', 
+        SET fulfillment_status = 'RETURNED', refund_proof_image = COALESCE(?, refund_proof_image), 
             updated_at = datetime('now') 
         WHERE id = ?
-      `, [order.id]);
+      `, [tag_image || null, order.id]);
 
       let items: any[] = [];
       try {
@@ -242,7 +242,9 @@ export async function PATCH(request: Request) {
       const phone = (contact_phone || order.customer_phone || '').trim();
       const methodLabel = refund_method === 'EXCHANGE' ? 'ĐỔI HÀNG (Đổi size/mẫu)' : 'HOÀN HÀNG (Trả hàng/Hoàn tiền)';
       const bankInfo = bank_account ? ` [STK: ${bank_account} - ${bank_name || ''} (${account_holder || ''})]` : '';
-      const fullNotes = `[${methodLabel}] [SĐT/Zalo liên hệ: ${phone}] Lý do: ${reasonLabel}${bankInfo}${notes ? ` - Ghi chú: ${notes}` : ''}`;
+      const tagNote = tag_image ? ' [Đã chụp tag áo]' : '';
+      const sendBackNote = refund_method === 'EXCHANGE' ? ' [Yêu cầu: Khách gửi sản phẩm nguyên tag về lại shop]' : '';
+      const fullNotes = `[${methodLabel}]${tagNote}${sendBackNote} [SĐT/Zalo liên hệ: ${phone}] Lý do: ${reasonLabel}${bankInfo}${notes ? ` - Ghi chú: ${notes}` : ''}`;
 
       try {
         const returnId = `ret-${Date.now().toString(36)}`;
@@ -265,14 +267,15 @@ export async function PATCH(request: Request) {
       }
 
       const returnMsg = refund_method === 'EXCHANGE'
-        ? `Chúng tôi sẽ liên hệ đổi hàng qua số điện thoại/Zalo ${phone} này nhé, bạn nhớ để ý điện thoại nhé!`
+        ? `Yêu cầu đổi hàng thành công! Quý khách vui lòng giữ nguyên tag áo và gửi sản phẩm về lại shop khi shipper liên hệ SĐT/Zalo ${phone}.`
         : `Chúng tôi sẽ liên hệ hoàn hàng qua số điện thoại/Zalo ${phone} này nhé, bạn nhớ để ý điện thoại nhé!`;
 
       return NextResponse.json({
         success: true,
         message: returnMsg,
         fulfillment_status: 'RETURNED',
-        contact_phone: phone
+        contact_phone: phone,
+        refund_proof_image: tag_image || order.refund_proof_image
       });
     }
 

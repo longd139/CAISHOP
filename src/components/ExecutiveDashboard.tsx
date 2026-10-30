@@ -134,6 +134,12 @@ interface Order {
   customer_email?: string;
   tracking_code?: string;
   carrier?: string;
+  refund_notes?: string;
+  refund_proof_image?: string;
+  cancel_reason?: string;
+  refund_bank_name?: string;
+  refund_bank_account?: string;
+  refund_account_holder?: string;
 }
 
 interface UserAccount {
@@ -344,7 +350,7 @@ export function parseOrderAddressDetails(rawAddress: string | null | undefined):
       shippingMethod = "Shipper riêng DE'GENT - Ship thường trong ngày";
       shippingFee = shippingFee || '40.000 ₫';
     } else {
-      shippingMethod = "Giao hàng tiêu chuẩn toàn quốc (Viettel Post)";
+      shippingMethod = "Giao hàng tiêu chuẩn toàn quốc";
       shippingFee = shippingFee || '30.000 ₫';
     }
   }
@@ -570,36 +576,7 @@ function PhoneZaloContact({ phone, className = '' }: PhoneZaloContactProps) {
         </div>,
         document.body
       )}
-      {/* Lightbox Modal: Xem ảnh bill phóng to */}
-      {previewProofModalUrl && (
-        <div 
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
-          onClick={() => setPreviewProofModalUrl(null)}
-        >
-          <div 
-            className="relative max-w-lg w-full max-h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
-            onClick={e => e.stopPropagation()}
-          >
-            <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <span className="text-xs font-bold text-slate-900">Ảnh xác nhận chuyển khoản (Bill chuyển tiền)</span>
-              <button
-                type="button"
-                onClick={() => setPreviewProofModalUrl(null)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-            <div className="p-4 overflow-auto flex items-center justify-center bg-slate-900/5 min-h-[250px]">
-              <img
-                src={previewProofModalUrl}
-                alt="Bill xác nhận chuyển khoản"
-                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xs"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+
 
     </div>
   );
@@ -5538,6 +5515,33 @@ export default function ExecutiveDashboard() {
                         </div>
                       </div>
 
+                      {isEx && selectedOrderForDetail.refund_proof_image && (
+                        <div className="p-3 bg-white rounded-xl border border-blue-200 flex items-center gap-3">
+                          <img
+                            src={selectedOrderForDetail.refund_proof_image}
+                            alt="Ảnh tag áo từ khách"
+                            className="w-14 h-14 object-cover rounded-lg border border-slate-300 shadow-xs cursor-pointer hover:scale-105 transition-transform"
+                            onClick={() => setPreviewProofModalUrl(selectedOrderForDetail.refund_proof_image)}
+                            title="Bấm để xem ảnh phóng to"
+                          />
+                          <div>
+                            <span className="text-xs font-bold text-blue-950 block">
+                              📸 Ảnh tag áo khách đã chụp:
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setPreviewProofModalUrl(selectedOrderForDetail.refund_proof_image)}
+                              className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                            >
+                              Bấm xem ảnh tag áo phóng to →
+                            </button>
+                            <span className="text-[10px] text-blue-700 block mt-0.5">
+                              Yêu cầu khách giữ nguyên tag áo & gửi sản phẩm về lại shop
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       {selectedOrderForDetail.return_created_at && (
                         <div className="text-[11px] text-slate-500 pt-0.5">
                           Thời gian gửi yêu cầu: {new Date(selectedOrderForDetail.return_created_at).toLocaleString('vi-VN')}
@@ -5723,7 +5727,7 @@ export default function ExecutiveDashboard() {
                           </span>
                           {selectedOrderForDetail.tracking_code ? (
                             <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded bg-slate-100 text-slate-900 border border-slate-200 text-xs font-semibold">
-                              <span>{selectedOrderForDetail.carrier || 'Viettel Post'}:</span>
+                              <span>{selectedOrderForDetail.carrier || 'Đang cập nhật'}:</span>
                               <span className="font-bold font-mono">{selectedOrderForDetail.tracking_code}</span>
                             </span>
                           ) : (
@@ -5925,7 +5929,7 @@ export default function ExecutiveDashboard() {
                           </div>
 
                           <div className="text-slate-800 font-semibold text-xs leading-normal">
-                            {parsed.shippingMethod || "Giao hàng tiêu chuẩn toàn quốc (Viettel Post)"}
+                            {parsed.shippingMethod || "Giao hàng tiêu chuẩn toàn quốc"}
                           </div>
 
                           {parsed.deliveryTimeSlot && (
@@ -7050,6 +7054,37 @@ export default function ExecutiveDashboard() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Modal: Xem ảnh bill phóng to */}
+      {previewProofModalUrl && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPreviewProofModalUrl(null)}
+        >
+          <div 
+            className="relative max-w-lg w-full max-h-[85vh] bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-3 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+              <span className="text-xs font-bold text-slate-900">Ảnh xác nhận chuyển khoản (Bill chuyển tiền)</span>
+              <button
+                type="button"
+                onClick={() => setPreviewProofModalUrl(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-4 overflow-auto flex items-center justify-center bg-slate-900/5 min-h-[250px]">
+              <img
+                src={previewProofModalUrl}
+                alt="Bill xác nhận chuyển khoản"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-xs"
+              />
+            </div>
           </div>
         </div>
       )}

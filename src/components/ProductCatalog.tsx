@@ -161,6 +161,7 @@ export default function ProductCatalog() {
   const [activeProduct, setActiveProduct] = useState<Product | null>(null);
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedQty, setSelectedQty] = useState<number>(1);
 
   // Toast feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -476,7 +477,7 @@ export default function ProductCatalog() {
     return () => clearTimeout(timer);
   }, [searchQuery, filteredProducts.length]);
 
-  const handleOpenProduct = (product: Product) => {
+  const handleOpenProduct = (product: Product, preselectedSize?: string) => {
     if (searchQuery.trim() && searchStartTimeRef.current) {
       const duration = Number(((Date.now() - searchStartTimeRef.current) / 1000).toFixed(1));
       fetch('/api/analytics', {
@@ -494,11 +495,42 @@ export default function ProductCatalog() {
     }
 
     setActiveProduct(product);
+    setSelectedQty(1);
     if (product.variants.length > 0) {
-      setSelectedColor(product.variants[0].color);
-      setSelectedSize(product.variants[0].size);
+      if (preselectedSize) {
+        const matched = product.variants.find((v) => v.size === preselectedSize) || product.variants[0];
+        setSelectedColor(matched.color);
+        setSelectedSize(matched.size);
+      } else {
+        setSelectedColor(product.variants[0].color);
+        setSelectedSize(product.variants[0].size);
+      }
     }
   };
+
+  const handleSelectColor = (color: string) => {
+    setSelectedColor(color);
+    if (!activeProduct) return;
+    const sizesForColor = activeProduct.variants
+      .filter((v) => v.color === color)
+      .map((v) => v.size);
+    if (!sizesForColor.includes(selectedSize)) {
+      setSelectedSize(sizesForColor[0] || '');
+    }
+  };
+
+  const activeProductColors = useMemo(() => {
+    if (!activeProduct) return [];
+    return Array.from(new Set(activeProduct.variants.map((v) => v.color))).filter(Boolean);
+  }, [activeProduct]);
+
+  const activeProductSizes = useMemo(() => {
+    if (!activeProduct) return [];
+    const filteredVariants = selectedColor
+      ? activeProduct.variants.filter((v) => v.color === selectedColor)
+      : activeProduct.variants;
+    return Array.from(new Set(filteredVariants.map((v) => v.size))).filter(Boolean);
+  }, [activeProduct, selectedColor]);
 
   const activeVariant = activeProduct?.variants.find(
     (v) => v.color === selectedColor && v.size === selectedSize
@@ -513,14 +545,19 @@ export default function ProductCatalog() {
 
   // Add to Bag
   const handleAddToBag = () => {
-    if (!activeProduct || !activeVariant) return;
+    if (!activeProduct || !activeVariant) {
+      showToast('⚠️ Vui lòng chọn kích cỡ (Size) phù hợp');
+      return;
+    }
+
+    const qtyToAdd = Math.max(1, selectedQty);
 
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === activeVariant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === activeVariant.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + qtyToAdd }
             : item
         );
       }
@@ -529,55 +566,27 @@ export default function ProductCatalog() {
         {
           variant_id: activeVariant.id,
           product_name: activeProduct.name,
-          product_image: activeProduct.image_url,
+          product_image: getPrimaryImageUrl(activeProduct.image_url),
           sku: activeVariant.sku,
           color: activeVariant.color,
           size: activeVariant.size,
           price: activeVariant.selling_price,
-          quantity: 1,
-          available_qty: 999999,
+          quantity: qtyToAdd,
+          available_qty: activeVariant.available_qty ?? 999999,
         },
       ];
     });
 
-    showToast(`✓ Đã thêm vào giỏ hàng: ${activeProduct.name} (${activeVariant.color} / Size ${activeVariant.size})`);
+    showToast(`✓ Đã thêm vào giỏ hàng: ${activeProduct.name} (${activeVariant.color} / Size ${activeVariant.size}) x${qtyToAdd}`);
     setActiveProduct(null);
+    setSelectedQty(1);
   };
 
-  // Quick Add to Cart from product cards
-  const handleQuickAddToCart = (e: React.MouseEvent, product: Product) => {
+  // Quick Add to Cart from product cards - open popup to select size & quantity
+  const handleQuickAddToCart = (e: React.MouseEvent, product: Product, preselectedSize?: string) => {
     e.preventDefault();
     e.stopPropagation();
-
-    const variant = product.variants[0];
-    if (!variant) return;
-
-    setCart((prev) => {
-      const existing = prev.find((item) => item.variant_id === variant.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.variant_id === variant.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          variant_id: variant.id,
-          product_name: product.name,
-          product_image: getPrimaryImageUrl(product.image_url),
-          sku: variant.sku,
-          color: variant.color,
-          size: variant.size,
-          price: variant.selling_price,
-          quantity: 1,
-          available_qty: 999999,
-        },
-      ];
-    });
-
-    showToast(`✓ Đã thêm vào giỏ hàng: ${product.name} (Size ${variant.size})`);
+    handleOpenProduct(product, preselectedSize);
   };
 
   const handleUpdateQty = (variantId: string, delta: number) => {
@@ -1547,12 +1556,15 @@ export default function ProductCatalog() {
                           {/* Sizes Preview */}
                           <div className="flex items-center gap-1 pt-1.5 min-h-[26px]">
                             {uniqueSizes.map((sz) => (
-                              <span
+                              <button
                                 key={sz}
-                                className="text-[10px] font-mono uppercase border hairline px-1.5 py-0.5 text-[#0a0a0a]/70"
+                                type="button"
+                                onClick={(e) => handleQuickAddToCart(e, product, sz)}
+                                className="text-[10px] font-mono uppercase border hairline px-1.5 py-0.5 text-[#0a0a0a]/70 hover:border-black hover:text-black hover:bg-black/5 transition-all cursor-pointer"
+                                title={`Chọn Size ${sz}`}
                               >
                                 {sz}
-                              </span>
+                              </button>
                             ))}
                           </div>
                         </div>
@@ -2161,6 +2173,204 @@ export default function ProductCatalog() {
           </div>
         </div>
       </footer>
+
+      {/* ================= POPUP CHỌN SIZE & SỐ LƯỢNG TRƯỚC KHI THÊM VÀO GIỎ ================= */}
+      {activeProduct && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setActiveProduct(null)}
+        >
+          <div 
+            className="bg-white border hairline max-w-lg w-full p-5 sm:p-6 space-y-4 shadow-2xl relative animate-in zoom-in-95 duration-150 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header: Title & Close button */}
+            <div className="flex items-start justify-between pb-3 border-b hairline">
+              <div>
+                <span className="text-[10px] font-mono tracking-widest uppercase text-[#0a0a0a]/50 block">
+                  {activeProduct.category || 'Tùy chọn sản phẩm'}
+                </span>
+                <h3 className="font-wide uppercase text-sm sm:text-base font-bold text-[#0a0a0a] mt-0.5 line-clamp-1">
+                  {activeProduct.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveProduct(null)}
+                className="p-1 text-[#0a0a0a]/60 hover:text-black transition-colors cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Product Summary Row */}
+            <div className="flex items-center gap-3.5 bg-slate-50 p-3 border hairline">
+              <div className="w-16 h-20 bg-white border hairline overflow-hidden shrink-0 relative">
+                <img
+                  src={getPrimaryImageUrl(activeProduct.image_url)}
+                  alt={activeProduct.name}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="flex-1 min-w-0 space-y-1">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-base sm:text-lg font-mono font-bold text-[#0a0a0a]">
+                    {activeVariant ? formatMoney(activeVariant.selling_price) : (
+                      activeProduct.variants.length > 0 ? formatMoney(Math.min(...activeProduct.variants.map((v) => v.selling_price))) : '---'
+                    )}
+                  </span>
+                </div>
+                {activeVariant ? (
+                  <div className="text-[11px] font-mono text-[#0a0a0a]/70">
+                    Đang chọn: <span className="font-bold text-black">{activeVariant.color} / Size {activeVariant.size}</span>
+                  </div>
+                ) : (
+                  <div className="text-[11px] font-mono text-amber-600">
+                    Vui lòng chọn Size & Màu sắc
+                  </div>
+                )}
+                <div className="text-[10px] font-mono text-[#0a0a0a]/50">
+                  {activeVariant?.sku ? `Mã SKU: ${activeVariant.sku}` : `${activeProduct.variants.length} quy cách`}
+                </div>
+              </div>
+            </div>
+
+            {/* Colors Selection (nếu có màu) */}
+            {activeProductColors.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs font-mono uppercase">
+                  <span className="text-[#0a0a0a]/70 font-medium">Màu sắc:</span>
+                  <span className="font-bold text-black">{selectedColor}</span>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {activeProductColors.map((color) => {
+                    const isSelected = selectedColor === color;
+                    return (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => handleSelectColor(color)}
+                        className={`px-3 py-1.5 text-xs font-mono border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-[#0a0a0a] text-white border-black font-bold shadow-xs'
+                            : 'bg-white text-[#0a0a0a] border-slate-200 hover:border-black'
+                        }`}
+                      >
+                        {color}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Sizes Selection (chọn size gì) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs font-mono uppercase">
+                <span className="text-[#0a0a0a]/70 font-medium">Kích cỡ (Size):</span>
+                <span className="font-bold text-black">Size {selectedSize || 'Chưa chọn'}</span>
+              </div>
+              <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                {activeProductSizes.map((size) => {
+                  const isSelected = selectedSize === size;
+                  return (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => setSelectedSize(size)}
+                      className={`h-10 text-xs font-mono border transition-all flex items-center justify-center cursor-pointer ${
+                        isSelected
+                          ? 'bg-[#0a0a0a] text-white border-black font-bold shadow-xs ring-1 ring-black'
+                          : 'bg-white text-[#0a0a0a] border-slate-200 hover:border-black hover:bg-slate-50'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Gợi ý size trực quan theo size đang chọn */}
+              <div className="p-2.5 bg-slate-50 border hairline text-[11px] font-mono text-slate-600 flex items-center justify-between">
+                <span>
+                  <strong>Size {selectedSize || '---'}</strong>:{' '}
+                  {selectedSize === 'S' && '1m55 - 1m65 • 48 - 55 kg'}
+                  {selectedSize === 'M' && '1m65 - 1m72 • 55 - 65 kg'}
+                  {selectedSize === 'L' && '1m70 - 1m78 • 65 - 75 kg'}
+                  {selectedSize === 'XL' && '1m75 - 1m85 • 75 - 85 kg'}
+                  {selectedSize === 'XXL' && '1m80 - 1m92 • 85 - 95 kg'}
+                  {!['S', 'M', 'L', 'XL', 'XXL'].includes(selectedSize) && 'Form chuẩn thương hiệu DE\'GENT'}
+                </span>
+                <Link
+                  href={`/products/${activeProduct.id}`}
+                  className="text-black font-bold hover:underline shrink-0 ml-2"
+                  title="Xem trang chi tiết sản phẩm"
+                >
+                  Chi tiết &rarr;
+                </Link>
+              </div>
+            </div>
+
+            {/* Quantity Stepper (số lượng bao nhiêu) */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between text-xs font-mono uppercase">
+                <span className="text-[#0a0a0a]/70 font-medium">Số lượng mua:</span>
+                <div className="flex items-center border hairline bg-white">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQty((prev) => Math.max(1, prev - 1))}
+                    disabled={selectedQty <= 1}
+                    className="w-8 h-8 flex items-center justify-center text-sm hover:bg-slate-100 font-mono cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                  >
+                    -
+                  </button>
+                  <span className="w-10 text-center text-xs font-mono font-bold select-none">
+                    {selectedQty}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedQty((prev) => prev + 1)}
+                    className="w-8 h-8 flex items-center justify-center text-sm hover:bg-slate-100 font-mono cursor-pointer select-none"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Total amount summary & Action button */}
+            <div className="pt-2 border-t hairline space-y-2.5">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-slate-500 uppercase">Tạm tính ({selectedQty} sản phẩm):</span>
+                <span className="text-sm font-bold text-black font-mono">
+                  {formatMoney((activeVariant ? activeVariant.selling_price : 0) * selectedQty)}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setActiveProduct(null)}
+                  className="py-3 px-4 border hairline text-xs font-mono uppercase tracking-wider text-[#0a0a0a] hover:bg-slate-100 transition-colors cursor-pointer text-center"
+                >
+                  Đóng
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddToBag}
+                  disabled={!activeVariant}
+                  className="py-3 px-4 bg-[#0a0a0a] text-white text-xs font-mono uppercase tracking-wider hover:bg-black/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-md font-bold"
+                >
+                  <ShoppingBag className="w-3.5 h-3.5" />
+                  <span>Xác nhận thêm</span>
+                </button>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
 
       {/* ================= USER PROFILE MODAL ================= */}
       <UserProfileModal

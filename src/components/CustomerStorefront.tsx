@@ -209,6 +209,7 @@ export default function CustomerStorefront() {
   const [quickViewImageIndex, setQuickViewImageIndex] = useState<number>(0);
   const [selectedColor, setSelectedColor] = useState<string>('');
   const [selectedSize, setSelectedSize] = useState<string>('');
+  const [selectedQty, setSelectedQty] = useState<number>(1);
 
   // Checkout State
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -355,12 +356,19 @@ export default function CustomerStorefront() {
   };
 
   // Open product drawer/modal
-  const handleSelectProduct = (product: Product) => {
+  const handleSelectProduct = (product: Product, preselectedSize?: string) => {
     setActiveProduct(product);
     setQuickViewImageIndex(0);
+    setSelectedQty(1);
     if (product.variants.length > 0) {
-      setSelectedColor(product.variants[0].color);
-      setSelectedSize(product.variants[0].size);
+      if (preselectedSize) {
+        const matched = product.variants.find((v) => v.size === preselectedSize) || product.variants[0];
+        setSelectedColor(matched.color);
+        setSelectedSize(matched.size);
+      } else {
+        setSelectedColor(product.variants[0].color);
+        setSelectedSize(product.variants[0].size);
+      }
     }
   };
 
@@ -375,12 +383,14 @@ export default function CustomerStorefront() {
   const handleAddToBag = () => {
     if (!activeProduct || !activeVariant) return;
 
+    const qtyToAdd = Math.max(1, selectedQty);
+
     setCart((prev) => {
       const existing = prev.find((item) => item.variant_id === activeVariant.id);
       if (existing) {
         return prev.map((item) =>
           item.variant_id === activeVariant.id
-            ? { ...item, quantity: item.quantity + 1 }
+            ? { ...item, quantity: item.quantity + qtyToAdd }
             : item
         );
       }
@@ -394,49 +404,22 @@ export default function CustomerStorefront() {
           color: activeVariant.color,
           size: activeVariant.size,
           price: activeVariant.selling_price,
-          quantity: 1,
+          quantity: qtyToAdd,
           available_qty: 999999,
         },
       ];
     });
 
+    showToast(`✓ Đã thêm vào giỏ hàng: ${activeProduct.name} (${activeVariant.color} / Size ${activeVariant.size}) x${qtyToAdd}`);
     setActiveProduct(null);
+    setSelectedQty(1);
   };
 
-  // Quick Add to Bag from product cards
-  const handleQuickAddToCart = (e: React.MouseEvent, product: Product) => {
+  // Quick Add to Bag from product cards - opens quick view modal to select size & quantity
+  const handleQuickAddToCart = (e: React.MouseEvent, product: Product, preselectedSize?: string) => {
     e.preventDefault();
     e.stopPropagation();
-
-    const variant = product.variants[0];
-    if (!variant) return;
-
-    setCart((prev) => {
-      const existing = prev.find((item) => item.variant_id === variant.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.variant_id === variant.id
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [
-        ...prev,
-        {
-          variant_id: variant.id,
-          product_name: product.name,
-          product_image: getPrimaryImageUrl(product.image_url),
-          sku: variant.sku,
-          color: variant.color,
-          size: variant.size,
-          price: variant.selling_price,
-          quantity: 1,
-          available_qty: 999999,
-        },
-      ];
-    });
-
-    showToast(`Đã thêm "${product.name}" (Size ${variant.size}) vào giỏ hàng.`);
+    handleSelectProduct(product, preselectedSize);
   };
 
   // Update Cart Quantity
@@ -1564,13 +1547,38 @@ export default function CustomerStorefront() {
                   </div>
                 </div>
 
+                {/* Quantity Stepper */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="flex items-center justify-between text-xs font-mono uppercase">
+                    <span className="text-[#0a0a0a]/70 font-medium">Số lượng mua:</span>
+                    <div className="flex items-center border hairline bg-white">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQty((prev) => Math.max(1, prev - 1))}
+                        disabled={selectedQty <= 1}
+                        className="w-8 h-8 flex items-center justify-center text-sm hover:bg-slate-100 font-mono cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                      >
+                        -
+                      </button>
+                      <span className="w-10 text-center text-xs font-mono font-bold select-none">{selectedQty}</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedQty((prev) => prev + 1)}
+                        className="w-8 h-8 flex items-center justify-center text-sm hover:bg-slate-100 font-mono cursor-pointer select-none"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Add to Bag Action */}
                 <button
                   onClick={handleAddToBag}
                   disabled={!activeVariant}
-                  className="w-full py-3.5 bg-[#0a0a0a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black/80 disabled:bg-black/10 disabled:text-black/30 transition-colors"
+                  className="w-full py-3.5 bg-[#0a0a0a] text-white text-[11px] tracking-wide-2 uppercase font-medium hover:bg-black/80 disabled:bg-black/10 disabled:text-black/30 transition-colors cursor-pointer font-bold"
                 >
-                  {activeVariant ? 'Thêm vào giỏ hàng' : 'Chọn quy cách'}
+                  {activeVariant ? `Thêm vào giỏ hàng • ${formatMoney(activeVariant.selling_price * selectedQty)}` : 'Chọn quy cách'}
                 </button>
               </div>
             </div>

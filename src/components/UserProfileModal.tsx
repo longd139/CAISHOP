@@ -147,36 +147,52 @@ export function UserProfileModal({
   const cartSubtotal = cart.reduce((sum, item) => sum + item.price * item.quantity, 0);
 
   // Tabs lọc đơn hàng: đã xác nhận, đang giao, đã giao, hoàn đổi
-  type OrderSubTab = 'all' | 'confirmed' | 'delivering' | 'delivered' | 'returned';
+  type OrderSubTab = 'all' | 'confirmed' | 'delivering' | 'delivered' | 'returned' | 'cancelled';
   const [orderSubTab, setOrderSubTab] = useState<OrderSubTab>('all');
 
-  const getOrderCategory = useCallback((ord: any): 'confirmed' | 'delivering' | 'delivered' | 'returned' => {
+  const getOrderCategory = useCallback((ord: any): 'confirmed' | 'delivering' | 'delivered' | 'returned' | 'cancelled' => {
+    // 1. Đơn Hoàn đổi
     const isReturned = ord.fulfillment_status === 'RETURNED' || 
                        ord.fulfillment_status === 'RETURNING' || 
                        ord.fulfillment_status === 'RETURN_REQUESTED' || 
                        Boolean(ord.return_status);
     if (isReturned) return 'returned';
 
+    // 2. Đơn Hủy (Hủy do hết hàng, hủy do quá hạn thanh toán, hoặc admin/khách hủy)
+    const isCancelled = ord.fulfillment_status === 'CANCELLED';
+    const isRefunded = ord.payment_status === 'REFUNDED';
+    const isOutOfStock = ord.cancel_reason === 'OUT_OF_STOCK' || 
+                         (isCancelled && isRefunded) || 
+                         (ord.cancel_reason || '').toUpperCase() === 'OUT_OF_STOCK' || 
+                         (ord.refund_notes || '').toLowerCase().includes('hết hàng');
+    if (isCancelled || isRefunded || isOutOfStock) return 'cancelled';
+
+    // 3. Đã giao thành công
     const isDelivered = ord.fulfillment_status === 'DELIVERED';
     if (isDelivered) return 'delivered';
 
+    // 4. Đang giao (Đã có mã vận đơn hoặc DISPATCHED)
     const isDispatched = ord.fulfillment_status === 'DISPATCHED' || Boolean(ord.tracking_code);
     if (isDispatched) return 'delivering';
 
+    // 5. Đã xác nhận / Đang chuẩn bị hàng
     return 'confirmed';
   }, []);
 
   const orderCounts = useMemo(() => {
-    const counts = {
+    const counts: Record<OrderSubTab, number> = {
       all: orders.length,
       confirmed: 0,
       delivering: 0,
       delivered: 0,
       returned: 0,
+      cancelled: 0,
     };
     orders.forEach((ord) => {
       const cat = getOrderCategory(ord);
-      counts[cat]++;
+      if (counts[cat] !== undefined) {
+        counts[cat]++;
+      }
     });
     return counts;
   }, [orders, getOrderCategory]);
@@ -398,6 +414,7 @@ export function UserProfileModal({
               { id: 'delivering', label: 'Đang giao', count: orderCounts.delivering },
               { id: 'delivered', label: 'Đã giao', count: orderCounts.delivered },
               { id: 'returned', label: 'Hoàn đổi', count: orderCounts.returned },
+              { id: 'cancelled', label: 'Hủy', count: orderCounts.cancelled },
             ].map((tab) => {
               const isActive = orderSubTab === tab.id;
               return (
@@ -904,7 +921,7 @@ export function UserProfileModal({
                     <p className="text-[11px] text-slate-500">
                       Hiện tại bạn không có đơn hàng nào trong mục{' '}
                       <span className="font-semibold text-slate-700">
-                        {orderSubTab === 'confirmed' ? 'Đã xác nhận' : orderSubTab === 'delivering' ? 'Đang giao' : orderSubTab === 'delivered' ? 'Đã giao' : 'Hoàn đổi'}
+                        {orderSubTab === 'confirmed' ? 'Đã xác nhận' : orderSubTab === 'delivering' ? 'Đang giao' : orderSubTab === 'delivered' ? 'Đã giao' : orderSubTab === 'returned' ? 'Hoàn đổi' : 'Hủy'}
                       </span>.
                     </p>
                   </div>
@@ -959,70 +976,13 @@ export function UserProfileModal({
                             </span>
                           </div>
 
-                          {/* Status Badges */}
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            {/* Bỏ 'Chờ thanh toán' khi shop báo hết hàng hoặc đơn đã hủy */}
-                            {isPaid ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                Đã thanh toán
-                              </span>
-                            ) : (!isOutOfStock && !isCancelled && !isRefunded) ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
-                                Chờ thanh toán
-                              </span>
-                            ) : null}
-
-                            {/* Live 1-hour countdown timer badge (Chỉ áp dụng cho đơn thanh toán online chưa trả tiền, không áp dụng COD và đơn hủy/hết hàng) */}
-                            {!isPaid && !isCancelled && !isOutOfStock && ord.payment_method !== 'cod' && (
-                              <OrderCountdownBadge
-                                createdAt={ord.created_at}
-                                orderId={ord.id}
-                                onExpired={() => fetchOrders(true)}
-                              />
-                            )}
-
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                                isRefunded
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                  : isCancelled
-                                  ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                                  : isExchange
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                                  : isRefund
-                                  ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                                  : isDelivered
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                  : isDispatched
-                                  ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                                  : isConfirming
-                                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                  : isPacking
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-slate-100 text-slate-700 border border-slate-200'
-                              }`}
-                            >
-                              {isOutOfStock
-                                ? (isRefunded ? 'Hết hàng • Đã hoàn tiền' : 'Hết hàng')
-                                : isRefunded
-                                ? 'Đã hoàn tiền'
-                                : isCancelled
-                                ? 'Đã hủy'
-                                : isExchange
-                                ? 'Đang đổi hàng'
-                                : isRefund
-                                ? 'Đang trả hàng'
-                                : isDelivered
-                                ? 'Đã nhận'
-                                : isDispatched
-                                ? 'Đang vận chuyển'
-                                : isConfirming
-                                ? 'Chờ shop xác nhận'
-                                : isPacking
-                                ? 'Chờ vận chuyển'
-                                : 'Chưa xử lý'}
-                            </span>
-                          </div>
+                          {!isPaid && !isCancelled && !isOutOfStock && ord.payment_method !== 'cod' && (
+                            <OrderCountdownBadge
+                              createdAt={ord.created_at}
+                              orderId={ord.id}
+                              onExpired={() => fetchOrders(true)}
+                            />
+                          )}
                         </div>
 
                         {/* Thông báo hết hàng cho đơn nếu có */}
@@ -1064,6 +1024,39 @@ export function UserProfileModal({
                           </div>
                         )}
 
+                        {/* Thông báo yêu cầu đổi hàng nếu có */}
+                        {isExchange && (
+                          <div className="p-3 rounded-lg bg-amber-50/90 border border-amber-200/90 text-xs space-y-1">
+                            <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                              <RotateCcw className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span>Yêu cầu đổi hàng: Giữ nguyên tag áo và gửi sản phẩm về lại shop</span>
+                            </div>
+                            <p className="text-[11px] text-amber-800 leading-relaxed">
+                              Quý khách vui lòng đóng gói sản phẩm và giữ nguyên tem mác/tag áo. Shipper sẽ liên hệ theo SĐT của bạn để nhận hàng gửi về shop.
+                            </p>
+                            {ord.refund_proof_image && (
+                              <div className="pt-2 border-t border-amber-200/60 flex items-center gap-2.5">
+                                <img
+                                  src={ord.refund_proof_image}
+                                  alt="Ảnh tag áo"
+                                  className="w-10 h-10 object-cover rounded-md border border-amber-300 shadow-2xs cursor-pointer hover:scale-105 transition-transform"
+                                  onClick={() => setSelectedProofImage(ord.refund_proof_image)}
+                                />
+                                <div>
+                                  <span className="text-[11px] font-bold text-amber-950 block">Ảnh tag áo sản phẩm:</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedProofImage(ord.refund_proof_image)}
+                                    className="text-[10px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                                  >
+                                    Xem ảnh tag áo phóng to →
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
                         {/* Order Footer & Actions */}
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-3 flex-wrap">
                           <div className="text-xs">
@@ -1080,7 +1073,7 @@ export function UserProfileModal({
                                 type="button"
                                 disabled={confirmingOrderId === ord.id}
                                 onClick={() => handleConfirmDelivered(ord.id)}
-                                className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
+                                className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95 disabled:opacity-50"
                               >
                                 {confirmingOrderId === ord.id ? (
                                    <>
@@ -1120,10 +1113,9 @@ export function UserProfileModal({
                             <button
                               type="button"
                               onClick={() => setSelectedDetailOrder(ord)}
-                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-medium transition-colors inline-flex items-center gap-1 cursor-pointer"
+                              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-xs font-medium transition-colors cursor-pointer"
                             >
-                              <span>Chi tiết đơn</span>
-                              <ArrowRight className="w-3 h-3 text-slate-500" />
+                              Chi tiết
                             </button>
                           </div>
                         </div>
@@ -1248,46 +1240,13 @@ export function UserProfileModal({
 
               {/* Body */}
               <div className="p-5 overflow-y-auto space-y-4 text-xs">
-                {/* Trạng thái đơn hàng */}
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-3 flex-wrap">
-                  <div className="flex items-center gap-2">
-                    <span className="text-slate-500 font-medium">Tiến trình đơn:</span>
-                    <span
-                      className={`px-2.5 py-0.5 rounded text-[11px] font-bold ${
-                        isCancelled
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : isExchange
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                          : isRefund
-                          ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                          : isDelivered
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                          : isDispatched
-                          ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                          : isPacking
-                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                          : 'bg-slate-200/80 text-slate-700 border border-slate-300'
-                      }`}
-                    >
-                      {isOutOfStock
-                        ? (isRefunded ? 'Hết hàng • Đã hoàn tiền' : 'Hết hàng')
-                        : isCancelled
-                        ? 'Đã hủy'
-                        : isExchange
-                        ? 'Đang đổi hàng'
-                        : isRefund
-                        ? 'Đang trả hàng'
-                        : isDelivered
-                        ? 'Đã nhận hàng'
-                        : isDispatched
-                        ? 'Đang vận chuyển'
-                        : isPacking
-                        ? 'Chờ vận chuyển'
-                        : 'Chưa xử lý'}
-                    </span>
-                  </div>
-
-                  {!isPaid && !isCancelled && det.payment_method !== 'cod' && (
+                {/* Nhắc nhở đếm ngược giữ đơn khi chưa thanh toán */}
+                {!isPaid && !isCancelled && det.payment_method !== 'cod' && (
+                  <div className="p-3 rounded-xl bg-amber-50 border border-amber-200/90 flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-2 text-amber-900 font-semibold text-xs">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>Thời gian giữ đơn hàng:</span>
+                    </div>
                     <OrderCountdownBadge
                       createdAt={det.created_at}
                       orderId={det.id}
@@ -1296,8 +1255,8 @@ export function UserProfileModal({
                         setSelectedDetailOrder(null);
                       }}
                     />
-                  )}
-                </div>
+                  </div>
+                )}
 
                 {/* ⚠️ Thông báo Hết hàng & Hoàn tiền cho Khách */}
                 {isOutOfStock && (
@@ -1336,22 +1295,49 @@ export function UserProfileModal({
                         </div>
                       </div>
                     )}
-                    <div className="flex items-center gap-2 pt-1 flex-wrap">
-                      <a
-                        href="https://zalo.me/0903112233"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs transition-all shadow-2xs"
-                      >
-                        <span>Chat Zalo với Shop (Đổi mẫu khác)</span>
-                      </a>
-                      <a
-                        href="tel:0903112233"
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-800 border border-slate-300 font-medium text-xs transition-all"
-                      >
-                        <span>Hotline: 0903.112.233</span>
-                      </a>
+                  </div>
+                )}
+
+                {/* 🔄 Thông báo Yêu Cầu Đổi Hàng */}
+                {isExchange && (
+                  <div className="p-4 rounded-xl bg-amber-50/90 border border-amber-200 space-y-2.5">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-xs sm:text-sm">
+                      <RotateCcw className="w-4 h-4 text-amber-700 shrink-0" />
+                      <span>THÔNG BÁO TỪ SHOP: YÊU CẦU ĐỔI HÀNG</span>
                     </div>
+                    <p className="text-xs text-amber-800 leading-relaxed">
+                      Quý khách vui lòng <strong>giữ nguyên tag áo/tem mác</strong> còn nguyên vẹn trên sản phẩm và đóng gói cẩn thận để gửi về lại cho shop. Bưu tá DE&apos;GENT sẽ liên hệ đến lấy hàng theo địa chỉ của bạn.
+                    </p>
+                    {det.return_notes && (
+                      <div className="text-xs text-amber-950 bg-white/90 p-2.5 rounded-lg border border-amber-200 font-medium">
+                        💬 <strong>Chi tiết yêu cầu:</strong> {det.return_notes}
+                      </div>
+                    )}
+
+                    {det.refund_proof_image && (
+                      <div className="p-3 bg-white/95 rounded-xl border border-amber-200/90 flex items-center gap-3">
+                        <img
+                          src={det.refund_proof_image}
+                          alt="Ảnh tag áo sản phẩm"
+                          className="w-14 h-14 object-cover rounded-lg border border-slate-300 shadow-xs cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => setSelectedProofImage(det.refund_proof_image)}
+                          title="Bấm để xem ảnh phóng to"
+                        />
+                        <div>
+                          <span className="text-xs font-bold text-slate-900 block">Ảnh tag áo đã chụp gửi kèm:</span>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedProofImage(det.refund_proof_image)}
+                            className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                          >
+                            Bấm xem ảnh tag áo phóng to →
+                          </button>
+                          <span className="text-[10px] text-amber-700 block mt-0.5 font-medium">
+                            Giữ nguyên tag áo khi gửi sản phẩm về lại shop
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1359,21 +1345,46 @@ export function UserProfileModal({
                 <div className="p-3.5 bg-slate-50/80 border border-slate-200/90 rounded-xl space-y-2.5">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
-                      {det.carrier === 'VIETTEL_POST' || !det.carrier ? (
-                        <img
-                          src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
-                          onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
-                          alt="Viettel Post"
-                          className="w-5 h-5 rounded object-cover shadow-2xs border border-red-200 shrink-0"
-                        />
+                      {det.tracking_code ? (
+                        <>
+                          {det.carrier === 'VIETTEL_POST' ? (
+                            <img
+                              src="https://inkythuatso.com/uploads/thumbnails/800/2023/05/logo-viettelpost-inkythuatso-27-14-52-01.jpg"
+                              onError={(e) => { (e.currentTarget as HTMLImageElement).src = 'https://res.cloudinary.com/tkfku9hx/image/upload/v1792863870/degent/viettelpost-logo.jpg'; }}
+                              alt="Viettel Post"
+                              className="w-5 h-5 rounded object-cover shadow-2xs border border-red-200 shrink-0"
+                            />
+                          ) : det.carrier === 'SHIPPER' ? (
+                            <div className="w-5 h-5 rounded bg-blue-600 text-white flex items-center justify-center shrink-0">
+                              <Truck className="w-3.5 h-3.5" />
+                            </div>
+                          ) : (
+                            <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
+                              <Truck className="w-3.5 h-3.5" />
+                            </div>
+                          )}
+                          <span className="text-xs font-bold text-slate-900">
+                            {det.carrier === 'GHTK'
+                              ? 'Giao Hàng Tiết Kiệm (GHTK)'
+                              : det.carrier === 'GHN'
+                              ? 'Giao Hàng Nhanh (GHN)'
+                              : det.carrier === 'SHIPPER'
+                              ? "Shipper riêng DE'GENT"
+                              : det.carrier === 'VIETTEL_POST'
+                              ? 'Viettel Post'
+                              : det.carrier || 'Đơn vị vận chuyển'}
+                          </span>
+                        </>
                       ) : (
-                        <div className="w-5 h-5 rounded bg-emerald-600 text-white flex items-center justify-center shrink-0">
-                          <Truck className="w-3.5 h-3.5" />
-                        </div>
+                        <>
+                          <div className="w-5 h-5 rounded bg-slate-900 text-white flex items-center justify-center shrink-0">
+                            <Truck className="w-3.5 h-3.5" />
+                          </div>
+                          <span className="text-xs font-bold text-slate-900">
+                            Đơn vị vận chuyển (Đang sắp xếp)
+                          </span>
+                        </>
                       )}
-                      <span className="text-xs font-bold text-slate-900">
-                        {det.carrier === 'GHTK' ? 'Giao Hàng Tiết Kiệm (GHTK)' : det.carrier === 'GHN' ? 'Giao Hàng Nhanh (GHN)' : det.carrier === 'SHIPPER' ? 'Shipper riêng DE\'GENT' : 'Viettel Post'}
-                      </span>
                     </div>
 
                     {det.tracking_code ? (
@@ -1415,19 +1426,25 @@ export function UserProfileModal({
                           <Copy className="w-3 h-3" />
                           <span>Sao chép</span>
                         </button>
-                        <a
-                          href={
-                            det.carrier === 'GHTK' ? `https://i.ghtk.vn/${det.tracking_code}` :
-                            det.carrier === 'GHN' ? `https://tracking.ghn.vn/?order_code=${det.tracking_code}` :
-                            `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${det.tracking_code}`
-                          }
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-[11px] font-semibold text-red-700 hover:text-red-900 bg-white px-2 py-1 rounded border border-red-200 shadow-2xs hover:bg-red-50 transition-colors flex items-center gap-1"
-                        >
-                          <span>Tra cứu bưu gửi</span>
-                          <ExternalLink className="w-3 h-3 text-red-500" />
-                        </a>
+                        {det.carrier === 'SHIPPER' ? (
+                          <span className="text-[11px] font-medium text-slate-600 bg-white px-2 py-1 rounded border border-slate-200">
+                            Giao trực tiếp
+                          </span>
+                        ) : (
+                          <a
+                            href={
+                              det.carrier === 'GHTK' ? `https://i.ghtk.vn/${det.tracking_code}` :
+                              det.carrier === 'GHN' ? `https://tracking.ghn.vn/?order_code=${det.tracking_code}` :
+                              `https://viettelpost.vn/tra-cuu-hanh-trinh-don-hang?id=${det.tracking_code}`
+                            }
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-[11px] font-semibold text-red-700 hover:text-red-900 bg-white px-2 py-1 rounded border border-red-200 shadow-2xs hover:bg-red-50 transition-colors flex items-center gap-1"
+                          >
+                            <span>Tra cứu bưu gửi</span>
+                            <ExternalLink className="w-3 h-3 text-red-500" />
+                          </a>
+                        )}
                       </div>
                     </div>
                   ) : (
@@ -1464,31 +1481,236 @@ export function UserProfileModal({
                     Sản phẩm đã đặt ({Array.isArray(det.items) ? det.items.length : 0})
                   </span>
                   <div className="border border-slate-200 rounded-xl divide-y divide-slate-100 overflow-hidden bg-white">
-                    {Array.isArray(det.items) && det.items.map((it: any) => (
-                      <div key={it.id} className="p-3 flex items-center gap-3">
-                        <img
-                          src={getPrimaryImageUrl(it.product_images)}
-                          alt={it.product_name}
-                          className="w-12 h-14 object-cover rounded border border-slate-200 shrink-0"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-slate-900 truncate">
-                            {it.product_name}
+                    {Array.isArray(det.items) && det.items.map((it: any) => {
+                      const notesLower = (det.refund_notes || '').toLowerCase();
+                      const itNameLower = (it.product_name || '').toLowerCase();
+                      const itSizeLower = (it.size || '').toLowerCase();
+                      const isItemOutOfStock = Boolean(
+                        notesLower && (
+                          (notesLower.includes(itNameLower) && (!it.size || notesLower.includes(itSizeLower))) ||
+                          notesLower.includes('hết hàng toàn bộ') ||
+                          (isOutOfStock && !isPacking && !isDispatched && !isDelivered)
+                        )
+                      );
+                      const isItemGrayedOut = isItemOutOfStock && (isDispatched || isDelivered || isPacking);
+
+                      return (
+                        <div
+                          key={it.id}
+                          className={`p-3 flex items-center gap-3 transition-colors ${
+                            isItemGrayedOut ? 'bg-slate-50/80 opacity-60' : ''
+                          }`}
+                        >
+                          <img
+                            src={getPrimaryImageUrl(it.product_images)}
+                            alt={it.product_name}
+                            className={`w-12 h-14 object-cover rounded border border-slate-200 shrink-0 ${
+                              isItemGrayedOut ? 'grayscale contrast-75' : ''
+                            }`}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className={`font-semibold truncate ${isItemGrayedOut ? 'text-slate-500 line-through' : 'text-slate-900'}`}>
+                                {it.product_name}
+                              </span>
+                              {isItemOutOfStock && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
+                                  Hết hàng (Đã hoàn tiền)
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 mt-0.5">
+                              {it.color} / Size {it.size} × {it.quantity}
+                            </div>
+                            <div className="text-[11px] text-slate-400 mt-0.5">
+                              Đơn giá: {formatMoney(it.unit_price)}
+                            </div>
                           </div>
-                          <div className="text-[11px] text-slate-500 mt-0.5">
-                            {it.color} / Size {it.size} × {it.quantity}
-                          </div>
-                          <div className="text-[11px] text-slate-400 mt-0.5">
-                            Đơn giá: {formatMoney(it.unit_price)}
+                          <div className={`font-bold tabular-nums text-right ${isItemGrayedOut ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                            {formatMoney(it.total_price || (it.unit_price * it.quantity))}
                           </div>
                         </div>
-                        <div className="font-bold text-slate-900 tabular-nums text-right">
-                          {formatMoney(it.total_price || (it.unit_price * it.quantity))}
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
+
+                {/* 🕒 Lịch sử trạng thái của đơn hàng */}
+                {(() => {
+                  const formatEventTime = (d?: string | null) => {
+                    if (!d) return '';
+                    try {
+                      return new Date(d).toLocaleDateString('vi-VN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                      });
+                    } catch {
+                      return '';
+                    }
+                  };
+
+                  const carrierName = det.carrier === 'GHTK' ? 'GHTK' : det.carrier === 'GHN' ? 'GHN' : det.carrier === 'SHIPPER' ? "Shipper riêng DE'GENT" : det.carrier === 'VIETTEL_POST' ? 'Viettel Post' : det.carrier || 'Đơn vị vận chuyển';
+
+                  const timeline: Array<{
+                    title: string;
+                    time?: string;
+                    desc: string;
+                    state: 'done' | 'current';
+                  }> = [];
+
+                  // Mốc 1: Đặt hàng thành công (luôn có)
+                  timeline.push({
+                    title: 'Đặt hàng thành công',
+                    time: formatEventTime(det.created_at),
+                    desc: `Đơn hàng #${det.order_code} đã được tạo thành công trên hệ thống.`,
+                    state: 'done',
+                  });
+
+                  // Mốc 2: Thanh toán
+                  if (isPaid) {
+                    timeline.push({
+                      title: 'Đã thanh toán',
+                      desc: `Đã hoàn tất thanh toán ${formatMoney(det.total_amount)} qua VietQR.`,
+                      state: 'done',
+                    });
+                  } else if (det.payment_method === 'cod') {
+                    timeline.push({
+                      title: 'Phương thức thanh toán COD',
+                      desc: `Khách thanh toán ${formatMoney(det.total_amount)} khi nhận hàng.`,
+                      state: isDelivered ? 'done' : 'current',
+                    });
+                  } else if (!isCancelled && !isRefunded) {
+                    timeline.push({
+                      title: 'Chờ thanh toán',
+                      desc: `Đang chờ quý khách chuyển khoản thanh toán ${formatMoney(det.total_amount)}.`,
+                      state: 'current',
+                    });
+                  }
+
+                  // Mốc 3: Sản phẩm hết hàng tại kho (nằm ở TRÊN trước khâu đóng gói & bàn giao DVVC)
+                  const hasOutOfStock = isOutOfStock || isRefunded || (det.refund_notes && det.refund_notes.toLowerCase().includes('hết hàng'));
+                  if (hasOutOfStock) {
+                    // Khi chuyển sang bàn giao cho DVVC (isDispatched) hoặc đã giao (isDelivered):
+                    // mốc hết hàng này sẽ thành màu xám (state: 'done')
+                    const isOutOfStockDone = isDispatched || isDelivered;
+                    timeline.push({
+                      title: isRefunded ? 'Đã hoàn tiền về tài khoản' : 'Sản phẩm hết hàng tại kho',
+                      desc: det.refund_notes || `Cửa hàng đã hoàn lại 100% tiền (${formatMoney(det.total_amount)}) về tài khoản ngân hàng của bạn.`,
+                      state: isOutOfStockDone ? 'done' : 'current',
+                    });
+                  }
+
+                  // Mốc 4: Xác nhận & Đóng gói (nếu đơn không bị hủy hoàn toàn do hết hàng)
+                  if (!isCancelled && !(isOutOfStock && !isPacking && !isDispatched && !isDelivered)) {
+                    if (isConfirming) {
+                      timeline.push({
+                        title: 'Chờ shop xác nhận còn hàng',
+                        desc: "DE'GENT đang kiểm tra số lượng tồn kho và chuẩn bị sản phẩm.",
+                        state: 'current',
+                      });
+                    } else if (isPacking) {
+                      timeline.push({
+                        title: 'Đang chuẩn bị đóng gói',
+                        desc: hasOutOfStock
+                          ? "DE'GENT đang tiến hành đóng gói các sản phẩm còn lại trong đơn hàng."
+                          : "DE'GENT đã xác nhận còn hàng và đang tiến hành đóng gói kiện hàng.",
+                        state: isDispatched || isDelivered ? 'done' : 'current',
+                      });
+                    } else if (isDispatched || isDelivered) {
+                      timeline.push({
+                        title: 'Đã xác nhận & Đóng gói xong',
+                        desc: 'Sản phẩm đã được kiểm tra và đóng gói hoàn tất tại kho.',
+                        state: 'done',
+                      });
+                    }
+                  }
+
+                  // Mốc 5: Bàn giao vận chuyển
+                  if (det.tracking_code || isDispatched) {
+                    timeline.push({
+                      title: 'Đã bàn giao cho đơn vị vận chuyển',
+                      time: formatEventTime(det.shipment_dispatched_at),
+                      desc: `Đơn hàng đã bàn giao cho ${carrierName} (Mã vận đơn: ${det.tracking_code}).`,
+                      state: isDelivered ? 'done' : 'current',
+                    });
+                  }
+
+                  // Mốc 6: Giao hàng thành công
+                  if (isDelivered) {
+                    timeline.push({
+                      title: 'Giao hàng thành công',
+                      time: formatEventTime(det.delivered_at || det.shipment_delivered_at),
+                      desc: 'Kiện hàng đã được giao đến tay người nhận hoàn tất.',
+                      state: 'done',
+                    });
+                  }
+
+                  // Mốc 7: Hủy đơn do nguyên nhân khác (không phải do hết hàng)
+                  if (isCancelled && !hasOutOfStock) {
+                    timeline.push({
+                      title: 'Đơn hàng đã hủy',
+                      desc: det.cancel_reason === 'PAYMENT_EXPIRED' ? 'Đơn hàng tự động hủy do quá hạn thời gian thanh toán.' : 'Đơn hàng đã được xử lý hủy.',
+                      state: 'current',
+                    });
+                  }
+
+                                    if (isReturned) {
+                    timeline.push({
+                      title: isExchange ? 'Yêu cầu đổi hàng (Đã chụp tag áo)' : 'Yêu cầu trả hàng hoàn tiền',
+                      time: formatEventTime(det.return_created_at),
+                      desc: isExchange
+                        ? 'Khách đã gửi yêu cầu đổi hàng (đã chụp tag áo). Quý khách vui lòng gửi sản phẩm về lại shop để tiến hành đổi mới.'
+                        : (det.return_notes || 'Cửa hàng đã tiếp nhận yêu cầu đổi / trả của bạn và đang xử lý.'),
+                      state: 'current',
+                    });
+                  }
+
+                  return (
+                    <div className="p-3.5 rounded-xl border border-slate-200 bg-white space-y-3">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900 pb-2 border-b border-slate-100">
+                        <Clock className="w-3.5 h-3.5 text-slate-700 shrink-0" />
+                        <span>Lịch sử trạng thái đơn hàng</span>
+                      </div>
+
+                      <div className="space-y-3.5 pt-1 pl-1">
+                        {timeline.map((item, idx) => (
+                          <div key={idx} className="flex gap-3 relative">
+                            {idx < timeline.length - 1 && (
+                              <div className="absolute left-[7px] top-[18px] bottom-[-14px] w-[2px] bg-slate-200" />
+                            )}
+                            <div
+                              className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 z-10 ${
+                                item.state === 'current'
+                                  ? 'bg-slate-900 text-white ring-4 ring-slate-100'
+                                  : 'bg-slate-400 text-white'
+                              }`}
+                            >
+                              <div className="w-1.5 h-1.5 rounded-full bg-white" />
+                            </div>
+                            <div className="flex-1 min-w-0 -mt-0.5">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className={`text-xs font-semibold ${item.state === 'current' ? 'text-slate-950 font-bold' : 'text-slate-900'}`}>
+                                  {item.title}
+                                </span>
+                                {item.time && (
+                                  <span className="text-[11px] text-slate-400 font-mono">
+                                    {item.time}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                                {item.desc}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 {/* 💰 Chi tiết thanh toán & Các khoản giảm trừ */}
                 <div className="p-3.5 rounded-xl border border-slate-200 bg-slate-50/70 space-y-2">
@@ -1567,7 +1789,65 @@ export function UserProfileModal({
               </div>
 
               {/* Footer Actions */}
-              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-2 flex-wrap">
+              <div className="p-4 border-t border-slate-200 bg-slate-50 flex items-center justify-end gap-2 flex-wrap">
+                {/* Confirm Delivered inside modal */}
+                {!isDelivered && !isCancelled && !isReturned && (isPaid || det.payment_method === 'cod') && Boolean(det.tracking_code) && (
+                  <button
+                    type="button"
+                    disabled={confirmingOrderId === det.id}
+                    onClick={async () => {
+                      await handleConfirmDelivered(det.id);
+                      setSelectedDetailOrder((prev: any) => prev ? { ...prev, fulfillment_status: 'DELIVERED' } : null);
+                    }}
+                    className="px-3.5 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    {confirmingOrderId === det.id ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang xử lý...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
+                        <span>Đã nhận hàng</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {/* Continue Payment inside modal */}
+                {!isPaid && !isCancelled && !isReturned && (
+                  <button
+                    type="button"
+                    disabled={redirectingOrderId === det.id}
+                    onClick={() => handleContinuePayment(det)}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  >
+                    {redirectingOrderId === det.id ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        <span>Đang mở PayOS...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CreditCard className="w-3.5 h-3.5" />
+                        <span>Tiếp tục thanh toán</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                {isDelivered && !isReturned && (
+                  <button
+                    type="button"
+                    onClick={() => setReturnRequestOrder(det)}
+                    className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                    <span>Yêu cầu đổi / trả hàng</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setSelectedDetailOrder(null)}
@@ -1575,66 +1855,6 @@ export function UserProfileModal({
                 >
                   Đóng
                 </button>
-
-                <div className="flex items-center gap-2">
-                  {/* Confirm Delivered inside modal */}
-                  {!isDelivered && !isCancelled && !isReturned && (isPaid || det.payment_method === 'cod') && Boolean(det.tracking_code) && (
-                    <button
-                      type="button"
-                      disabled={confirmingOrderId === det.id}
-                      onClick={async () => {
-                        await handleConfirmDelivered(det.id);
-                        setSelectedDetailOrder((prev: any) => prev ? { ...prev, fulfillment_status: 'DELIVERED' } : null);
-                      }}
-                      className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                    >
-                      {confirmingOrderId === det.id ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Đang xử lý...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Check className="w-3.5 h-3.5 stroke-[3]" />
-                          <span>Đã nhận hàng</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Continue Payment inside modal */}
-                  {!isPaid && !isCancelled && !isReturned && (
-                    <button
-                      type="button"
-                      disabled={redirectingOrderId === det.id}
-                      onClick={() => handleContinuePayment(det)}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
-                    >
-                      {redirectingOrderId === det.id ? (
-                        <>
-                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          <span>Đang mở PayOS...</span>
-                        </>
-                      ) : (
-                        <>
-                          <CreditCard className="w-3.5 h-3.5" />
-                          <span>Tiếp tục thanh toán</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-
-                  {isDelivered && !isReturned && (
-                    <button
-                      type="button"
-                      onClick={() => setReturnRequestOrder(det)}
-                      className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
-                    >
-                      <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
-                      <span>Yêu cầu đổi / trả hàng</span>
-                    </button>
-                  )}
-                </div>
               </div>
             </div>
           </div>
